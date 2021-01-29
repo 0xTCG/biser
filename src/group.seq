@@ -1,0 +1,274 @@
+from sd2 import *
+from tree2 import *
+from time import *
+
+# this is script for creating distance matrix between all SDs
+
+def getIntTree(path, wgac = True, coordinates = None):
+    dict_int_tree = dict [str,IntervalTree[Interval[SD]]]()
+    
+    sd_l = list[SD]()
+    file1 = open(path, 'r')
+    for i in file1.readlines():
+        line = i.split('\t')
+        # print line
+
+        # first we build interval tree for our SEDEF new hard_masked data (.bed file)
+        if not wgac:
+            if coordinates:
+                if line[0] not in coordinates:
+                    continue
+                sd = SD(line[0],int(line[1]),int(line[2]),line[3],int(line[4]),int(line[5]), '', '',line[8] != line[9])
+                sd_l.append(sd)
+
+                chr1 = line[0]
+                chr2 = line[3]
+                if not chr1 in dict_int_tree:
+                    dict_int_tree[chr1] = IntervalTree[Interval[SD]]()
+                if not chr2 in dict_int_tree:
+                    dict_int_tree[chr2] = IntervalTree[Interval[SD]]()
+                dict_int_tree[chr1][ int(line[1]) : int(line[2]) ]  = Interval[SD]( int(line[4]), int(line[5]) , sd)
+                dict_int_tree[chr2][ int(line[4]) : int(line[5]) ]  = Interval[SD]( int(line[1]), int(line[2]) , sd)
+
+                ovrlp1 = coordinates[line[0]].overlap(float(line[1]),float(line[2]))
+                ovrlp2 = coordinates[line[3]].overlap(float(line[4]),float(line[5]))
+                
+                for i in ovrlp1:
+                    sd.clade.add(i.data)
+
+            if not coordinates: # or ( coordinates[line[0]].overlap(int(line[1]),int(line[2])) or coordinates[line[3]].overlap(int(line[4]),int(line[5])) ):
+                sd = SD(line[0],int(line[1]),int(line[2]),line[3],int(line[4]),int(line[5]), '', '',line[8] != line[9])
+                sd_l.append(sd)
+
+                chr1 = line[0]
+                chr2 = line[3]
+                if not chr1 in dict_int_tree:
+                    dict_int_tree[chr1] = IntervalTree[Interval[SD]]()
+                if not chr2 in dict_int_tree:
+                    dict_int_tree[chr2] = IntervalTree[Interval[SD]]()
+                dict_int_tree[chr1][ int(line[1]) : int(line[2]) ]  = Interval[SD]( int(line[4]), int(line[5]) , sd)
+                dict_int_tree[chr2][ int(line[4]) : int(line[5]) ]  = Interval[SD]( int(line[1]), int(line[2]) , sd)
+        else:
+            # print line
+            if abs(int(line[8]) - int(line[7])) <= 1:
+                continue
+            sd = SD(line[0],int(line[1]),int(line[2]),line[6],int(line[7]),int(line[8]), '', '',line[5] != '+')
+            sd_l.append(sd)
+
+            chr1 = line[0]
+            chr2 = line[6]
+            if not chr1 in dict_int_tree:
+                dict_int_tree[chr1] = IntervalTree[Interval[SD]]()
+            if not chr2 in dict_int_tree:
+                dict_int_tree[chr2] = IntervalTree[Interval[SD]]()
+            dict_int_tree[chr1][ int(line[1]) : int(line[2]) ]  = Interval[SD]( int(line[7]), int(line[8]) , sd)
+            dict_int_tree[chr2][ int(line[7]) : int(line[8]) ]  = Interval[SD]( int(line[1]), int(line[2]) , sd)
+
+    return dict_int_tree, sd_l
+
+def get_min(sd_l, labels):
+    min_value = 99.0
+    min_indexes = (0,0)
+    for i in range(0,len(sd_l)):
+        if labels[i] == -1:
+            continue
+        for j in range(i + 1,len(sd_l)):
+            if i == j or labels[j] == -1:
+                continue
+            # here calculate similarities
+            distance = sd_l[i][j]
+            
+            
+            if distance < min_value:
+                min_value = distance
+                min_indexes = (i,j)
+
+    return min_value, min_indexes
+
+
+def pritn_matrix(matrix):
+    for i in matrix:
+        print (i)
+
+def add_recalculate(sim_matrix, i_, j_, clade_weights, labels):
+    # print (i_, j_), labels[i_], labels[j_]
+    # print f'labele {labels}'
+    # pritn_matrix(sim_matrix)
+    assert labels[i_] != -1 and labels[j_] != -1
+
+    labels[i_] = -1
+    labels[j_] = -1
+    labels.append(len(labels))
+
+    clade_weights.append(clade_weights[i_] + clade_weights[j_])
+
+    for i in range(0, len(sim_matrix)):
+        distance = (clade_weights[i_] * sim_matrix[i_][i] + clade_weights[j_] *  sim_matrix[j_][i]) / (clade_weights[i_] + clade_weights[j_])
+        if labels[i] != -1:
+            sim_matrix[i].append(distance)
+        else:
+            sim_matrix[i].append(2.0)
+    
+    l_h = list[float]()
+    for i in range(0, len(sim_matrix)):
+        l_h.append(sim_matrix[i][-1])
+    l_h.append(-1.0)
+    sim_matrix.append(l_h)
+
+def how_many_neg(labels):
+    count = 0
+    for i in labels:
+        if i == -1:
+            count+=1
+    return count
+
+
+type MergedNode(first: int, second: int, father: int)
+
+def upgma(sim_matrix):
+    merged_nodes = list[MergedNode]()
+    clade_weights = list[int]()
+    labels = list[int]()
+    for i in range(0,len(sim_matrix)):
+        clade_weights.append(1)
+        labels.append(i)
+
+    print 'Done reading, now doing UPGMA:'
+    num_of_nodes = len(sim_matrix)
+    while num_of_nodes > 1:
+        print f'Nodes: {num_of_nodes}'
+        min_val, min_index = get_min(sim_matrix, labels)
+        l_i = min(min_index)
+        m_i = max(min_index)
+        add_recalculate(sim_matrix, l_i, m_i, clade_weights, labels)
+        num_of_nodes-= 1
+        merged_nodes.append(MergedNode(l_i,m_i, labels[-1]))
+
+
+    print merged_nodes
+
+
+
+
+
+def print_matrix(distance_matrix):
+    s = ','
+    for i in range(0,len(distance_matrix)):
+        s += f'{i}'
+        if i != len(distance_matrix) -1:
+            s += f','
+    s+='\n'
+    for i in range(0,len(distance_matrix)):
+        s+=f'{i},'
+        print i
+        for j in range(0,len(distance_matrix)):
+            s+= f'{distance_matrix[i][j]}'
+            if j != len(distance_matrix) - 1:
+                s += f','
+        s+='\n'
+    print s
+    return s
+
+
+
+import sys
+
+
+
+
+
+def group():
+
+    # first create interval tree for SDs
+    path_sds = 'same8/hg19_hg19/final.bed' # 'different8/final_all.bed' #'data/wgac_hard_aligned_2.bed'
+    elementary_path = 'data/cores/out_hg19_new.txt' #'test/final.bed'
+
+    coordinates = ('hg19#chr16', 7615224, 7623073)
+    # print 'Reading SDs:'
+    # dict_int_t, sd_l = getIntTree(path_sds, False, coordinates)
+    distance_matrix = list[list[float]]()
+
+    elem_dict = dict[int, list[tuple[str, int,int, int]]]()
+    # second, assign to each interval its corresponding clades
+    
+    # print 'Reading elementaries:'
+    cores__ = list[int]()
+    cores_dict = dict[int, str]()
+    for i in open(elementary_path,'r'):
+        # after that, we can build similarity matrix based on shared elemetnary sds]
+        line = i.split('\t')
+        if len(line) == 1:
+            line = i.split(' ')
+            cores__.append(int(line[1]))
+            cores_dict[int(line[1])] = i
+            continue
+        # print line
+        clade = int(line[0])
+        chr1 = line[1]
+        start = int(line[2])
+        end = int(line[3])
+        # if clade == 0:
+        #     continue
+        if clade in elem_dict:
+            elem_dict[clade].append((chr1, start, end, clade))
+        else:
+            elem_dict[clade] = [(chr1, start, end, clade)]
+    print f'done reading elementaries {len(cores__)}, {len(elem_dict)}'
+    for_saving = list[int]()
+    for key in elem_dict:
+        for list_elem in elem_dict[key]:
+            # print list_elem, coordinates
+            if list_elem[0][:-1] == coordinates[0]:
+                if  list_elem[1] < coordinates[2] and list_elem[2] > coordinates[1]:
+                    # print list_elem, coordinates
+
+                    for_saving.append(key)
+    for_saving = list[int](set[int](for_saving))
+    for i in for_saving:
+        print i, cores_dict[i]
+    # count = 0
+    # for i in cores_dict:
+    #     print i, cores_dict[i]
+        # if count >10:
+        #     break
+        # count += 1
+    print f'Build for saving keys '
+    sys.exit(1)
+
+    small_int_tree = dict[str,IntervalTree[int]]()
+    for key in for_saving:
+        for list_elem in elem_dict[key]:
+            if list_elem[0] in small_int_tree:
+                small_int_tree[list_elem[0][:-1] ].add(Interval(list_elem[1],list_elem[2],list_elem[3]))
+            else:
+                small_int_tree[list_elem[0][:-1] ] = IntervalTree[int]()
+                small_int_tree[list_elem[0][:-1] ].add(Interval(list_elem[1],list_elem[2],list_elem[3]))
+
+    print 'built small interv tree'
+
+    # now get all SDs that overlap these elementary
+    dict_int_t, sd_l = getIntTree(path_sds, False, small_int_tree)
+    
+    # print small_int_tree
+    
+    min_indexes = (0,0)
+    min_value = -1
+    out = open('output_distances.txt', 'w')
+    # print 'Building matrix:'
+    print f' len of sd_l : {len(sd_l)}'
+    out.write(f'{len(sd_l)}\n')
+    for i in range(0,len(sd_l)):
+        # print i, len(sd_l)
+        distance_matrix.append(list[float]())
+        for j in range(i+1,len(sd_l)):
+            distance = 2.0
+            # here calculate similarities
+            if i != j:
+                distance =  1 - ( len( sd_l[i].clade.intersection(sd_l[j].clade) ) / len( sd_l[i].clade.union( sd_l[j].clade ) ) )
+                if distance != 1:
+                    # print f'{i}\t{j}\t{distance}'
+                    out.write(f'{i}\t{j}\t{distance}\n')
+
+
+with timing('all'):
+    group()

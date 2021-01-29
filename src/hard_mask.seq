@@ -1,0 +1,103 @@
+# from bio.fasta import FASTA
+from pickle import *
+
+
+# This is function for hard-masking genome but with leaving small gaps of N-s (set as difference parameter)
+# constants:
+list_l = set([s'a', s'c', s'g', s't', s'N', s'n'])
+list_u = set([s'A', s'C', s'G', s'T'])
+# list_l = set(['a', 'c', 'g', 't', 'N', 'n'])
+# list_u = set(['A', 'C', 'G', 'T'])
+# changed difference
+difference = 0#50
+def hard_mask(path: str, path_to_hard: str, path_to_dict: str = "search/data/position_conv"):
+    # fr = FASTA(path)
+    position_converter = dict[str,dict[int,int]]()
+    write_f = open(path_to_hard,'w')
+    # write_f = open("test.fa",'w')
+    for i in FASTA(path):
+        # if chr is one of regular ones:
+        # human chr(1-22;X;Y;M)
+        #  == "chr22" or i.name == "chr1"
+        if not '_' in i.name:
+            last_u = 0
+            last_n = 0
+            index_new = 0
+            index_old = 0
+            help_dict = dict[int,int]()
+            # help_dict2 = dict[int,int]()
+
+            write_f.write(f'>{i.name}\n')
+            for s in i.seq:
+                if s in list_u:
+                    if last_n != 0 and last_n <= difference:
+                        write_f.write(str(i.seq[index_old - last_n :index_old ]))
+                        for j in range(index_old - last_n, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+
+                            index_new += 1
+                        
+                        
+                    last_n = 0
+                    last_u += 1
+                elif s == s'N' or s == s'n':
+                    if last_u > 0:
+                        write_f.write(str(i.seq[index_old - last_u :index_old ]))
+                        for j in range(index_old - last_u, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+                            index_new += 1
+                        last_u = 0
+                    last_n += 1
+                else:
+                    if last_u > 0:
+                        write_f.write(str(i.seq[index_old - last_u :index_old ]))
+                        for j in range(index_old - last_u, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+                            index_new += 1
+                        last_u = 0
+                    if last_n != 0 and last_n <= difference:
+                        write_f.write(str(i.seq[index_old - last_n :index_old ]))
+                        for j in range(index_old - last_n, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+                            index_new += 1
+                        last_n = 0 
+                
+                # help_dict2[index_old] = index_new
+                index_old+=1
+                
+                
+            # just writewhat is left at the end
+            if last_n != 0 and last_n <= difference:
+                write_f.write(str(i.seq[index_old - last_n :index_old ]))
+                for j in range(index_old - last_n, index_old):
+                    help_dict[index_new] = j
+                    index_new += 1
+            if last_u > 0:
+                write_f.write(str(i.seq[index_old - last_u :index_old ]))
+                for j in range(index_old - last_u, index_old):
+                    help_dict[index_new] = j
+                    index_new += 1
+            position_converter[i.name] = help_dict
+            # assert len(help_dict2) == len(i.seq)
+            write_f.write('\n')
+    f = gzFile(path_to_dict,'w')
+    dump[dict[str,dict[int,int]]](position_converter,f)
+    f.close()
+
+            
+
+
+
+
+# hard_mask("data/hg19.fa", "data/hg19_hard_50.fa", "data/genomes/position_conv_50_rev")
+# hard_mask("data/genomes/mm10.fa", "data/genomes/mm10_hard_50.fa", "data/genomes/mm10_position_conv_50")
+# print 'Done one'
+# hard_mask("data/genomes/rheMac10.fa", "data/genomes/rheMac10_hard_50.fa", "data/genomes/rheMac10_position_conv_50")
+# hard_mask("data/genomes/panTro6.fa", "data/genomes/panTro6_hard_50.fa", "data/genomes/panTro6_position_conv_50")
+# hard_mask("data/genomes/gorGor6.fa", "data/genomes/gorGor6_hard_50.fa", "data/genomes/gorGor6_position_conv_50")
+# /home/hiseric1/new_sedef/seq/search/data/genomes/mm8/mm8.fa
+hard_mask("data/genomes/mm8/mm8.fa", "data/genomes/mm8_hard_50.fa", "data/genomes/mm8_position_conv_50")

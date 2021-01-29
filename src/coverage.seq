@@ -1,0 +1,287 @@
+from uf_help2 import *
+
+def analyze_region(s1,s2):
+    if len(s1) != len(s2):
+        print 'error lens'
+        print len(s1), len(s2)
+        assert False
+    # assert len(s1) == len(s2)
+    miss_ = 0
+    for i in range(0,len(s1)):
+        if s1[i] != s2[i]:
+            miss_ += 1
+        
+    return len(s1) - miss_, miss_
+
+
+def get_stats_for_cigar(cigar, l1, l2, s1 = '',s2=''):
+    count1 = 0
+    count2 = 0
+    match_ = 0
+    miss = 0
+    gap_I = 0
+    gap_D = 0
+
+    for br,let in cigar:
+        if let == 'I':
+            count1 += br
+            gap_I+=br
+        elif let == 'D':
+            count2+=br
+            gap_D+=br
+        else:
+            # mt,ms = analyze_region(s1[count1:count1+br],s2[count2:count2+br])
+            match_	+= br # mt
+            miss	+= 0 # ms
+
+            count2	+= br
+            count1	+= br
+    if match_ + miss + gap_I != l1 or match_ + miss + gap_D != l2:
+        print 'error'
+        print match_ + miss + gap_I, l1
+        print match_ + miss + gap_D,l2
+        return 0,0,0
+        # sys.exit(1)
+    assert match_ + miss + gap_I == l1
+    assert match_ + miss + gap_D == l2
+
+    return match_, miss, gap_I + gap_D
+
+# in this script we calculate basepairs coverage of each methods that is finding SDs
+class who_coveres:
+    wgac: bool
+    sdquest: bool
+    biser: bool
+    sedef: bool
+    def __init__(self: who_coveres, w:bool, s:bool, b:bool, sed: bool):
+        self.wgac = w
+        self.sdquest = s
+        self.biser = b
+        self.sedef = sed
+
+def get_dots(path, tag, dots_dict, chrs):
+    f = open(path,'r').readlines()
+    how_many = 0
+    if tag == 'wgac':
+        for l_ in f:
+            l = l_.split('\t')
+            # 
+            # print l_
+            if  abs(int(l[1]) - int(l[2]) ) <2 or abs(int(l[8]) - int(l[7]) ) < 2:
+                continue
+            how_many+=1
+            # print how_many
+            chr1 = l[0]
+            chr2 = l[6] 
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[7]), int(l[8])),
+                l[5] == '-',
+                CIGAR('')
+            )
+            l1,l2 = sd.get_all_dots()
+            for i in l1:
+                if i in dots_dict:
+                    dots_dict[i].wgac = True
+                else:
+                    dots_dict[i] = who_coveres(True, False, False, False)
+            
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].wgac = True
+                else:
+                    dots_dict[i] = who_coveres(True, False, False, False)
+    elif tag == 'sdquest':
+
+        for l_ in f:
+            l = l_.split('  ')
+            
+            if  abs(int(l[3]) - int(l[2]) ) <2:
+                continue
+            how_many+=1
+            # print how_many
+            chr1 = l[1]
+            chr2 = l[5] 
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[2]), int(l[3])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[6]), int(l[7])),
+                l[8] == '-',
+                CIGAR('')
+            )
+            l1,l2 = sd.get_all_dots()
+            for i in l1:
+                if i in dots_dict:
+                    dots_dict[i].sdquest = True
+                else:
+                    dots_dict[i] = who_coveres(False, True, False, False)
+            
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].sdquest = True
+                else:
+                    dots_dict[i] = who_coveres(False, True, False, False)
+    elif tag == 'biser':
+        
+        for l_ in f:
+            l = l_.split('\t')
+            
+            if  abs(int(l[1]) - int(l[2]) ) <2:
+                continue
+            how_many+=1
+            # print how_many
+            chr1 = l[0].split('#')[1]
+            chr2 = l[3].split('#')[1]
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[4]), int(l[5])),
+                l[9] == '-',
+                CIGAR('')
+            )
+            l1,l2 = sd.get_all_dots()
+            for i in l1:
+                if i in dots_dict:
+                    dots_dict[i].biser = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, True, False)
+            
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].biser = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, True, False)
+    elif tag == 'sedef':
+        
+        for l_ in f:
+            l = l_.split('\t')
+            
+            if l[1] == 'start1' or abs(int(l[1]) - int(l[2]) ) <2:
+                continue
+            how_many+=1
+            # print how_many
+            chr1 = l[0]
+            chr2 = l[3]
+            
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[4]), int(l[5])),
+                l[9] == '-',
+                CIGAR('')
+            )
+            l1,l2 = sd.get_all_dots()
+            for i in l1:
+                if i in dots_dict:
+                    dots_dict[i].sedef = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, False, True)
+            
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].sedef = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, False, True)
+    # elif tag == 'elementaries':
+    #     for l_ in f:
+    #         l = l_.split('\t')
+    #         if len(l) == 1 or abs(int(l[3]) - int(l[2]) ) <2:
+    #             continue
+            
+    #         how_many+=1
+    #         # print how_many
+    #         chr1 = l[0].split('#')[1]
+
+    #         sd = SD(
+    #             # len(sds),
+    #             Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+    #             Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+    #             False,
+    #             CIGAR('')
+    #         )
+    #         l1,l2 = sd.get_all_dots()
+    #         for i in l1:
+    #             if i in dots_dict:
+    #                 dots_dict[i].sedef = True
+    #             else:
+    #                 dots_dict[i] = who_coveres(False, False, False, True)
+            
+    #         for i in l2:
+    #             if i in dots_dict:
+    #                 dots_dict[i].sedef = True
+    #             else:
+    #                 dots_dict[i] = who_coveres(False, False, False, True)
+
+
+
+
+def main_f(thr = ''):
+    dots_dict = dict[Dot, who_coveres]()
+    chrs = dict[str,int]()
+    path_wgac = 'data/wgac_hard_aligned_2.bed' #'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed' # 'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed'
+    path_sdquest = 'data/sdquest_rev.bed'# 'data/sdquest_mm8_hard.txt' # 'data/sdquest_rev.bed'
+    path_sedef = "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" #"/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # '/home/hiseric1/new_sedef/sedef/out_mice/final.bed'  # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" # "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed"
+    path_biser = 'same8/hg19_hg19/final.bed' # 'same8/mm8_mm8/final.bed' # 'same8/hg19_hg19/final.bed' # 'mm8_2000/final.bed' # f'test_padding2/{thr}/final.bed' # 'biser_ms/hg19_hg19/final.bed' # 'final_test/wwinnowing_filter/final.bed'
+
+    get_dots(path_sedef, 'sedef', dots_dict, chrs)
+    print 'Done sedef'
+    get_dots(path_wgac, 'wgac', dots_dict, chrs)
+    print 'Done wgac'
+    
+    get_dots(path_sdquest, 'sdquest', dots_dict, chrs)
+    print 'Done sdquest'
+
+    get_dots(path_biser, 'biser', dots_dict, chrs)
+    print 'Done biser'
+
+    d = dict[str, int]()
+
+    for j in dots_dict:
+        s = ''
+        i = dots_dict[j]
+        if i.wgac:
+            s += 'wgac_'
+        if i.sdquest:
+            s += 'sdquest_'
+        if i.sedef:
+            s += 'sedef_'
+        if i.biser:
+            s += 'biser'
+        if s in d:
+            d[s] += 1
+        else:
+            d[s] = 1
+    for i in sorted(d):
+        print f'{i} {d[i]}'
+
+
+main_f()
+# 
+# main_f(sys.argv[1])
+
+def check_cigars():
+    path = '/home/hiseric1/new_sedef/seq/search/biser_ms/final_all.bed'
+    f = open(path, 'r').readlines()
+    for i in f:
+        line = i.split('\t')
+        cigar = line[12]
+        l1 = int(line[2]) - int(line[1])
+        l2 = int(line[5]) - int(line[4])
+        if '#' in cigar:
+            print line
+            cigar = cigar.split('mm10')[0]
+            # continue
+
+        m, mm, g = get_stats_for_cigar(CIGAR(cigar), l2, l1, s1 = '',s2='')
+        if m == 0:
+            print m, mm, g 
+            print (i)
+            sys.exit(2)
+
+
+
+# check_cigars()
+
+
+    
