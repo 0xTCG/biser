@@ -57,7 +57,6 @@ For example, to run hg19_hard_masked.fa on 8 cores type:
 Other possible parameters you can define:
 * `-p` - change padding (default 5000)
 * `-d` - change to dynamic gap
-* `-d` - change to dynamic gap
 * `-l` - if you want to use filtering
 * `-g` - if you want to use winnowing
 * `f` - force, if output folder already exists
