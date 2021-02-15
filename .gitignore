@@ -1,0 +1,9 @@
+src/sedef_out
+src/sedef/sedef
+src/results
+src/sedef/results/
+*.joblog
+*.comm
+*.o
+uf
+.gitignore

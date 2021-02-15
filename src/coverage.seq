@@ -219,10 +219,10 @@ def get_dots(path, tag, dots_dict, chrs):
 def main_f(thr = ''):
     dots_dict = dict[Dot, who_coveres]()
     chrs = dict[str,int]()
-    path_wgac = 'data/wgac_hard_aligned_2.bed' #'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed' # 'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed'
-    path_sdquest = 'data/sdquest_rev.bed'# 'data/sdquest_mm8_hard.txt' # 'data/sdquest_rev.bed'
+    path_wgac = '/home/hiseric1/new_sedef/seq/search/data/wgac_hard_aligned_2.bed' #'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed' # 'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed'
+    path_sdquest = '/home/hiseric1/new_sedef/seq/search/data/sdquest_rev.bed'# 'data/sdquest_mm8_hard.txt' # 'data/sdquest_rev.bed'
     path_sedef = "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" #"/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # '/home/hiseric1/new_sedef/sedef/out_mice/final.bed'  # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" # "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed"
-    path_biser = 'same8/hg19_hg19/final.bed' # 'same8/mm8_mm8/final.bed' # 'same8/hg19_hg19/final.bed' # 'mm8_2000/final.bed' # f'test_padding2/{thr}/final.bed' # 'biser_ms/hg19_hg19/final.bed' # 'final_test/wwinnowing_filter/final.bed'
+    path_biser = "test1/final.bed"  # 'same8/hg19_hg19/final.bed' # 'same8/mm8_mm8/final.bed' # 'same8/hg19_hg19/final.bed' # 'mm8_2000/final.bed' # f'test_padding2/{thr}/final.bed' # 'biser_ms/hg19_hg19/final.bed' # 'final_test/wwinnowing_filter/final.bed'
 
     get_dots(path_sedef, 'sedef', dots_dict, chrs)
     print 'Done sedef'

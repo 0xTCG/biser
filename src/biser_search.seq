@@ -82,7 +82,7 @@ query_treshold = 300 # 100
 out = 'new_sedef/'
 extend_var = 5000 # 10000# 5000
 overlap_percentage = 1 # 0.7
-ref_threshold = 1000
+ref_threshold = 800
 alowed_distance = 250
 INDEX_CUTOFF = 0.001
 MAX_SD_LEN = 2000000000 # it was 1000000 for testing dynamic distance
@@ -885,6 +885,8 @@ with timing('whole code'):
             elif o in ("-d", "--dynamic"):
                 if a == '1':
                     do_dynamic_distance = True
+                    MAX_SD_LEN = 1000000 # it was 1000000 for testing dynamic distance
+
                 else:
                     do_dynamic_distance = False
             elif o in ("-s", "--strand"):

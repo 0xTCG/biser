@@ -5,8 +5,13 @@
 echo "Start: `date`"
 
 GETOPT="getopt"
-# TIME="/usr/bin/time"
-TIME="time"
+
+TIME=/usr/bin/time
+
+if [[ ! -f "${TIME}" ]]; then
+	TIME="/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time"
+fi
+
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
 	:
@@ -37,7 +42,7 @@ if ! command -v "parallel" >/dev/null 2>&1 ; then
 fi
 
 OPTIONS=hj:o:w:fe:t:S:d:g:l:p:
-LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params
+LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params,dynamic,withoutw,filtering,padding
 PARSED=$($GETOPT --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then
 	exit 2
@@ -55,6 +60,7 @@ d="0"
 g="0"
 l="1"
 p="5000"
+
 while true; do
 	case "$1" in
 		-h|--help)
@@ -155,7 +161,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ]; then
 	# ARRAY=()
 	for i in $validchrs; do 
         
-		echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/seeds ${input} ${input} $i >${output}/log/seeds/${i}_.log 2>${output}/log/seeds/${i}_2.log"
+		echo "${TIME} -f'TIMING %e %M' seqc biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/seeds ${input} ${input} $i >${output}/log/seeds/${i}_.log 2>${output}/log/seeds/${i}_2.log"
 		
 	done | tee "${output}/seeds.comm" | ${TIME} -f'Seeding time: %E' parallel --will-cite -j ${jobs} --bar --joblog "${output}/seeds.joblog"
 	
@@ -186,7 +192,7 @@ fi
 
 # now do merging part 
 # here path to your sedef file
-./sedef merge "${output}/seeds/" "${output}/merged/"
+# ./sedef/sedef merge "${output}/seeds/" "${output}/merged/"
 
 
 # and align at the end
@@ -200,13 +206,14 @@ fa2=$input
 mkdir "${output}/aligned/"
 mkdir -p "${output}/log/align/"
 
-output="${path}/aligned"
+output2="${output}/aligned/"
+echo ${output2}
 
 for i in $files; do 
 
     filename1=$(basename -- "$i")
 	# also put here to sedef exe
-    echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' sedef align generate --k 10 ${fa1} ${i} ${fa2} >${output}/${filename1} 2>${logs}/${filename1}.log"
+    echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i} ${fa2} >${output2}/${filename1} 2>${logs}/${filename1}.log"
 
 done | ${TIME} -f'Align time: %E' parallel --will-cite -j ${jobs} --joblog "${output}/align.joblog"
 
@@ -222,4 +229,5 @@ sc_mem_k=`echo "${sc_mem} / 1024" | bc`
 echo "Memory used: ${sc_mem_k} MB"
 
 
-cat ${output}/aligned/* >${output}/final.bed
+cat ${output2}/* >${output}/final.bed
+uf ${output}/final.bed >${output}/elementaries.txt

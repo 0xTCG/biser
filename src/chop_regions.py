@@ -85,11 +85,15 @@ def build_dict(path, d = dict()):
                 d[chr2].add(Interval(s2,e2))
     
     coverage = 0
+    # coverage_before = 0
     for i in d:
+        # for inerv in d[i]:
+        #     coverage_before += inerv.end - inerv.begin
         d[i].merge_overlaps()
         for inerv in d[i]:
             coverage += inerv.end - inerv.begin
     km = path.split("/")[1]
+    # print (coverage_before)
     # print (f'{km}\t{counters[0]}\t{counters[1]}\t{counters[2]}')
     return d, count_sds, coverage
 
@@ -312,10 +316,10 @@ from fasta_reader import read_fasta
 
 
 # ok first read whole genome and save ti to dictionary
-def extract_sequences():
-    path = 'data/genomes/'
-    out_folder = 'sdregions8'
-    input_beds = 'same8'
+def extract_sequences(path, out_folder, input_beds):
+    # path = 'data/genomes/'
+    # out_folder = 'sdregions8'
+    # input_beds = 'same8'
 
     for i in os.listdir(path):
         main_fa_dict = dict()
@@ -327,7 +331,7 @@ def extract_sequences():
             print (specie)
             # continue
             new_fa = open(f'{out_folder}/SD_regions_{specie}.fa', 'w')
-            for item in read_fasta(f"data/genomes/{specie}_hard_50.fa"):
+            for item in read_fasta(f"{path}{specie}_hard_50.fa"):
                 main_fa_dict[f'{specie}#{item.defline}'] = item.sequence
                 # print(item)
             print (len(main_fa_dict))
@@ -365,11 +369,9 @@ def change_in_folders(out):
 
 # change_in_folders('different8')
 
-        # if os.path.isdir(path + folder):
 
-
-def statistics():
-    path = 'different8'
+def statistics(path):
+    # path = 'different8'
     specie = []
     dic = dict()
 
@@ -410,12 +412,12 @@ def statistics():
         
 # statistics()
         
-def statistics2():
+def statistics2(path):
     # path = 'l1'
     specie = []
     dic = dict()
 
-    for i in open('l1', 'r'):
+    for i in open(path, 'r'):
         gen, k, c = i.split('\t')
         sd_region = gen.split('_')[0]
         whole_g = gen.split('_')[1]
@@ -455,31 +457,54 @@ def statistics2():
         
 # statistics2()
 
-def extract_all():
-    out = 'same8'
-    final_one = open('different8/final_all.bed', 'w')
+def extract_all(out1, out2, out_fin):
+    out = out1 # 'same8'
+    # 'different8/final_all.bed'
+    final_one = open(out_fin, 'w')
     for i in os.listdir(out):
         if i != 'log' and os.path.isdir(out + '/' + i):
-            print (f'Here: {i}')
+            # print (f'Here: {i}')
             count1 = 0
             for line in open(f'{out}/{i}/final.bed'):
                 final_one.write(line)
                 count1+= 1
-            print (count1)
+            # print (count1)
             
 
-    out = 'different8'
+    out = out2 # 'different8'
     for i in os.listdir(out):
         if i != 'log' and os.path.isdir(out + '/' + i):
-            print (f'Here: {i}')
+            # print (f'Here: {i}')
             count1 = 0
             for line in open(f'{out}/{i}/final.bed', 'r').readlines():
                 final_one.write(line)
                 count1+= 1
-            print (count1)
+            # print (count1)
 
         
 
 # extract_all()
 # statistics2()
 
+
+def main():
+    import sys
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'extract':
+            # def extract_sequences(path, out_folder, input_beds):
+            # path = 'data/genomes/'
+            # out_folder = 'sdregions8'
+            # input_beds = 'same8'
+            # print (sys.argv[1] , sys.argv[2], sys.argv[3], sys.argv[4])
+            extract_sequences( sys.argv[2], sys.argv[3], sys.argv[4])
+        elif sys.argv[1] == 'normalize':
+            change_in_folders(sys.argv[2])
+        elif sys.argv[1] == 'final':
+            extract_all(sys.argv[2], sys.argv[3], sys.argv[4])
+        elif sys.argv[1] == 'statistics':
+            statistics(sys.argv[2])
+        elif sys.argv[1] == 'create':
+            d, i, s = build_dict(sys.argv[2])
+            print (i, s)
+
+main()

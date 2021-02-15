@@ -1,4 +1,4 @@
-# BISER: BriskInference of Segmental duplication Evolutionary stRucture
+# BISER: Brisk Inference of Segmental duplication Evolutionary stRucture
 
 Biser is a fast tool for:
 * Detecting SDs in a genome
@@ -46,6 +46,7 @@ Same note if you are using Boost in a non-standard directory, you should specify
 
 
 ## Usage
+### One specie
 For finding SDs and decomposing them in elementary SDs in one specie, go to `src` directory and run:
 ```bash
 ./biser_1s.sh  -o <output> -j <jobs> <hard_masked_genome> 
@@ -55,14 +56,33 @@ For example, to run hg19_hard_masked.fa on 8 cores type:
 ./biser_1s.sh -o biser_out_hg19 -j 8 hg19_hard_masked.fa
 ```
 Other possible parameters you can define:
-* `-p` - change padding (default 5000)
-* `-d` - change to dynamic gap
-* `-l` - if you want to use filtering
-* `-g` - if you want to use winnowing
+* `-p <padding value>` - change padding (default 5000)
+* `-d <1/0>` - change to dynamic gap (max SD length set to 1Mbp)
+* `-l <1/0>` - if you want to use filtering
+* `-g <1/0>` - if you want to use winnowing
 * `f` - force, if output folder already exists
+
+### Multiple specie
+For finding SDs and decomposing them in elementary SDs in multiple specie, go to `src` directory and run:
+```bash
+./biser_ms.sh  -o <output> -j <jobs> <destionation_where_hard_masked_genomes_are> 
+```
+For example, to run hg19_hard_masked.fa on 8 cores type:
+```bash
+./biser_ms.sh -o biser_out_ms -j 8 data/genomes/
+```
+Other possible parameters you can define:
+* `-p <padding value>` - change padding (default 5000)
+* `-d <1/0>` - change to dynamic gap (max SD length set to 1Mbp)
+* `-l <1/0>` - if you want to use filtering
+* `-g <1/0>` - if you want to use winnowing
+* `f` - force, if output folder already exists
+
+All genome names must be in format `{specie_name}_hard_50.fa`
 
 ## Output
 Output is in specified `output` folder. `{output}/final.bed` contains all SDs and `{output}/elementaries.txt` contains all elementaries in format:
 * `elementary_id`, `chromosome`, `begin`, `end`,  `length`
 * at the end are lines in format: `[core]`, `elementary_id`, `# of SDs that contain this core`
 
+For multiple species chromosome names are in format `{specie_name}#{chromosome}`

@@ -6,7 +6,13 @@ echo "Start: `date`"
 
 GETOPT="getopt"
 # TIME="/usr/bin/time"
-TIME="time"
+
+TIME=/usr/bin/time
+
+if [[ ! -f "${TIME}" ]]; then
+	TIME="/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time"
+fi
+
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
 	:
@@ -138,6 +144,8 @@ validchrs=${input}*50.fa
 export OMP_NUM_THREADS=1
 mkdir "${output}/log"
 mkdir "${output}/log/seeds"
+mkdir "${output}/log/merged"
+
 curent_dic=`pwd`
 
 echo "************************************************************************"
@@ -159,9 +167,12 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ] ; then # || tru
 				mkdir "${output}/${filename1}_${filename2}/seeds"
 				mkdir "${output}/${filename1}_${filename2}/merged"
 				mkdir "${output}/${filename1}_${filename2}/aligned"
-				
+
+				samtools faidx $i
+				samtools faidx $j
+
 				# final one:
-				echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc new_sedef_6.seq -k 14 -w 16 -f ${l} -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
+				echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc biser_search.seq -k 14 -w 16 -f ${l} -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
 	            
 				# echo "/home/hiseric1/new_sedef/sedef/sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/"
 
@@ -199,10 +210,10 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ] ; then # || tru
             	filename1="${filename1%_*_*}"
                 filename2=$(basename -- "$j")
                 filename2="${filename2%_*_*}"
-				echo "/home/hiseric1/new_sedef/sedef/sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/"
+				echo "sedef/sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/ >${output}/log/merged/${filename1}_${filename2}.log"
 			fi
 	    done
-	done | tee "${output}/seeds.comm" | ${TIME} -f'Seeding time: %E' parallel --will-cite -j ${jobs} --bar --joblog "${output}/seeds.joblog"
+	done | ${TIME} -f'Merging time: %E' parallel --will-cite -j ${jobs} --bar --joblog "${output}/merged.joblog"
 
 fi
 
