@@ -88,8 +88,10 @@ Output is in specified `output` folder. `{output}/final.bed` contains all SDs an
 For multiple species chromosome names are in format `{specie_name}#{chromosome}`
 
 ## Simulations
-Path for SD detections simulatios:
-https://github.com/0xTCG/biser/blob/master/src/plot_simulations.ipynb
+Path for SD detection simulations:
+https://github.com/0xTCG/biser/blob/master/src/plot_simulations.ipynb   
+
+
 Path for core detection simulations:
-https://github.com/0xTCG/biser/blob/master/src/simulate_cores.ipynb
+https://github.com/0xTCG/biser/blob/master/src/simulate_cores.ipynb   
 
