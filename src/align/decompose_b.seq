@@ -1,0 +1,397 @@
+# from home.hiseric1.seq.test.apps.avid.avid import *
+import sys
+# import bio.align
+# import bio.bwt
+from time import *
+# from pair import *
+from linked_list_node1 import *
+# from bisect import bisect_left
+
+
+def gap_size(e1,b2):
+	return b2 - e1
+
+gapLenForSW = 300
+INDEX_CUTOFF = 0.1
+
+SEARCH_MAX_EDIT_ERROR = 0.15
+kmer_size = 10
+min_mate_len = 50 # 100# 2# 100
+min_mate_similarity = 0.6
+
+def mark_visited(visited_array, begin, end):
+	for i in range(begin, end):
+		visited_array[i] = True
+
+
+def process(threads: Optional[Linked_list_node], visited, return_array = list[tuple[int,int,int, int]]()):
+	# list in format: chr_id, begin, end
+	
+	walker = threads
+	while walker:
+		# add extend here and dont return anything if only one elem in the list!
+		if walker.end - walker.begin > min_mate_len:
+			# mark_visited(visited[walker.chr_], walker.begin , walker.end )
+			# print f'chr: {walker.chr_},  begn: {walker.begin}, end: {walker.end}, score: {walker.score}, len: {walker.end-walker.begin}, gap: {walker.gap}'
+			return_array.append((walker.chr_, walker.begin , walker.end, walker.score ))
+		walker = walker.next
+	if len(return_array) == 1:
+		return list[tuple[int,int,int, int]]()
+	else:
+		for walker_ in return_array:
+			mark_visited(visited[walker_[0]], walker_[1] , walker_[2] )
+
+	return return_array
+
+
+
+def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list: list[tuple[int,int]], difference: int , return_array: list[list[ tuple[int,int,int, int]] ] = list[tuple[int,int,int]](), visited: list[list[bool]] = list[list[bool]]() ) -> Optional[Linked_list_node]:
+
+	minimizer_index = len(minimizers_dict_list) - 1
+	node_counter = 0
+
+	length = len(minimizers_dict_list)
+
+	walker = threads
+	previous = threads #threads
+	previous = None
+	holder = threads
+	while threads and minimizer_index >= 0 and (minimizers_dict_list[minimizer_index][0] > threads.chr_ or (minimizers_dict_list[minimizer_index][0] == threads.chr_ and minimizers_dict_list[minimizer_index][1] > threads.end + difference + kmer_size)):
+		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index][0]][minimizers_dict_list[minimizer_index][1]]:
+			minimizer_index-=1
+			continue
+
+		walker = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][0], threads,0,1)
+
+		walker.score += 1
+		node_counter += 1
+		if previous:
+
+			previous.next = walker
+
+		else:
+			holder = walker
+		# print f'Walk: {walker}'
+		
+		previous = walker
+		minimizer_index-=1
+
+	walker = threads
+	threads = holder
+	
+	while walker:
+		
+		node_counter += 1
+
+		case_ = 0
+		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index][0]][minimizers_dict_list[minimizer_index][1]]:
+			minimizer_index-=1
+			continue
+		if minimizer_index >= 0 and walker.chr_ == minimizers_dict_list[minimizer_index][0] and (walker.end - kmer_size ) <  minimizers_dict_list[minimizer_index][1] and (walker.end + difference) >= minimizers_dict_list[minimizer_index][1]:
+			if walker.end >= minimizers_dict_list[minimizer_index][1]:
+				
+				walker.end += 1
+				walker.score += 1
+				walker.gap = 0
+				walker.count+=1
+				minimizer_index-=1
+			else:
+				walker.end = minimizers_dict_list[minimizer_index][1]  + 10
+				walker.score += 1
+				walker.inner_gap += 0
+				
+				walker.gap = 0
+				walker.count+=1
+			
+			minimizer_index-=1
+			continue
+		elif minimizer_index >= 0 and walker.chr_ == minimizers_dict_list[minimizer_index][0] and (walker.end - kmer_size ) >  minimizers_dict_list[minimizer_index][1] and walker.begin <= minimizers_dict_list[minimizer_index][1]:
+			minimizer_index-=1
+			walker.score += 1
+
+			continue
+
+
+		elif minimizer_index >= 0 and (not walker.next or walker.next.chr_ < minimizers_dict_list[minimizer_index][0] or (walker.next.chr_ == minimizers_dict_list[minimizer_index][0] and walker.next.end + difference < minimizers_dict_list[minimizer_index][1]) ):
+			walker.insert_after(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][0],1,1)
+			walker.next.score += 1
+			minimizer_index-=1
+			
+		
+		walker.gap +=1
+		walker.age += 1
+		
+		condition = walker.gap < difference
+
+		if condition:
+			walker.potentional = True
+		elif not condition:
+			if walker.potentional:
+				if walker.end - walker.begin > min_mate_len: 
+					temp_arr = process(threads, visited)
+					if len(temp_arr) > 0:
+						return_array.append( temp_arr )
+					walker = None
+					holder = None
+					previous = None
+					while threads and threads.next:
+						temp = threads.next
+						threads.next = None
+						threads = temp
+
+					threads = None
+
+
+					return threads
+
+			if walker is threads:
+				help_ = threads.next
+				threads.next = None
+				threads = help_
+				case_ = 1
+			else:
+				if walker.next is None:
+					previous.next = None
+				else:
+					case_ = 3
+					previous.next = walker.next
+					walker.next = None
+		if case_ == 3:
+			walker = previous.next
+		elif case_ == 1:
+			walker = threads
+		else:
+			previous = walker
+			walker = walker.next
+
+	while minimizer_index >= 0:
+		node_counter += 1
+		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index][0]][minimizers_dict_list[minimizer_index][1]]:
+			minimizer_index-=1
+			continue
+
+		if not threads:
+			threads = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1],minimizers_dict_list[minimizer_index][0], None, 1, 1)
+			threads.score += 1
+			previous = threads
+		else:
+			previous.insert_after(minimizers_dict_list[minimizer_index][1],minimizers_dict_list[minimizer_index][0])
+
+			previous = previous.next
+			previous.score += 1
+		minimizer_index-=1
+
+	return threads
+
+
+
+def dict_align(s1, chr1, ref_dict: dict[int, list[tuple[int,int]]] = dict[int, list[tuple[int,int]]](), visited = list[bool] ()):
+
+	step = 1
+	loc = 0
+	frequency = 0 
+
+	for i in s1.kmers[Kmer[10]](step):
+		visited.append(False)
+		frequency += 1
+		i_ = int(i.as_int())
+		if i_ in ref_dict:
+			ref_dict[i_].append((chr1,loc))
+		else:
+			ref_dict[i_] = [(chr1,loc)]
+		loc += 1
+	for i in range(9):
+		visited.append(False)
+	return frequency
+
+def get_coverage(visited, croms):
+	all = 0
+	covered = 0
+	for i_ in range(0, len(visited)):
+		i = visited[i_]
+		covered1 = 0
+		for j in i:
+			if j:
+				covered1 += 1
+		all += len(i)
+		covered += covered1
+		# print croms[i_], len(i), covered1
+		
+	return covered, all
+
+
+def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[list[ tuple[int,int,int,int]]](), visited = list[list[bool]] ()):
+	loc = 0
+	step = 1
+	difference = 60
+
+	helper = list[tuple[int,int]]()
+
+	threads = None # Optional[Linked_list_node]() # Linked_list_node(0,0)
+	
+	max_val = 0
+	avg = 0
+	avg_count = 0
+	for i in s1.kmers[Kmer[10]](step):
+		i_ = int(i.as_int())
+		if len(ref_dict[i_]) >= threshold:
+			# print 'skipped', i, loc, len(ref_dict[i_]) , threshold
+			loc += step
+			continue
+		if visited[chr1][loc]:
+			loc += step
+			if not threads is None:
+				temp_arr = process(threads, visited)
+				if len(temp_arr) > 0:
+					best_nodes.append( temp_arr )
+				threads = None
+
+			continue
+		if i_ in ref_dict:
+			threads = add_to_tree_align(threads, ref_dict[i_], difference,best_nodes, visited)
+			if len(ref_dict[i_]) > max_val:
+				max_val = len(ref_dict[i_])
+			avg +=  len(ref_dict[i_])
+			avg_count +=1
+		
+		loc += step
+
+	
+
+
+
+	walker = threads
+	# best_nodes.append( walker )
+	temp_arr = process(threads, visited)
+	if len(temp_arr) > 0:
+		best_nodes.append( temp_arr )
+
+	# print max_val, avg_count, avg, avg / avg_count
+	threads = None
+	walker = None
+	# return threads
+
+from bio.fasta import *
+
+def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=''):
+
+	counter = 0
+	failed_ = 0
+
+	croms = dict[int, str]()
+	croms_rev = dict[str, int]()
+
+	fr = FASTA(path_to_fa1, fai = fai)
+	ref_dict = dict[int, list[tuple[int,int]]]()
+
+	# dict_seqc = dict[str, seq]()
+
+	visited = list[list[bool]]()
+	frequency = 0
+	# first we create dictionary
+	with timing('creating dict'):
+		# for i in  FASTA(path_to_fa1):
+		for i in FASTA(path_to_fa1, fai = fai):
+			visited.append(list[bool]())
+
+			croms[counter] = i.name
+			croms_rev[i.name] = counter
+			frequency += dict_align(i.seq, counter, ref_dict, visited[-1])
+			# dict_seqc[i.name] = i.seq
+
+			counter += 1
+
+		# break
+
+
+	if destination_path[-1] != '/':
+		destination_path+= '/'
+	name = path_to_fa1.split('/')[-1].split('.')[0] if outpt_filename == '' else outpt_filename
+	print f'{destination_path}{name}.bed'
+	output = open(f'{destination_path}{name}.bed','w') #if outpt_filename == '' else outpt_filename
+
+	count = 0
+	count2 = 0
+	chunks = 800
+
+	hist = dict[int,int]()
+	for i in ref_dict:
+		if not len(ref_dict[i]) in hist:
+			hist[ len(ref_dict[i]) ] = 1
+		else:
+			hist[len(ref_dict[i])] += 1
+			
+	ignore = int( frequency - (frequency * INDEX_CUTOFF) / 100 )
+
+	sum = 0
+	threshold = 1 << 31
+	filtered = 0
+	# here we calculate threshold which tells us what is maximum length of a list of kmers
+	for i in sorted(hist.keys()):
+		sum += hist[i] * i
+		if sum <= ignore:
+			threshold = i
+
+	# fr.close()
+	if threshold < 100:
+		threshold = 1 << 31
+	print f'Threshold is: {threshold}'
+	count3 = 0
+	count4 = 0
+	with timing('Finding elementaries'):
+
+		# for i in  FASTA(path_to_fa1):
+		
+		for i in FASTA(path_to_fa1, fai = fai):
+			best_nodes = list[list[ tuple[int,int,int, int]]]()
+
+			with timing(f'{count}, {len(i.seq)}'):
+				# print count, len(i.seq)
+				count2 += len(i.seq)
+				find_elems(i.seq, croms_rev[i.name], ref_dict, threshold, best_nodes, visited)
+			
+			for elementary_set in best_nodes:
+				
+				for elem in elementary_set:
+					# print f'chr: {elem[0]}/ {croms[elem[0]]}, current: {croms_rev[i.name]}/{i.name}, start: {elem[1]}, end: {elem[2]}, score: {elem[3]}, len: {elem[2] - elem[1]}'
+					# print f'{dict_seqc[croms[elem[0]]][elem[1]:elem[2]]}'
+					chrom, begin, end = croms[elem[0]].split('-')
+					output.write(f'{chrom}\t{int(begin) +elem[1] }\t{int(begin) + elem[2]}\t{name}_{count3}\t{elem[2] - elem[1]}\n')
+					count4 += 1
+				count3 += 1
+				# print f'END OF ONE ELEM SET --------------- {count3}'
+
+			count += 1
+			# print f'COunt: {count}'
+			# if count == 1:
+			# 	break
+			
+	# print ref_dict
+	cov, all = get_coverage(visited, croms)
+	print f'Elementary sets: {count3}\nAll elementaries: {count4}\nCovered: {cov}\nAll: {all}'
+	
+
+
+def main():
+	if len(sys.argv) == 1:
+		# decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/sdregions/SD_regions_hg19.fa', 'results/', True)
+		# decompose('results/test/test.fa', 'results/test/')
+		decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/7.fa', 'results/', True)
+
+		# decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/786.fa', 'results/', True)
+		# decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/1863.fa', 'results/', True)
+	elif len(sys.argv) == 2:
+		decompose(sys.argv[1], 'results/')
+	elif len(sys.argv) == 3:
+		decompose(sys.argv[1], sys.argv[2])
+	elif len(sys.argv) == 4:
+		for i in range (int(sys.argv[3])):
+			bin_num = sys.argv[1].split('/')[-1].split('.')[0]
+			decompose(f'{sys.argv[1]}/{i}.fa', sys.argv[2], True, f'{bin_num}_{i}')
+main()
+
+
+
+# def main2():
+# 	path = '/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/'
+

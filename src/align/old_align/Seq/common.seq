@@ -1,0 +1,13 @@
+# def hash_dna(c:seq) -> int:
+# 	return int((c.__int__()))#dna_hash_lookup.val[c]  .__int__()
+def hash_dna(c: seq) -> int:
+    k = int((c.__int__()))
+    return 0 if k == 4 else k
+def align_dna(c):
+ 	return int(seq(c))#dna_align_lookup.val[c]
+
+def rev_dna(c):
+ 	return str(~seq(c))#rev_comp_lookup.val[c]
+
+def pct(p: float, tot: float):
+    return 100*p/tot

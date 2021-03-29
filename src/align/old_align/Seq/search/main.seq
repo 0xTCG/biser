@@ -1,0 +1,21 @@
+import sys
+import getopt
+# from align_main import *
+from search_main import *
+from time import timing
+
+# load parameters:
+# n -
+# k - kmer size
+# w - winnow size
+# r - reverse
+opts,args = getopt.getopt(sys.argv[1:], "n:k:r:w:")
+
+# align is not implemented yet, but that main call would go here
+# if (args[0] == "align"):
+#     align_main(opts,args[1:])
+
+# Print out timing
+with timing('search'):
+    if (args[0] == "search"):
+        search_main(opts,args[1:])

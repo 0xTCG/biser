@@ -1,0 +1,22 @@
+from IntervalTree.intervaltree import *
+from IntervalTree.interval import *
+
+# class Tree:
+# 	tree: IntervalTree[Interval[bool]]
+
+# 	def __init__(self: Tree):
+# 		self.tree = IntervalTree[Interval[bool]](None)
+# 	def newNode(self: Tree, i: Interval):
+# 		self.tree.add(i)
+# 		# return t
+# 	def insert(self: Tree, i: Interval, i_ref: Interval[bool]):
+# 		i.data = i_ref
+# 		self.tree.add(i)
+	# def doOverlap(self:Tree,i1: Interval, i2: Interval):
+		
+	# 	return i1.overlaps(i2)
+	# def doOverlapOne(self:Tree,i2: Interval,i1: int):
+		
+	# 	return i1.overlaps(i1)
+	
+	

@@ -1,0 +1,41 @@
+# small class for simulating mutable tuple
+class pair[T_first, T_second]:
+    first: T_first
+    second: T_second
+
+    def __init__(self: pair, i: T_first, j: T_second):
+        self.first = i
+        self.second = j
+    def __init__(self: pair):
+        self.first = 0
+        self.second = None
+    def __init__(self: pair, i: tuple[T_first, T_second]):
+        self.first = i[0]
+        self.second = i[1]
+
+    def __getitem__(self: pair, num: int):
+        assert num < 3
+        if num == 0:
+            return self.first
+        else:
+            return self.second
+
+    def __setitem__(self: pair, num: int, value: T_first):
+        assert num < 3
+        if num == 0:
+            self.first = value
+        else:
+            self.second = value
+    def __setitem__(self: pair, num: int, value: T_second):
+        assert num < 3
+        if num == 0:
+            self.first = value
+        else:
+            self.second = value
+    def __str__(self:pair):
+        return f"({self.first}, {self.second})"
+    def __eq__(self: pair, other: pair):
+        return (self.first, self.second) == (other.first, other.second)
+    
+    def __lt__(self: pair, other:pair):
+        return (self.first, self.second) < (other.first, other.second)

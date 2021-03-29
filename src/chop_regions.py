@@ -102,6 +102,105 @@ def build_dict(path, d = dict()):
 # d__, i__, j__ =  build_dict('/home/hiseric1/new_sedef/sedef/hg_3/final.bed', dict())
 # print(i__, j__)
 
+def build_dict_2(path, d = dict()):
+    count_sds = 0
+    threshold1 = 5000000
+    threshold2 = 10000000
+    threshold3 = 20000000
+
+    counters = [0,0,0]
+    if os.path.isdir(path):
+        for i in os.listdir(path):
+            # print (i)
+            for j in open(path + '/' + i, 'r'):
+                line = j.split('\t')
+                chr1 = line[0]
+                chr2 = line[3]
+
+                if chr1 == 'chrM' or chr2 == 'chrM':
+                    continue
+                count_sds += 1
+                s1 = int(line[1])
+                e1 = int(line[2])
+
+                s2 = int(line[4])
+                e2 = int(line[5])
+
+                # if e1 - s1 > 5000000:
+                #     print (j)
+                if e1 - s1 > threshold1:
+                    counters[0] += 1
+                if e1 - s1 > threshold2:
+                    counters[1] += 1
+                if e1 - s1 > threshold3:
+                    counters[2] += 1
+
+                chr1 += line[8]
+                chr2 += line[9] if line[9] == '+' else '_'
+
+                if chr1 in d:
+                    d[chr1].add(Interval(s1,e1))
+                else:
+                    d[chr1] = IntervalTree()
+                    d[chr1].add(Interval(s1,e1))
+
+                if chr2 in d:
+                    d[chr2].add(Interval(s2,e2))
+                else:
+                    d[chr2] = IntervalTree()
+                    d[chr2].add(Interval(s2,e2))
+    else:
+        for j in open(path, 'r'):
+            line = j.split('\t')
+            chr1 = line[0]
+            if chr1 == '#chr1':
+                continue
+            chr2 = line[3]
+
+            if chr1 == 'chrM' or chr2 == 'chrM':
+                continue
+            count_sds += 1
+            s1 = int(line[1])
+            e1 = int(line[2])
+
+            s2 = int(line[4])
+            e2 = int(line[5])
+
+            # if e1 - s1 > 5000000:
+            #     print (j)
+            if e1 - s1 > threshold1:
+                counters[0] += 1
+            if e1 - s1 > threshold2:
+                counters[1] += 1
+            if e1 - s1 > threshold3:
+                counters[2] += 1
+            
+            chr1 += line[8]
+            chr2 += line[9] if line[9] == '+' else '_'
+
+            if chr1 in d:
+                d[chr1].add(Interval(s1,e1))
+            else:
+                d[chr1] = IntervalTree()
+                d[chr1].add(Interval(s1,e1))
+
+            if chr2 in d:
+                d[chr2].add(Interval(s2,e2))
+            else:
+                d[chr2] = IntervalTree()
+                d[chr2].add(Interval(s2,e2))
+    
+    coverage = 0
+    # coverage_before = 0
+    for i in d:
+        # for inerv in d[i]:
+        #     coverage_before += inerv.end - inerv.begin
+        d[i].merge_overlaps()
+        for inerv in d[i]:
+            coverage += inerv.end - inerv.begin
+    km = path.split("/")[1]
+    return d, count_sds, coverage
+
 def chop_this_region(s1,e1,s2,e2, threshold):
     
     while s1 < e1:
@@ -347,6 +446,59 @@ def extract_sequences(path, out_folder, input_beds):
 
 
 # extract_sequences()
+from Bio.Seq import Seq
+# ok first read whole genome and save ti to dictionary
+def extract_sequences_2(path, out_folder, input_beds):
+    # path = 'data/genomes/'
+    # out_folder = 'sdregions8'
+    # input_beds = 'same8'
+
+    #first we create dict for genome(s):
+    main_fa_dict = dict()
+    if os.path.isdir(path):
+        for i in os.listdir(path):
+            path_ = i.split('_')
+            # print (path_)
+            if len(path_) > 2 and path_[1] == 'hard' and path_[2] == '50.fa':
+                specie = path_[0] # 'hg19'
+                print (specie)
+                # continue
+                for item in read_fasta(f"{path}{specie}_hard_50.fa"):
+                    main_fa_dict[f'{specie}#{item.defline}'] = item.sequence
+                    # print(item)
+                print (len(main_fa_dict))
+    else:
+        specie = path.split('/')[-1].split('_')[0]
+        print (specie, path)
+        for item in read_fasta(f"{path}"):
+            print (f'{specie}#{item.defline}')
+            main_fa_dict[f'{specie}#{item.defline}'] = item.sequence
+    
+    # Now we iterate trought different colors files and 
+    count_array = []
+    num_ov_neg = 0
+    for i in  os.listdir(input_beds):
+        print (i)
+        new_fa = open(f'{out_folder}/{i}.fa', 'w')
+        d__ = dict()
+        d__, i__, j__ = build_dict_2(f'{input_beds}/{i}', dict())
+        count_array.append((i__, j__))
+        print (f'Dictionary built {i__}, {j__}')
+        for chr_ in d__:
+            for interval in d__[chr_]:
+                if chr_[-1] == '+':
+                    new_fa.write(f'>{chr_}-{interval.begin}-{interval.end}\n{main_fa_dict[chr_[:-1]][interval.begin : interval.end]}\n')
+                else:
+                    num_ov_neg += 1
+                    new_fa.write(f'>{chr_}-{interval.begin}-{interval.end}\n{Seq(main_fa_dict[chr_[:-1]][interval.begin : interval.end]).reverse_complement()}\n')
+
+
+        new_fa.close()
+    count_array.sort(reverse = True)
+    print (f'Num of rev comp: {num_ov_neg}')
+    for i in count_array[:10]:
+        print (i)
+
 
 def change_coordinates(path = 'test_out_2', path2 = 'final2.bed'):
     final = open(path2, 'w')
@@ -370,10 +522,12 @@ def change_in_folders(out):
 # change_in_folders('different8')
 
 
-def statistics(path):
+def statistics(path, path2, write_path):
     # path = 'different8'
     specie = []
     dic = dict()
+
+    w_f = open(write_path, 'w')
 
     for i in os.listdir(path):
         if os.path.isdir(path + '/' + i) and not 'log' in i:
@@ -385,7 +539,19 @@ def statistics(path):
             specie.append(sd_region)
             specie.append(whole_g)
             dic[i] = (k,c)
-            print( f'{i}\t{k}\t{c}')
+            w_f.write( f'{i}\t{k}\t{c}\n')
+    for i in os.listdir(path2):
+        if os.path.isdir(path2 + '/' + i) and not 'log' in i:
+            # so the first one is SD regions and the bigger one is genome
+            path_full = f'{path2}/{i}/final.bed'
+            d, k, c = build_dict(path_full, d = dict())
+            sd_region = i.split('_')[0]
+            whole_g = i.split('_')[1]
+            specie.append(sd_region)
+            specie.append(whole_g)
+            dic[i] = (k,c)
+            w_f.write( f'{i}\t{k}\t{c}\n')
+    w_f.close()
     sys.exit(1)
     
     specie = list(set(specie))
@@ -436,8 +602,13 @@ def statistics2(path):
         help_row = []
         for j in specie:
             sr = f'{i}_{j}'
+            sr3 = f'{j}_{i}'
+
             if sr in dic:
                 help_row.append(str(dic[sr][0]).strip())
+            elif sr3 in dic:
+                help_row.append(str(dic[sr3][0]).strip())
+
             else:
                 help_row.append('')
         matrix.append(help_row)
@@ -502,9 +673,13 @@ def main():
         elif sys.argv[1] == 'final':
             extract_all(sys.argv[2], sys.argv[3], sys.argv[4])
         elif sys.argv[1] == 'statistics':
-            statistics(sys.argv[2])
+            # statistics(sys.argv[2], sys.argv[3], sys.argv[4])
+            statistics2( sys.argv[4])
+
         elif sys.argv[1] == 'create':
             d, i, s = build_dict(sys.argv[2])
             print (i, s)
+        elif sys.argv[1] == 'extract_colors':
+            extract_sequences_2( sys.argv[2], sys.argv[3], sys.argv[4])
 
 main()

@@ -1,0 +1,222 @@
+from globals import *
+from common import *
+from util import *
+
+# Hash impllemented as a class, just in case
+class Hash:
+
+    status: int
+    hash: int
+
+    def __init__(self: Hash, hash: int, status: int):
+        self.hash = hash
+        self.status = status
+        
+    def __init__(self: Hash):
+        self.hash = 0
+        self.status = 0
+    def __gt__(h1: Hash, h2: Hash):
+        return (h1.status, h1.hash) > (h2.status, h2.hash)
+    def __lt__(h1: Hash, h2: Hash):
+        return (h1.status, h1.hash) < (h2.status, h2.hash)
+    def __eq__(h1: Hash, h2: Hash):
+        # print f'Called {h1.hash} == {h2.hash} and {h1.status} == {h2.status}'
+        return h1.status == h2.status and h1.hash==h2.hash
+    def __ge__(h1: Hash, h2: Hash):
+        return (h1.status, h1.hash) >= (h2.status, h2.hash)
+    def __ne__(h1: Hash, h2: Hash):
+        return (h1.status, h1.hash) != (h2.status, h2.hash)
+    def __le__(h1: Hash, h2: Hash):
+        return (h1.status, h1.hash) <= (h2.status, h2.hash)
+    def __hash__(self: Hash):
+        # return hash(self.hash) ^ hash(self.status)
+        return self.hash.__hash__() ^ self.status.__hash__()
+    def __str__(self:Hash):
+        return f'{self.hash}, {self.status}'
+
+
+# type representing hash used for hashing minimizers
+# type Hash(status: int, hash: int):
+
+#     #     # All possible statusses:
+#     #     # 0 -> HAS_UPPERCASE
+#     #     # 1 -> ALL_LOWERCASE
+#     #     # 2 -> HAS_N
+#     # def __init__(self: Hash):
+#     #     return
+#     def __gt__(h1: Hash, h2: Hash):
+#         return (h1.status, h1.hash) > (h2.status, h2.hash)
+#     def __lt__(h1: Hash, h2: Hash):
+#         return (h1.status, h1.hash) < (h2.status, h2.hash)
+#     def __eq__(h1: Hash, h2: Hash):
+#         return h1.status == h2.status and h1.hash==h2.hash
+#     def __ge__(h1: Hash, h2: Hash):
+#         return (h1.status, h1.hash) >= (h2.status, h2.hash)
+#     def __ne__(h1: Hash, h2: Hash):
+#         return (h1.status, h1.hash) != (h2.status, h2.hash)
+#     def __le__(h1: Hash, h2: Hash):
+#         return (h1.status, h1.hash) <= (h2.status, h2.hash)
+#     def __hash__(self: Hash):
+#         # return hash(self.hash) ^ hash(self.status)
+#         return self.hash.__hash__() ^ self.status.__hash__()
+#     def __str__(self:Hash):
+#         return f'{self.hash}, {self.status}'
+    
+class Minimizer:
+    hash: Hash
+    loc: int
+    def __init__(self: Minimizer, hash: Hash, loc: int):
+        self.hash = hash
+        self.loc = loc
+    def __eq__(m1: Minimizer, m2: Minimizer):
+        return (m1.loc,m1.hash) == (m2.loc,m2.hash)
+
+class Sequence:
+    name: str
+    seq: seq
+    is_rc: bool
+
+    def __init__(self: Sequence, name: str, seq: seq, is_rc: bool):
+        self.name = name
+        self.seq = seq
+        self.is_rc = is_rc
+        if (is_rc):
+            self.seq = rc(seq)
+        
+
+def get_minimizers(s:seq,kmer_size, window_size, separate_lowercase):
+    
+    
+    
+    # making 2 lists, one for minimizers, and sliding winnow
+    minimizers = list[Minimizer]()
+    window = list[Minimizer]()
+
+    MASK = (1 << (2 * kmer_size)) - 1
+
+    h = 0
+    last_n = - kmer_size - window_size
+    last_u = last_n
+    brojac = 0
+    for i in range(0,len(s)):
+        # Updating positions of last 'N' and last uppercase letter
+        if (s[i]== s'N' or s[i]== s'n'):
+            last_n = i
+        elif (str(s[i]).isupper()):
+            last_u = i
+        
+        # hash_dna for 'N' returns 4, just assign 0 instead, other letters asigned as usual
+        temp_h = 0 if hash_dna(s[i]) == 4 else hash_dna(s[i])
+        h = ((h << 2) | temp_h) & MASK
+        
+        
+        if (i < kmer_size - 1):
+            continue
+        
+        # HAS_N   ->        2
+        # HAS_UPPERCASE ->  0
+        # ALL_LOWERCASE ->  1
+        hh = Hash( h,  2 if last_n >= (i - kmer_size + 1) else (0 if last_u >= (i - kmer_size + 1)  else 0 if not separate_lowercase else 1 )  )
+        
+        # Ensured that this happens when setting status
+        # if(not separate_lowercase and hh.status == 1):
+        #     hh.status = 0
+
+        # here we ensure that correct elements are in winnow
+        while (len(window) > 0 and not (window[-1].hash < hh)):
+            window.pop()
+        while (len(window)>0 and window[-1].loc < ((i - kmer_size + 1) - window_size)):
+            window.pop(0)
+        
+        window.append(Minimizer(hh, i - kmer_size + 1))
+
+        if (i - kmer_size + 1 < window_size):
+            continue
+        if ((len(minimizers) == 0) or ( not window[0] == minimizers[-1])):
+            newHash = Hash(window[0].hash.hash,window[0].hash.status)
+            minimizers.append(Minimizer(newHash, window[0].loc))
+        
+    
+    return minimizers
+
+# Main class that holds sequence, minimizers and index (positions) of hashed minimizers
+class Index:
+    kmer_size: int 
+    window_size: int
+    threshold: int
+
+    seq: Sequence
+
+    minimizers: list[Minimizer]
+    index: dict[Hash, list[int]]
+
+    def __init__(self:Index,i2:Index):
+        self.kmer_size = i2.kmer_size
+        self.window_size = i2.window_size
+        self.threshold = i2.threshold
+
+        self.seq = i2.seq
+        self.minimizers = i2.minimizers
+        self.index = i2.index
+
+    def __init__(self:Index,seq: Sequence, kmer_size: int, window_size: int, separate_lowercase: bool):
+        self.seq = seq
+        self.kmer_size = kmer_size
+        self.window_size = window_size
+        self.index = dict[Hash, list[int]]()
+        # we need this for INDEX_CUTOFF
+        h = HashGlobal()
+
+        assert(kmer_size <= 16)
+
+        # getting minimizers
+        self.minimizers = get_minimizers(self.seq.seq, kmer_size, window_size, separate_lowercase)
+        
+        
+        for i in self.minimizers:
+            
+            self.index.setdefault(i.hash, list[int]()).append(i.loc)
+        
+        
+        ignore = int((len(self.minimizers) * h.INDEX_CUTOFF) / 100.0)
+        
+        hist = dict[int,int]()
+        
+        for i in self.index:
+            if not len(self.index[i]) in hist:
+                hist[len(self.index[i])] = 1
+            else:
+                hist[len(self.index[i])] +=1
+        sum = 0
+
+        self.threshold = 1 << 31
+        # print(f'Threshold 1: {self.threshold}')
+        j = 0
+        for i in sorted(hist.keys(),reverse = True):
+            sum += hist[i]
+            if sum <= ignore:
+                self.threshold = i
+            else:
+                break
+            j+=1
+
+
+
+    # Find first minimizer at loci p
+    def find_minimizers(self:Index,p:int):
+        lo = 0
+        hi = len(self.minimizers) - 1
+        mid = 0
+        while (lo <= hi):
+            mid = int(lo + (hi - lo) / 2)
+            if (self.minimizers[mid].loc >= p and (not mid or self.minimizers[mid - 1].loc < p)):
+                break
+            if (self.minimizers[mid].loc < p):
+                lo = mid + 1
+            else:
+                hi = mid
+        assert(self.minimizers[mid].loc >= p or mid == len(self.minimizers) - 1); 
+        assert(not mid or self.minimizers[mid-1].loc < p)
+        if (self.minimizers[mid].loc < p):
+            mid+=1 # the last one--- no solution
+        return mid

@@ -77,12 +77,12 @@ output = 'out'
 SEARCH_MAX_EDIT_ERROR_ = 0.15
 tau_var = tau(SEARCH_MAX_EDIT_ERROR_,kmer_size)
 biggest_len = 0
-query_treshold = 300 # 100
+query_threshold = 300 # 100
+ref_threshold = 1000
 
 out = 'new_sedef/'
 extend_var = 5000 # 10000# 5000
 overlap_percentage = 1 # 0.7
-ref_threshold = 800
 alowed_distance = 250
 INDEX_CUTOFF = 0.001
 MAX_SD_LEN = 2000000000 # it was 1000000 for testing dynamic distance
@@ -289,7 +289,7 @@ def add_to_tree_3(threads: Linked_list_node, minimizers_dict_list: list[pair[int
         elif (not condition) or (walker.last - walker.first) >= MAX_SD_LEN:
             if walker.potentional:
                 # for last was previously used walker.first + current - walker.ref  (< walker.ref -> for checking how close they are?)
-                if current - walker.ref >= ref_threshold and walker.last - walker.first > query_treshold:
+                if current - walker.ref >= ref_threshold and walker.last - walker.first > query_threshold:
                     
                     if walker.chr_ != current_chr:
                         print_sd(walker, walker.ref_last, current_chr, croms, lens_dict, dict_final_sds)
@@ -402,7 +402,7 @@ def get_minimizers(s:seq,
     walker = threads
     
     while walker and just_find:
-        if walker.potentional and (walker.last - walker.first > query_treshold or walker.count >= 4):
+        if walker.potentional and (walker.last - walker.first > query_threshold or walker.count >= 4):
 
             # switched on ref_last for more precise coordinate
             end_ = walker.ref_last # walker.ref  + (walker.last - walker.first) if walker.ref  + (walker.last - walker.first) < lens_dict[chr_] else lens_dict[chr_] - 1
@@ -498,7 +498,7 @@ def get_minimizers_winnowed(s:seq,
     walker = threads
 
     while walker and just_find:
-        if walker.potentional and (walker.last - walker.first > query_treshold or walker.count >= 4):
+        if walker.potentional and (walker.last - walker.first > query_threshold or walker.count >= 4):
 
             end_ = walker.ref_last # walker.ref  + (walker.last - walker.first) if walker.ref  + (walker.last - walker.first) < lens_dict[chr_] else lens_dict[chr_] - 1
             if walker.chr_ != chr_:
@@ -835,7 +835,7 @@ def _main_fun(pair_fa):
     return dict_final_sds
 
 
-opts, args = getopt.getopt(sys.argv[1:], "n:k:r:w:o:d:s:g:f:p:m:")
+opts, args = getopt.getopt(sys.argv[1:], "n:k:r:w:o:d:s:g:f:p:m:q:")
 
 def get_fas():
     for i in ["data/genomes/hg19_hard_50.fa","data/genomes/mm10_hard_50.fa","data/genomes/rheMac10_hard_50.fa"]:
@@ -908,6 +908,10 @@ with timing('whole code'):
                 extend_var = int(a)
             elif o in ("-m", "--simulation"):
                 simulation = True
+            elif o in ("-r", "--ref"):
+                ref_threshold = int(a)
+            elif o in ("-q", "--query"):
+                query_threshold = int(a)
     
     if simulation:
         if len(args) != 2:

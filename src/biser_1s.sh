@@ -41,8 +41,8 @@ if ! command -v "parallel" >/dev/null 2>&1 ; then
 	exit 1
 fi
 
-OPTIONS=hj:o:w:fe:t:S:d:g:l:p:
-LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params,dynamic,withoutw,filtering,padding
+OPTIONS=hj:o:w:fe:t:S:d:g:l:p:r:q:
+LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params,dynamic,withoutw,filtering,padding,ref,query
 PARSED=$($GETOPT --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then
 	exit 2
@@ -60,6 +60,8 @@ d="0"
 g="0"
 l="1"
 p="5000"
+r="700"
+q="100"
 
 while true; do
 	case "$1" in
@@ -96,6 +98,14 @@ while true; do
 			p="$2"
 			shift 2
 			;;
+		-r|--ref)
+			r="$2"
+			shift 2
+			;;
+		-q|--query)
+			q="$2"
+			shift 2
+			;;
 		-o|--output)
 			output="$2"
 			shift 2
@@ -123,13 +133,9 @@ while true; do
 	esac
 done
 
-# if [[ $# -ne 1 ]]; then
-# 	echo "$0: FASTA file is required."
-# 	exit 1
-# fi
 input="$1"
 
-echo "SEDEF: FASTA=${input}; output=${output}; jobs=${jobs}; force=${force}"
+echo "BISER: FASTA=${input}; output=${output}; jobs=${jobs}; force=${force}"
 
 
 if [ -e "${output}" ]; then
@@ -161,13 +167,13 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ]; then
 	# ARRAY=()
 	for i in $validchrs; do 
         
-		echo "${TIME} -f'TIMING %e %M' seqc biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/seeds ${input} ${input} $i >${output}/log/seeds/${i}_.log 2>${output}/log/seeds/${i}_2.log"
+		echo "${TIME} -f'TIMING %e %M' seqc biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -r ${r} -q ${q} -o ${output}/seeds ${input} ${input} $i >${output}/log/seeds/${i}_.log 2>${output}/log/seeds/${i}_2.log"
 		
 	done | tee "${output}/seeds.comm" | ${TIME} -f'Seeding time: %E' parallel --will-cite -j ${jobs} --bar --joblog "${output}/seeds.joblog"
 	
 	curent_dic=`pwd`
 	echo ${curent_dic}
-	time /home/hiseric1/new_sedef/sedef/sedef merge "${curent_dic}/${output}/seeds/" "${curent_dic}/${output}/merged/"
+	time sedef/sedef merge "${curent_dic}/${output}/seeds/" "${curent_dic}/${output}/merged/"
 
 	cat ${output}/merged/*.bed_merged >"${output}/seeds.bed"
 
@@ -176,7 +182,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ]; then
 	# Get the single-core running time
 	sc_time=`grep TIMING ${output}/log/seeds/*.log | awk '{s+=$2}END{print s}'`
 	sc_time_h=`echo "${sc_time} / 3600" | bc`
-	echo "Single-core running time: ${sc_time_h} hours (${sc_time} seconds)"
+	echo "Single-core search running time: ${sc_time_h} hours (${sc_time} seconds)"
 
 	filtered=`grep FILTERED ${output}/log/seeds/*.log | awk '{s+=$2}END{print s}'`
 
@@ -184,7 +190,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ]; then
 
 	sc_mem=`grep TIMING ${output}/log/seeds/*.log | awk '{if($3>m)m=$3}END{print m}'`
 	sc_mem_k=`echo "${sc_mem} / 1024" | bc`
-	echo "Memory used: ${sc_mem_k} MB"
+	echo "Memory used for search: ${sc_mem_k} MB"
 
 	touch "${output}/seeds.joblog.ok"
 fi
@@ -208,26 +214,29 @@ mkdir -p "${output}/log/align/"
 
 output2="${output}/aligned/"
 echo ${output2}
-
+count_all=0
 for i in $files; do 
 
     filename1=$(basename -- "$i")
 	# also put here to sedef exe
     echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i} ${fa2} >${output2}/${filename1} 2>${logs}/${filename1}.log"
-
+	((count_all=count_all+1))
 done | ${TIME} -f'Align time: %E' parallel --will-cite -j ${jobs} --joblog "${output}/align.joblog"
 
 # cat ${output}/*.bed_merged >"${path}/final.bed"
 
 sc_time=`grep TIMING ${logs}/*.log | awk '{s+=$2}END{print s}'`
 sc_time_h=`echo "${sc_time} / 3600" | bc`
-echo "Single-core running time: ${sc_time_h} hours (${sc_time} seconds)"
+echo "Single-core align running time: ${sc_time_h} hours (${sc_time} seconds)"
 
 
 sc_mem=`grep TIMING ${logs}/*.log | awk '{if($3>m)m=$3}END{print m}'`
 sc_mem_k=`echo "${sc_mem} / 1024" | bc`
-echo "Memory used: ${sc_mem_k} MB"
+echo "Memory used for align: ${sc_mem_k} MB"
 
+#Finished
+finished=`grep Finished ${logs}/*.log | awk '{s+=1}END{print s}'`
+echo "Finished: ${finished}/${count_all}"
 
 cat ${output2}/* >${output}/final.bed
 uf ${output}/final.bed >${output}/elementaries.txt

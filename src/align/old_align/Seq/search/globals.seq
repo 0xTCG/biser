@@ -1,0 +1,145 @@
+# 786
+
+# This file is subject to the terms and conditions defined in
+# file 'LICENSE', which is part of this source code package.
+
+# Author: inumanag
+
+#******************************************************************************
+
+#pragma once
+
+#******************************************************************************
+
+#include "common.h"
+
+#******************************************************************************
+
+KB = 1000
+MB = 1000 * KB
+GB = 1000 * MB
+
+#******************************************************************************
+
+class Search:
+    # search_main.cc
+    KMER_SIZE: int
+    WINDOW_SIZE: int
+    MIN_UPPERCASE: int
+    MAX_ERROR: float
+    MAX_EDIT_ERROR: float
+    GAP_FREQUENCY: float
+    MIN_READ_SIZE: float
+    MAX_SD_SIZE: int
+
+    def __init__(self: Search):
+        KB = 1000
+        self.KMER_SIZE = 12
+        self.WINDOW_SIZE = 16 
+        self.MIN_UPPERCASE = self.KMER_SIZE
+
+        # search_main.cc
+        self.MAX_ERROR = 0.30
+        self.MAX_EDIT_ERROR = 0.15
+        self.GAP_FREQUENCY = 0.005
+        self.MIN_READ_SIZE = KB * (1 - self.MAX_ERROR)
+
+        # search.cc
+        self.MAX_SD_SIZE = 1 * 1024 * 1024 # 1MB at most
+    def __str__(self:Search):
+        return f'{self.KMER_SIZE}\t{self.WINDOW_SIZE}\t{self.MIN_UPPERCASE}\t{self.MAX_ERROR}\t{self.MAX_EDIT_ERROR}\t'
+class HashGlobal:
+    INDEX_CUTOFF: float
+    # hash.cc
+    def __init__(self: HashGlobal):
+        self.INDEX_CUTOFF = 0.001
+class Align: # Full SD alignment (via KSW)
+    # align_main.cc + align.cc
+    MATCH: int
+    MISMATCH: int
+    GAP_OPEN: int
+    GAP_EXTEND: int
+    MAX_KSW_SEQ_LEN: int
+
+    def __init__(self: Align):
+        self.MATCH = 5
+        self.MISMATCH = -4
+        self.GAP_OPEN = -40
+        self.GAP_EXTEND = -1
+
+        # align.cc
+        self.MAX_KSW_SEQ_LEN = 60 * KB
+class Extend: # Extension of initial SDs
+    RATIO: float
+    MAX_EXTEND: int
+    MERGE_DIST: int
+    
+    # align_main.cc
+    # Formula for left and right extension:
+    #		let width = max(query_len, ref_len)
+    # 	extend min(MAX_EXTEND, width * EXTEND_RATIO) bases
+    def __init__(self: Extend):
+        self.RATIO = 5.0
+        self.MAX_EXTEND = 15*KB
+        # Max dist of two hits to be merged
+        self.MERGE_DIST = 250	
+
+# refine.cc
+class Refine: # SD alignment via approximate global alignment (after chaining)
+    MATCH: int
+    MISMATCH: int
+    GAP: float
+    GAPOPEN: int
+    MIN_READ: int
+    SIDE_ALIGN: int
+    MAX_GAP: int
+    
+    def __init__(self: Refine):
+        self.MATCH = 10
+        self.MISMATCH = 1
+        self.GAP = 0.5
+        self.GAPOPEN = 100 # try to approximate WGAC
+        self.MIN_READ = 900 # Minimal refined read size
+        self.SIDE_ALIGN = 500
+        self.MAX_GAP = 10 * KB # Max gap during refining process
+
+class Chain:
+    # chain.cc
+    # Minimum number of uppercase letters in the chain
+    MIN_UPPERCASE_MATCH: int 
+    MATCH_CHAIN_SCORE: int
+    MAX_CHAIN_GAP: float
+    def __init__(self: Chain):
+        self.MIN_UPPERCASE_MATCH = 90
+        self.MATCH_CHAIN_SCORE = 4
+        # Minimum chain gap (depends on user parameters)
+        self.MAX_CHAIN_GAP = .5
+        refine = Refine()
+class Stats:
+    MAX_OK_GAP: int
+    MIN_SPLIT_SIZE: int
+    MIN_UPPERCASE: int
+    MAX_SCALED_ERROR: float
+    MIN_ASSEMBLY_GAP_SIZE: int
+    BIG_OVERLAP_THRESHOLD: int
+    # stats_main.cc
+    def __init__(self: Stats):
+        # Maximal gap size (in percent of the alignment length) that should remain in alignment
+        self.MAX_OK_GAP = -1 
+        # Minimal size of the SDs after splitting (1KB by default)
+        self.MIN_SPLIT_SIZE = KB # TODO <-- change to 900
+        self.MIN_UPPERCASE = 100
+        self.MAX_SCALED_ERROR = 0.5
+
+        # Minimum number of consecutive Ns needed to call assembly gap
+        self.MIN_ASSEMBLY_GAP_SIZE = 100
+        self.BIG_OVERLAP_THRESHOLD = 100
+
+class Internal:
+    DoUppercase: bool
+    DoUppercaseSeeds: bool
+    DoQgram: bool
+    def __init__(self: Internal):
+        self.DoUppercase = True
+        self.DoUppercaseSeeds = True
+        self.DoQgram = True

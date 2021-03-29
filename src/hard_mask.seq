@@ -100,4 +100,4 @@ def hard_mask(path: str, path_to_hard: str, path_to_dict: str = "search/data/pos
 # hard_mask("data/genomes/panTro6.fa", "data/genomes/panTro6_hard_50.fa", "data/genomes/panTro6_position_conv_50")
 # hard_mask("data/genomes/gorGor6.fa", "data/genomes/gorGor6_hard_50.fa", "data/genomes/gorGor6_position_conv_50")
 # /home/hiseric1/new_sedef/seq/search/data/genomes/mm8/mm8.fa
-hard_mask("data/genomes/mm8/mm8.fa", "data/genomes/mm8_hard_50.fa", "data/genomes/mm8_position_conv_50")
+hard_mask("/home/hiseric1/new_sedef/seq/search/data/genomes/mm10/final/mm10.fa", "/home/hiseric1/new_sedef/seq/search/data/genomes/mm10/final/mm10_hard_50.fa", "/home/hiseric1/new_sedef/seq/search/data/genomes/mm10/final/mm10_position_conv_50")

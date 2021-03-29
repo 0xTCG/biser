@@ -1,0 +1,111 @@
+from tree2 import *
+from globals import *
+from hash import * 
+from align_hit import *
+from search import *
+from fasta import *
+from time import timing
+from util import *
+
+
+TOTAL_ATTEMPTED=0
+JACCARD_FAILED=0
+QGRAM_NORMAL_FAILED=0
+OTHER_FAILED=0
+INTERVAL_FAILED=0
+
+def print_function(h: Hit):
+    print (f'{h.to_bed()}\t;OK')
+
+def initial_search(query_hash: Index, ref_hash: Index, is_same_genome: bool,s:Search):
+    
+    tree = IntervalTree[Interval[bool]]()
+    total = 0
+    track = 0
+    next_to_attain = 0
+    TRACK_PROGRESS = 10000
+
+    SearchGlobal =  s
+
+    internal = Internal()
+    
+    for qi in range(0,len(query_hash.minimizers)):
+        
+        qm = query_hash.minimizers[qi]
+
+        if (qm.loc < next_to_attain):
+            continue
+
+        # hash1.statuses.index("HAS_N")   ->        2
+        # hash1.statuses.index("HAS_UPPERCASE") ->  0
+        # hash1.statuses.index("ALL_LOWERCASE") ->  1
+        if (internal.DoUppercaseSeeds and qm.hash.status != 0):
+            continue
+        
+        # calling main function for search
+        hits = search(qi, query_hash, ref_hash, tree, is_same_genome,int(SearchGlobal.MIN_READ_SIZE), True, False,s) # last true is report fails
+        
+        min_len = len(query_hash.seq.seq)
+        for pp in hits:
+            min_len = min(min_len, pp.query_end - pp.query_start)
+            # here we print hits that we found
+            print_function(pp)
+        total += len(hits)
+
+        next_to_attain = int(qm.loc + (SearchGlobal.MIN_READ_SIZE * SearchGlobal.MAX_ERROR) / 2) if (min_len >= SearchGlobal.MIN_READ_SIZE) else qm.loc
+        
+    return total
+
+
+
+
+def search_single(ref_path: str, query_chr: str,ref_chr:str,  is_ref_complement:bool,  kmer_size: int,  window_size: int,s: Search):
+    
+    is_same_genome = (ref_chr == query_chr) and not is_ref_complement
+    
+
+    fr = FastaReference(ref_path)
+    
+    ref = fr.get_sequence(ref_chr)
+    s_ref = Sequence(ref_chr, ref, is_ref_complement)
+    
+    ref_hash = Index(s_ref, kmer_size, window_size,True)
+    
+    query_hash = Index(ref_hash)
+
+    if (not is_same_genome):
+        query = fr.get_sequence(query_chr)
+        query_hash = Index(Sequence(query_chr, query,False), kmer_size, window_size, True)
+
+    total = initial_search(query_hash, ref_hash, is_same_genome,s)
+
+
+def search_main(opts,args):
+    # Search class for holding some global variables
+    s = Search()
+    is_complement  = False
+    # here we pick up and save input parameters
+    if (len(args)>0):
+        command = args[0]
+        for o,a in opts:
+            if o in ("-k","--kmer"):
+                s.KMER_SIZE = int(a)
+            elif o in ("-w","--window"):
+                s.WINDOW_SIZE= int(a)
+            elif o in ("-u","--uppercase"):
+                s.MIN_UPPERCASE= int(a)
+            elif o in ("-e","--error"):
+                s.MAX_ERROR= float(a)
+            elif o in ("-E","--edit-error"):
+                s.MAX_EDIT_ERROR= float(a)
+            elif o in ("-g","--gap-freq"):
+                s.GAP_FREQUENCY= float(a)
+            elif o in ("-r","reverse"):
+                is_complement = True
+        s.MIN_READ_SIZE = KB * (1 - s.MAX_ERROR)
+
+        search_single(args[0], args[1], args[2], is_complement,s.KMER_SIZE, s.WINDOW_SIZE,s)
+    else:
+        print f'Not enough arguments to search'
+
+

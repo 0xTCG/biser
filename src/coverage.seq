@@ -73,14 +73,18 @@ def get_dots(path, tag, dots_dict, chrs):
             # print how_many
             chr1 = l[0]
             chr2 = l[6] 
+            if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2:
+                continue
             sd = SD(
                 # len(sds),
                 Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
                 Pos(chrs.setdefault(chr2, len(chrs)), int(l[7]), int(l[8])),
                 l[5] == '-',
-                CIGAR('')
+                CIGAR(l[-1])
             )
-            l1,l2 = sd.get_all_dots()
+            # l1,l2 = sd.get_all_dots()
+            l1,l2 = sd.get_pairs_3() # sd.get_pairs_3() # sd.get_all_dots()
+
             for i in l1:
                 if i in dots_dict:
                     dots_dict[i].wgac = True
@@ -93,7 +97,6 @@ def get_dots(path, tag, dots_dict, chrs):
                 else:
                     dots_dict[i] = who_coveres(True, False, False, False)
     elif tag == 'sdquest':
-
         for l_ in f:
             l = l_.split('  ')
             
@@ -103,14 +106,21 @@ def get_dots(path, tag, dots_dict, chrs):
             # print how_many
             chr1 = l[1]
             chr2 = l[5] 
+            if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2: # or (chr1 == 'chrY' and chr2 == 'chrY') :
+                continue
+            assert l[4] == '+'
+            if len (l[-1].split('\t')) <= 1:
+                continue
             sd = SD(
                 # len(sds),
                 Pos(chrs.setdefault(chr1, len(chrs)), int(l[2]), int(l[3])),
                 Pos(chrs.setdefault(chr2, len(chrs)), int(l[6]), int(l[7])),
                 l[8] == '-',
-                CIGAR('')
+                CIGAR(l[-1].split('\t')[-1])
             )
-            l1,l2 = sd.get_all_dots()
+            # l1,l2 = sd.get_all_dots()
+            l1,l2 = sd.get_pairs_3() # sd.get_pairs_3() # sd.get_all_dots()
+
             for i in l1:
                 if i in dots_dict:
                     dots_dict[i].sdquest = True
@@ -129,18 +139,23 @@ def get_dots(path, tag, dots_dict, chrs):
             
             if  abs(int(l[1]) - int(l[2]) ) <2:
                 continue
+            # print l
             how_many+=1
             # print how_many
-            chr1 = l[0].split('#')[1]
-            chr2 = l[3].split('#')[1]
+            chr1 = l[0]#.split('#')[1]
+            chr2 = l[3]#.split('#')[1]
+            print len(l)
+            if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2 or (chr1 == 'chrY' and chr2 == 'chrY') or len(l) <28 or len(l) > 39 :
+                continue
             sd = SD(
                 # len(sds),
                 Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
                 Pos(chrs.setdefault(chr2, len(chrs)), int(l[4]), int(l[5])),
                 l[9] == '-',
-                CIGAR('')
+                CIGAR(l[-1]) if len(l) > 28 else  CIGAR(l[12]) , # CIGAR(l[12])
+                True if len(l) > 28 else False
             )
-            l1,l2 = sd.get_all_dots()
+            l1,l2 = sd.get_pairs_3() # sd.get_pairs_3() # sd.get_all_dots()
             for i in l1:
                 if i in dots_dict:
                     dots_dict[i].biser = True
@@ -157,21 +172,28 @@ def get_dots(path, tag, dots_dict, chrs):
         for l_ in f:
             l = l_.split('\t')
             
-            if l[1] == 'start1' or abs(int(l[1]) - int(l[2]) ) <2:
+            if l[1] == 'start1' or abs(int(l[1]) - int(l[2]) ) <2 :
                 continue
             how_many+=1
             # print how_many
+            
             chr1 = l[0]
             chr2 = l[3]
-            
+
+            if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2  or (chr1 == 'chrY' and chr2 == 'chrY'):
+                continue
+            # print len(l)
             sd = SD(
                 # len(sds),
                 Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
                 Pos(chrs.setdefault(chr2, len(chrs)), int(l[4]), int(l[5])),
                 l[9] == '-',
-                CIGAR('')
+                CIGAR(l[-1]) if len(l) > 35 else CIGAR(l[32]),
+                True if len(l) > 35 else  False
+
             )
-            l1,l2 = sd.get_all_dots()
+            l1,l2 = sd.get_pairs_3() # sd.get_pairs_3() # sd.get_all_dots()
+
             for i in l1:
                 if i in dots_dict:
                     dots_dict[i].sedef = True
@@ -219,21 +241,24 @@ def get_dots(path, tag, dots_dict, chrs):
 def main_f(thr = ''):
     dots_dict = dict[Dot, who_coveres]()
     chrs = dict[str,int]()
-    path_wgac = '/home/hiseric1/new_sedef/seq/search/data/wgac_hard_aligned_2.bed' #'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed' # 'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed'
-    path_sdquest = '/home/hiseric1/new_sedef/seq/search/data/sdquest_rev.bed'# 'data/sdquest_mm8_hard.txt' # 'data/sdquest_rev.bed'
-    path_sedef = "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" #"/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # '/home/hiseric1/new_sedef/sedef/out_mice/final.bed'  # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" # "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed"
-    path_biser = "test1/final.bed"  # 'same8/hg19_hg19/final.bed' # 'same8/mm8_mm8/final.bed' # 'same8/hg19_hg19/final.bed' # 'mm8_2000/final.bed' # f'test_padding2/{thr}/final.bed' # 'biser_ms/hg19_hg19/final.bed' # 'final_test/wwinnowing_filter/final.bed'
-
-    get_dots(path_sedef, 'sedef', dots_dict, chrs)
-    print 'Done sedef'
-    get_dots(path_wgac, 'wgac', dots_dict, chrs)
-    print 'Done wgac'
-    
-    get_dots(path_sdquest, 'sdquest', dots_dict, chrs)
-    print 'Done sdquest'
+    # path_wgac = '/home/hiseric1/new_sedef/seq/search/data/wgac_mm8_50_aligned.bed' # '/home/hiseric1/new_sedef/seq/search/data/wgac_hard_aligned_2.bed' # '/home/hiseric1/new_sedef/seq/search/data/wgac_mm8_50.bed'  #'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed' # 'data/wgac_mm8_50.bed' # 'data/wgac_hard_aligned_2.bed'
+    # path_sdquest = '/home/hiseric1/new_sedef/seq/search/data/sdquest_mm10/sdquest_mm10_hard_aligned_3.txt' # '/home/hiseric1/new_sedef/seq/search/data/sdquest_mm8_hard_aligned.txt' # '/home/hiseric1/new_sedef/seq/search/data/sdquest_hg19_hard.bed' # '/home/hiseric1/new_sedef/seq/search/data/sdquest_mm8_hard.txt'  #'/home/hiseric1/new_sedef/seq/search/data/sdquest_rev.bed'# 'data/sdquest_mm8_hard.txt' # 'data/sdquest_rev.bed'
+    # path_sedef = '/home/hiseric1/new_sedef/biser/src/sedef/results/mm10/final.bed' # '/home/hiseric1/new_sedef/biser/src/sedef/results/mm8_hard_1/final2.bed' # '/home/hiseric1/new_sedef/biser/src/sedef/results/hg19_hard_1/final_2.bed' # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # '/home/hiseric1/new_sedef/sedef/out_mice/final.bed' # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" # "sedef/results/hg19_hard/final.bed" # "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" #"/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # '/home/hiseric1/new_sedef/sedef/out_mice/final.bed'  # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed" # "/home/hiseric1/new_sedef/seq/search/data/hg19_hard.bed" # "/home/hiseric1/new_sedef/sedef/out2/final.bed" # "/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed"
+    path_biser = '/home/hiseric1/new_sedef/biser/src/sedef/results/mm10/final.bed' # '/home/hiseric1/new_sedef/biser/src/results/mm10/final.bed'# "/home/hiseric1/new_sedef/biser/src/results/4_all/same/hg19_hg19/final_opt4.bed" # "/home/hiseric1/new_sedef/biser/src/results/4_all/same/mm8_mm8/final.bed"  # 'same8/hg19_hg19/final.bed' # 'same8/mm8_mm8/final.bed' # 'same8/hg19_hg19/final.bed' # 'mm8_2000/final.bed' # f'test_padding2/{thr}/final.bed' # 'biser_ms/hg19_hg19/final.bed' # 'final_test/wwinnowing_filter/final.bed'
 
     get_dots(path_biser, 'biser', dots_dict, chrs)
     print 'Done biser'
+
+    # get_dots(path_sedef, 'sedef', dots_dict, chrs)
+    # print 'Done sedef'
+
+    # get_dots(path_wgac, 'wgac', dots_dict, chrs)
+    # print 'Done wgac'
+    
+    # get_dots(path_sdquest, 'sdquest', dots_dict, chrs)
+    # print 'Done sdquest'
+
+    
 
     d = dict[str, int]()
 

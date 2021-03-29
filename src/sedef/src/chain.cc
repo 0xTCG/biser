@@ -31,7 +31,9 @@ vector<Anchor> generate_anchors(const string &query, const string &ref,
   for (int i = 0; i < ref.size(); i++) {
     if (toupper(ref[i]) == 'N')
       last_n = i;
+
     h = ((h << 2) | hash_dna(ref[i])) & MASK;
+
     if (i < kmer_size - 1)
       continue;
     if (last_n >= (i - kmer_size + 1))
@@ -74,6 +76,7 @@ vector<Anchor> generate_anchors(const string &query, const string &ref,
         bool has_u = 0;
         int len;
         for (len = 0; q + len < query.size() && r + len < ref.size(); len++) {
+
           if (toupper(query[q + len]) == 'N' || toupper(ref[r + len]) == 'N') {
             assert(len >= kmer_size);
             break;
@@ -210,6 +213,8 @@ vector<Hit> fast_align(const string &query, const string &ref, const Hit &orig,
   /// 1. Generate the list of hits (small anchors) inside the dot graph
   auto anchors = generate_anchors(query, ref, orig, kmer_size);
   dprn("-- got {} anchors in {} s", anchors.size(), elapsed(T));
+  // Added this here:
+  eprn("-- got {} anchors in {} s", anchors.size(), elapsed(T));
   T = cur_time();
 
   /// 2. Run DP on the anchors and collect all different anchors

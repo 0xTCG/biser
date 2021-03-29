@@ -46,12 +46,20 @@ class SD:
     mate2: Pos
     reversed: bool
     cigar: CIGAR
+    inv_d_i: bool
 
     def __init__(self: SD, p1: Pos, p2: Pos, reversed: bool, cigar: CIGAR):
         self.mate1 = p1
         self.mate2 = p2
         self.reversed = reversed
         self.cigar = cigar
+        self.inv_d_i = True
+    def __init__(self: SD, p1: Pos, p2: Pos, reversed: bool, cigar: CIGAR, inv_d_i: bool):
+        self.mate1 = p1
+        self.mate2 = p2
+        self.reversed = reversed
+        self.cigar = cigar
+        self.inv_d_i = inv_d_i
     
     def get_first(self:SD, possible_extension = 0):
         c1, s1, e1 = self.mate1
@@ -102,6 +110,47 @@ class SD:
                 s2 += dir * sz
         # print s1, s2, e1, e2
         assert s1 == e1 
+    def get_pairs_3(self: SD) -> tuple[list[Dot], list[Dot]]:
+        c1, s1, e1 = self.mate1
+        c2, s2, e2 = self.mate2
+        l1 = list[Dot]()
+        l2 = list[Dot]()
+        threshold = 0
+
+        d__ = 'D' if self.inv_d_i else 'I'
+        i__ = 'I' if self.inv_d_i else 'D'
+
+        dir = 1
+        if self.reversed:
+            s2 = e2 - 1
+            dir = -1
+        for sz, op in self.cigar:
+            # print sz, op
+            if op == 'M':
+                for i in range(sz):
+                    l1.append(Dot(c1, s1))
+                    l2.append(Dot(c2, s2))
+                    s1 += 1
+                    s2 += dir
+            elif op == i__: #D I
+                if sz < threshold:
+                    for i in range(sz):
+                        l1.append(Dot(c1, s1))
+                        l2.append(Dot(c2, s2))
+                        s1 += 1
+                else:
+                    s1 += sz
+            elif op == d__: #I D
+                if sz < threshold:
+                    for i in range(sz):
+                        l1.append(Dot(c1, s1))
+                        l2.append(Dot(c2, s2))
+                        s2 += dir
+                else:
+                    s2 += dir * sz
+        print s1, s2, e1, e2
+        assert s1 == e1 
+        return (l1, l2)
     def get_pairs_2(self: SD) -> tuple[Dot, Dot]:
         c1, s1, e1 = self.mate1
         c2, s2, e2 = self.mate2

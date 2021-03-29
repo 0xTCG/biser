@@ -1,0 +1,162 @@
+from common import *
+from search import *
+from segment import *
+# from chain import *
+from align_hit import *
+
+
+def refine_chains(anchors: list[Hit], qseq: str, rseq: str, orig: Hit):
+    
+    print(":: taking " + str(len(anchors)) + " anchors for refinement")
+    #sort(anchors)
+    
+    same_chr = orig.query.name == orig.ref.name and orig.query.is_rc == orig.ref.is_rc
+    score = list[int]()
+    r = Refine()
+
+    for a in anchors:
+        score.append(r.MATCH*a.aln.matches() - r.MISMATCH *a.aln.mismatches() - r.GAP*a.aln.gap_bases())
+
+    dp = [0]* len(anchors)
+    prev = [-1]*len(anchors)
+    maxes = list[tuple[int,int]]() # ordered set
+    for ai in range(len(anchors)):
+        if(same_chr):
+            c = anchors[ai]
+            qlo = c.query_start
+            qhi = c.query_end
+            rlo = c.ref_start
+            rhi = c.ref_end
+            qo = max(0,min(orig.query_start + qhi, orig.ref_start + rhi) - max(orig.query_start + qlo, orig.ref_start + rlo))
+            if((rhi - rlo) - qo < r.SIDE_ALIGN and (qhi-qlo) -qo < r.SIDE_ALIGN):
+                # no gap between
+                continue
+        
+
+        dp[ai] = score[ai]
+
+        for aj in range(ai-1,0):
+            c = anchors[ai]
+            p = anchors[aj]
+
+            cqs = c.query_start
+            if(cqs < p.query_end):
+                cqs = p.query_end
+            
+            crs = c.ref_start
+            if(crs < p.ref_end):
+                crs = p.ref_end
+            
+            if(p.query_end >= c.query_end or p.ref_end >= c.ref_end):
+                continue
+            
+            if(p.ref_start >= c.ref_start):
+                continue
+
+            ma = max(cqs - p.query_end, crs - p.ref_end)
+            mi = min(cqs - p.query_end, crs - p.ref_end)
+
+            if(ma >= r.MAX_GAP):
+                continue
+
+            if(same_chr):
+                qlo = p.query_end
+                qhi = cqs
+                rlo = p.ref_end
+                rhi = crs
+                qo = max(0, min(orig.query_start + qhi, orig.ref_start + rhi) - max(orig.query_start + qlo, orig.ref_start + rlo))
+
+                if(qo >= 1):
+                    # no gap between
+                    continue
+                
+            mis = r.MISMATCH * mi
+            gap = r.GAPOPEN + r.GAP *(ma-mi)
+            sco = dp[aj] + score[ai] - mis - gap
+            if(sco >= dp[ai]):
+                dp[ai] = sco
+                prev[ai] = aj
+        
+        maxes.append((dp[ai], ai))
+    
+    used = [0]*len(anchors)
+    paths = list[list[int]]() # originally deque, fix later
+    hits = list[Hit]()
+
+    for m in maxes:
+        if(m[0] == 0):
+            break
+        maxi = m[1]
+        if(used[maxi]):
+            continue
+        paths.append(list[int]())
+        hasu = 0
+        while(maxi != -1 and (~used[maxi])):
+            paths[len(paths)-1].insert(0,maxi) # insert took a while when first testing
+            hasu += anchors[maxi].jaccard
+            used[maxi]= True
+            maxi = prev[maxi]
+        
+        qlo = anchors[paths[len(paths)-1][0]].query_start
+        qhi = anchors[paths[len(paths)-1][len(paths[len(paths)])]].query_end
+        rlo = anchors[paths[len(paths)-1][0]].ref_start
+        rhi = anchors[paths[len(paths)-1][len(paths[len(paths)])]].ref_end
+
+        est_size = anchors[paths[len(paths)-1][0]].aln.span()
+        for i in range(len(paths(len(paths)-1))):
+            est_size += anchors[paths[len(paths)-1][i]].aln.span()
+            est_size += max(anchors[paths[len(paths)-1][i]].query_start - anchors[paths[len(paths)][i-1]].query_end, anchors[paths[len(paths)][i]].ref_start - anchors[paths[len(paths)][i-1]].ref_end)
+        
+        print("-- chain: (est:" + str(est_size) + ", size:" + str(len(paths[len(paths)-1])) + ") " + str(qlo) + ".." + str(qhi) + " --> " + str(rlo) + ".." + str(rhi) + " ## " + str(qlo+orig.query_start) + ".." + str(qhi+orig.query_start) + " --> " + str(rlo+orig.ref_start) + ".." + str(rhi+orig.ref_start))
+
+        for p in paths[len(paths)-1]:
+            y = anchors[p]
+            print("     " + str(y.query_start) + ".." + str(y.query_end) + "-->" + str(y.ref_start) + ".." + str(y.ref_end))
+        
+
+        if(est_size < r.MIN_READ - r.SIDE_ALIGN):
+            print("est size failed")
+            continue
+        
+        overlap = False
+        for h in hits:
+            qo = max(0, min(qhi, h.query_end) - max(qlo,h.query_start))
+            ro = max(0, min(rhi, h.ref_end) - max(rlo, h.ref_start))
+
+            if(qhi-qlo-qo < r.SIDE_ALIGN and rhi-rlo-ro < r.SIDE_ALIGN):
+                print("between overlap failed")
+                overlap = True
+                break
+        
+        if(overlap):
+            continue
+
+        hit = Hit(anchors[0].query,qlo,qhi,anchors[0].ref,rlo,rhi,0,"","")
+        guide = list[Hit]()
+
+        prev = anchors[paths[len(paths)-1][0]]
+
+        for pi in range(1,len(paths[len(paths)-1])):
+            cur = anchors[paths[len(paths)-1][pi]]
+            if(cur.query_start < prev.query_end or cur.ref_start < prev.ref_end):
+                prev.aln.merge(cur.aln,qseq,rseq)
+                prev.update_from_alignment()
+            else:
+                guide.append(prev)
+                prev = cur
+            
+        guide.append(prev)
+
+        hit.aln = Alignment(hit.query.seq,hit.ref.seq,guide,r.SIDE_ALIGN)
+        hit.update_from_alignment()
+        if(hit.aln.span() >= r.MIN_READ):
+            print("IN!")
+            hits.append(hit)
+        else:
+            print("failed final size")
+    
+    anchors = hits
+    return anchors
+
+
+        

@@ -34,8 +34,8 @@ if ! command -v "parallel" >/dev/null 2>&1 ; then
     exit 1
 fi
 
-OPTIONS=hj:o:w:fe:t:S:d:g:l:
-LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params
+OPTIONS=hj:o:w:fe:t:S:d:g:l:p:r:q:
+LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params,dynamic,withoutw,filtering,padding,ref,query
 PARSED=$($GETOPT --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then
     exit 2
@@ -52,6 +52,10 @@ stat_params=""
 d="0"
 g="0"
 l="1"
+p="5000"
+r="100"
+q="700"
+
 while true; do
     case "$1" in
         -h|--help)
@@ -83,6 +87,18 @@ while true; do
             l="$2"
             shift 2
             ;;
+        -p|--padding)
+			p="$2"
+			shift 2
+			;;
+		-r|--ref)
+			r="$2"
+			shift 2
+			;;
+		-q|--query)
+			q="$2"
+			shift 2
+			;;
         -o|--output)
             output="$2"
             shift 2
@@ -128,7 +144,7 @@ fi
 # ./new_sedef_ms.sh data/genomes/ -o same -l 1 -j 10 
 output ${output}
 mkdir ${output}/same
-./new_sedef_ms.sh ${input} -o "${output}/same/" -l ${l} -j ${jobs}
+./new_sedef_ms.sh ${input} -o "${output}/same/" -l ${l} -p ${p} -q ${q} -d ${d} -g ${g} -j ${jobs}
 
 # now we do align of those putative SDs to find alignment and exact locations of those SDs
 # ./align_ms.sh data/genomes/ same
@@ -155,4 +171,4 @@ python3 chop_regions.py normalize ${output}/different/
 # at the end just concatinate everything into one file
 python3 chop_regions.py final ${output}/same/ ${output}/different/ ${output}/final.bed
 
-uf ${output}/final_all.bed >${output}/elementaries.txt
+uf ${output}/final.bed >${output}/elementaries.txt

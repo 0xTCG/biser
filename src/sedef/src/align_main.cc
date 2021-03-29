@@ -293,6 +293,7 @@ void generate_alignments(const string &ref_path, const string &bed_path,
   }
   FastaReference fr(ref_path);
   FastaReference fr2(ref_path2);
+  auto T = cur_time();
 
 
   int lines = 0, total = 0;
@@ -340,7 +341,10 @@ void generate_alignments(const string &ref_path, const string &bed_path,
         total_written++;
         prn("{}\t{}", hh.to_bed(false), h.to_bed(0));
       }
+      // break;
     }
+    // break;
+
   }
 
   eprn("\nFinished BED {} in {}s ({} lines, generated {} hits)", bed_path,

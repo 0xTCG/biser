@@ -1,0 +1,19 @@
+import sys
+import getopt
+from align_main import *
+from search_main import *
+from time import timing
+
+opts,args = getopt.getopt(sys.argv[1:], "n:k:r:w:")
+# print(opts)
+# print(args)
+
+if (args[0] == "align"):
+    align_main(opts,args[1:])
+
+with timing('search'):
+    if (args[0] == "search"):
+        # print args
+        # print(opts)
+        # print f'LOL\nLOLLL'
+        search_main(opts,args[1:])

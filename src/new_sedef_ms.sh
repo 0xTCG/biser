@@ -42,8 +42,8 @@ if ! command -v "parallel" >/dev/null 2>&1 ; then
 	exit 1
 fi
 
-OPTIONS=hj:o:w:fe:t:S:d:g:l:
-LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params
+OPTIONS=hj:o:w:fe:t:S:d:g:l:p:r:q:
+LONGOPTIONS=help,jobs,output,wgac,force,exclude,translate,stat-params,dynamic,withoutw,filtering,padding,ref,query
 PARSED=$($GETOPT --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
 if [[ $? -ne 0 ]]; then
 	exit 2
@@ -60,6 +60,10 @@ stat_params=""
 d="0"
 g="0"
 l="1"
+p="5000"
+r="100"
+q="700"
+
 while true; do
 	case "$1" in
 		-h|--help)
@@ -89,6 +93,18 @@ while true; do
 			;;
 		-l|--filtering)
 			l="$2"
+			shift 2
+			;;
+		-p|--padding)
+			p="$2"
+			shift 2
+			;;
+		-r|--ref)
+			r="$2"
+			shift 2
+			;;
+		-q|--query)
+			q="$2"
 			shift 2
 			;;
 		-o|--output)
@@ -172,8 +188,8 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ] ; then # || tru
 				samtools faidx $j
 
 				# final one:
-				echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc biser_search.seq -k 14 -w 16 -f ${l} -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
-	            
+				echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc biser_search.seq -r ${r} -q ${q} -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
+				
 				# echo "/home/hiseric1/new_sedef/sedef/sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/"
 
 			fi

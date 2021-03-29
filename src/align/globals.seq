@@ -1,0 +1,56 @@
+from time import *
+
+KB = 1000
+MB = 1000 * KB
+GB = 1000 * MB
+
+TOTAL_ATTEMPTED = 0
+JACCARD_FAILED = 0
+INTERVAL_FAILED = 0
+OTHER_FAILED = 0
+QGRAM_NORMAL_FAILED = 0
+
+
+def elapsed(t):
+    return time() - t
+
+# ------- TIME
+
+time_interval   = 0.0
+time_sliding    = 0.0
+time_extend     = 0.0
+time_filter     = 0.0
+time_search     = 0.0
+time_search_in_reference_interval = 0.0
+
+time_search_p1  =    0.0
+time_search_p2  =    0.0
+time_writing    =    0.0
+
+
+# ------ SEARCH
+
+SEARCH_KMER_SIZE =      12   
+SEARCH_WINDOW_SIZE =    16
+SEARCH_MIN_UPPERCASE =  12
+SEARCH_MAX_ERROR =      0.3
+SEARCH_MAX_EDIT_ERROR = 0.15
+SEARCH_GAP_FREQUENCY =  0.005
+SEARCH_MIN_READ_SIZE =  KB * (1 - SEARCH_MAX_ERROR)
+SEARCH_MAX_SD_SIZE =    1 * 1024 * 1024
+
+# ------ HASH
+
+HASH_INDEX_CUTOFF = 0.001
+
+# ------ INTERNAL
+
+INTERNAL_DoUppercase =      False
+INTERNAL_DoUppercaseSeeds = True
+INTERNAL_DoQgram =          False
+
+# chr_first   =    ""
+# chr_second  =    ""
+
+
+# final_dict = dict[int,int]()
