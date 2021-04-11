@@ -1,6 +1,6 @@
 #!/bin/bash
 path="$1"
-jobs=10
+jobs="10"
 TIME="/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time"
 
 output="$2"
@@ -16,8 +16,9 @@ for i in ${path}/*; do
     then
         # echo samtools faidx ${i}
         f="$(basename -- $i)"
+        sleep 1
         # echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc decompose.seq ${i} results/hg19_5/colors_elems/ >results/hg19_5/colors_logs/${f}_1 2>results/hg19_5/colors_logs/${f}_1"
-        /cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc run decompose.seq ${i} ${output}/colors_elems/ >${output}/colors_logs/${f}_1 2>${output}/colors_logs/${f}_2
+        # /cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc run decompose.seq ${i} ${output}/colors_elems/ >${output}/colors_logs/${f}_1 2>${output}/colors_logs/${f}_2
 
     fi
     # /cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc decompose.seq ${i} results/hg19_5/colors_elems/ >results/l1

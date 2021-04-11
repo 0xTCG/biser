@@ -3,7 +3,7 @@ import sys
 # import bio.align
 # import bio.bwt
 from time import *
-# from pair import *
+from pair import *
 from linked_list_node1 import *
 # from bisect import bisect_left
 
@@ -24,7 +24,7 @@ def mark_visited(visited_array, begin, end):
 		visited_array[i] = True
 
 
-def process(threads: Optional[Linked_list_node], visited, return_array = list[tuple[int,int,int, int]]()):
+def process(threads, visited, return_array = list[tuple[int,int,int, int]]()):
 	# list in format: chr_id, begin, end
 	
 	walker = threads
@@ -38,14 +38,14 @@ def process(threads: Optional[Linked_list_node], visited, return_array = list[tu
 	if len(return_array) == 1:
 		return list[tuple[int,int,int, int]]()
 	else:
-		for walker_ in return_array:
-			mark_visited(visited[walker_[0]], walker_[1] , walker_[2] )
+		for walker in return_array:
+			mark_visited(visited[walker[0]], walker[1] , walker[2] )
 
 	return return_array
 
 
 
-def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list: list[tuple[int,int]], difference: int , return_array: list[list[ tuple[int,int,int, int]] ] = list[tuple[int,int,int]](), visited: list[list[bool]] = list[list[bool]]() ) -> Optional[Linked_list_node]:
+def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair[int,int]], difference: int , return_array: list[list[ tuple[int,int,int, int]] ] = list[tuple[int,int,int]](), visited: list[list[bool]] = list[list[bool]]() ) -> Linked_list_node:
 
 	minimizer_index = len(minimizers_dict_list) - 1
 	node_counter = 0
@@ -56,12 +56,12 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
 	previous = threads #threads
 	previous = None
 	holder = threads
-	while threads and minimizer_index >= 0 and (minimizers_dict_list[minimizer_index][0] > threads.chr_ or (minimizers_dict_list[minimizer_index][0] == threads.chr_ and minimizers_dict_list[minimizer_index][1] > threads.end + difference + kmer_size)):
-		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index][0]][minimizers_dict_list[minimizer_index][1]]:
+	while threads and minimizer_index >= 0 and (minimizers_dict_list[minimizer_index].first > threads.chr_ or (minimizers_dict_list[minimizer_index].first == threads.chr_ and minimizers_dict_list[minimizer_index].second > threads.end + difference + kmer_size)):
+		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index].first][minimizers_dict_list[minimizer_index].second]:
 			minimizer_index-=1
 			continue
 
-		walker = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][0], threads,0,1)
+		walker = Linked_list_node(minimizers_dict_list[minimizer_index].second, minimizers_dict_list[minimizer_index].second, minimizers_dict_list[minimizer_index].first, threads,0,1)
 
 		walker.score += 1
 		node_counter += 1
@@ -84,11 +84,11 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
 		node_counter += 1
 
 		case_ = 0
-		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index][0]][minimizers_dict_list[minimizer_index][1]]:
+		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index].first][minimizers_dict_list[minimizer_index].second]:
 			minimizer_index-=1
 			continue
-		if minimizer_index >= 0 and walker.chr_ == minimizers_dict_list[minimizer_index][0] and (walker.end - kmer_size ) <  minimizers_dict_list[minimizer_index][1] and (walker.end + difference) >= minimizers_dict_list[minimizer_index][1]:
-			if walker.end >= minimizers_dict_list[minimizer_index][1]:
+		if minimizer_index >= 0 and walker.chr_ == minimizers_dict_list[minimizer_index].first and (walker.end - kmer_size ) <  minimizers_dict_list[minimizer_index].second and (walker.end + difference) >= minimizers_dict_list[minimizer_index].second:
+			if walker.end >= minimizers_dict_list[minimizer_index].second:
 				
 				walker.end += 1
 				walker.score += 1
@@ -96,7 +96,7 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
 				walker.count+=1
 				minimizer_index-=1
 			else:
-				walker.end = minimizers_dict_list[minimizer_index][1]  + 10
+				walker.end = minimizers_dict_list[minimizer_index].second  + 10
 				walker.score += 1
 				walker.inner_gap += 0
 				
@@ -105,15 +105,15 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
 			
 			minimizer_index-=1
 			continue
-		elif minimizer_index >= 0 and walker.chr_ == minimizers_dict_list[minimizer_index][0] and (walker.end - kmer_size ) >  minimizers_dict_list[minimizer_index][1] and walker.begin <= minimizers_dict_list[minimizer_index][1]:
+		elif minimizer_index >= 0 and walker.chr_ == minimizers_dict_list[minimizer_index].first and (walker.end - kmer_size ) >  minimizers_dict_list[minimizer_index].second and walker.begin <= minimizers_dict_list[minimizer_index].second:
 			minimizer_index-=1
 			walker.score += 1
 
 			continue
 
 
-		elif minimizer_index >= 0 and (not walker.next or walker.next.chr_ < minimizers_dict_list[minimizer_index][0] or (walker.next.chr_ == minimizers_dict_list[minimizer_index][0] and walker.next.end + difference < minimizers_dict_list[minimizer_index][1]) ):
-			walker.insert_after(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][0],1,1)
+		elif minimizer_index >= 0 and (not walker.next or walker.next.chr_ < minimizers_dict_list[minimizer_index].first or (walker.next.chr_ == minimizers_dict_list[minimizer_index].first and walker.next.end + difference < minimizers_dict_list[minimizer_index].second) ):
+			walker.insert_after(minimizers_dict_list[minimizer_index].second, minimizers_dict_list[minimizer_index].first,1,1)
 			walker.next.score += 1
 			minimizer_index-=1
 			
@@ -166,16 +166,16 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
 
 	while minimizer_index >= 0:
 		node_counter += 1
-		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index][0]][minimizers_dict_list[minimizer_index][1]]:
+		if minimizer_index >= 0 and visited[minimizers_dict_list[minimizer_index].first][minimizers_dict_list[minimizer_index].second]:
 			minimizer_index-=1
 			continue
 
 		if not threads:
-			threads = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1],minimizers_dict_list[minimizer_index][0], None, 1, 1)
+			threads = Linked_list_node(minimizers_dict_list[minimizer_index].second, minimizers_dict_list[minimizer_index].second,minimizers_dict_list[minimizer_index].first, None, 1, 1)
 			threads.score += 1
 			previous = threads
 		else:
-			previous.insert_after(minimizers_dict_list[minimizer_index][1],minimizers_dict_list[minimizer_index][0])
+			previous.insert_after(minimizers_dict_list[minimizer_index].second,minimizers_dict_list[minimizer_index].first)
 
 			previous = previous.next
 			previous.score += 1
@@ -185,7 +185,7 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
 
 
 
-def dict_align(s1, chr1, ref_dict: dict[int, list[tuple[int,int]]] = dict[int, list[tuple[int,int]]](), visited = list[bool] ()):
+def dict_align(s1:seq, chr1, ref_dict = dict[int, list[pair[int,int]]](), visited = list[bool]):
 
 	step = 1
 	loc = 0
@@ -196,9 +196,9 @@ def dict_align(s1, chr1, ref_dict: dict[int, list[tuple[int,int]]] = dict[int, l
 		frequency += 1
 		i_ = int(i.as_int())
 		if i_ in ref_dict:
-			ref_dict[i_].append((chr1,loc))
+			ref_dict[i_].append(pair(chr1,loc))
 		else:
-			ref_dict[i_] = [(chr1,loc)]
+			ref_dict[i_] = [pair(chr1,loc)]
 		loc += 1
 	for i in range(9):
 		visited.append(False)
@@ -220,15 +220,14 @@ def get_coverage(visited, croms):
 	return covered, all
 
 
-def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[list[ tuple[int,int,int,int]]](), visited = list[list[bool]] ()):
+def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[list[ tuple[int,int,int,int]]](), visited = list[list[bool]]):
 	loc = 0
 	step = 1
 	difference = 60
 
-	helper = list[tuple[int,int]]()
+	helper = list[pair[int,int]]()
 
-	threads = None # Optional[Linked_list_node]() # Linked_list_node(0,0)
-	
+	threads = Linked_list_node(0,0)
 	max_val = 0
 	avg = 0
 	avg_count = 0
@@ -240,7 +239,7 @@ def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[li
 			continue
 		if visited[chr1][loc]:
 			loc += step
-			if not threads is None:
+			if threads:
 				temp_arr = process(threads, visited)
 				if len(temp_arr) > 0:
 					best_nodes.append( temp_arr )
@@ -271,9 +270,9 @@ def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[li
 	walker = None
 	# return threads
 
-from bio.fasta import *
 
-def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=''):
+
+def decompose(path_to_fa1,destination_path = 'test', fai = True):
 
 	counter = 0
 	failed_ = 0
@@ -282,7 +281,7 @@ def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=
 	croms_rev = dict[str, int]()
 
 	fr = FASTA(path_to_fa1, fai = fai)
-	ref_dict = dict[int, list[tuple[int,int]]]()
+	ref_dict = dict[int, list[pair[int,int]]]()
 
 	# dict_seqc = dict[str, seq]()
 
@@ -306,9 +305,9 @@ def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=
 
 	if destination_path[-1] != '/':
 		destination_path+= '/'
-	name = path_to_fa1.split('/')[-1].split('.')[0] if outpt_filename == '' else outpt_filename
+	name = path_to_fa1.split('/')[-1].split('.')[0]
 	print f'{destination_path}{name}.bed'
-	output = open(f'{destination_path}{name}.bed','w') #if outpt_filename == '' else outpt_filename
+	output = open(f'{destination_path}{name}.bed','w')
 
 	count = 0
 	count2 = 0
@@ -333,8 +332,6 @@ def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=
 			threshold = i
 
 	# fr.close()
-	if threshold < 100:
-		threshold = 1 << 31
 	print f'Threshold is: {threshold}'
 	count3 = 0
 	count4 = 0
@@ -384,12 +381,7 @@ def main():
 		decompose(sys.argv[1], 'results/')
 	elif len(sys.argv) == 3:
 		decompose(sys.argv[1], sys.argv[2])
-	elif len(sys.argv) == 4:
-		for i in range (int(sys.argv[3])):
-			bin_num = sys.argv[1].split('/')[-1].split('.')[0]
-			decompose(f'{sys.argv[1]}/{i}.fa', sys.argv[2], True, f'{bin_num}_{i}')
 main()
-
 
 
 # def main2():

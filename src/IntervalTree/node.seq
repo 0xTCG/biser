@@ -61,17 +61,17 @@ def bisect_right[K](a:  list[K], x:K):
 class Node[K]:
     x_center: float
     s_center: set[Interval[K]]
-    left_node: Node
-    right_node: Node
+    left_node: Optional[Node[K]]
+    right_node: Optional[Node[K]]
     depth: int
     balance: int
 
     def __init__(
-        self: Node,
+        self: Node[K],
         x_center: optional[float] = 0.0,
         s_center: set[Interval[K]] = set[Interval[K]](),
-        left_node: optional[Node] = None,
-        right_node: optional[Node] = None,
+        left_node: optional[Node[K]] = None,
+        right_node: optional[Node[K]] = None,
     ):
         self.x_center = x_center
         self.s_center = set[Interval[K]](s_center)
@@ -81,7 +81,7 @@ class Node[K]:
         self.balance = 0  # ditto
         self.rotate()
 
-    def __init__(self: Node, x_center: float, s_center: set[Interval[K]]):
+    def __init__(self: Node[K], x_center: float, s_center: set[Interval[K]]):
         self.x_center = x_center
         self.s_center = set[Interval[K]](s_center)
         self.left_node = None
@@ -90,7 +90,7 @@ class Node[K]:
         self.balance = 0  # ditto
         self.rotate()
 
-    def __init__(self: Node):
+    def __init__(self: Node[K]):
         self.x_center = 0.0
         self.s_center = set[Interval[K]]()
         self.left_node = None
@@ -99,11 +99,11 @@ class Node[K]:
         self.balance = 0  # ditto
         self.rotate()
 
-    def from_interval(self: Node, interval: Interval[K]) -> Node[K]:
+    def from_interval(self: Node[K], interval: Interval[K]) -> Optional[Node[K]]:
         center = interval.begin
-        return Node(center, set[Interval[K]]([interval]))
+        return Node[K](center, set[Interval[K]]([interval]))
 
-    def from_intervals(self: Node, intervals: set[Interval[K]]) -> Node[K]:
+    def from_intervals(self: Node[K], intervals: set[Interval[K]]) -> Optional[Node[K]]:
         if not intervals or len(intervals) == 0:
             # print "oke"
             return None
@@ -111,7 +111,7 @@ class Node[K]:
         node = node.init_from_sorted(sorted(intervals))
         return node
 
-    def init_from_sorted(self: Node, intervals: list[Interval[K]]) -> Node[K]:
+    def init_from_sorted(self: Node[K], intervals: list[Interval[K]]) -> Optional[Node[K]]:
         # assumes that intervals is a non-empty collection.
         # Else, next line raises IndexError
         center_iv = intervals[len(intervals) // 2]
@@ -134,63 +134,72 @@ class Node[K]:
 
         return self.rotate()
 
-    def center_hit(self: Node, interval: Interval[K]):
+    def center_hit(self: Node[K], interval: Interval[K]):
         """Returns whether interval overlaps self.x_center."""
         return interval.contains_point(self.x_center)
 
-    def hit_branch(self: Node, interval: Interval[K]):
+    def hit_branch(self: Node[K], interval: Interval[K]):
         """
         Assuming not center_hit(interval), return which branch
         (left=0, right=1) interval is in.
         """
         return interval.begin > self.x_center
 
-    def refresh_balance(self: Node):
+    def refresh_balance(self: Node[K]):
         """
         Recalculate self.balance and self.depth based on child node values.
         """
-        left_depth = self.left_node.depth if self.left_node else 0
-        right_depth = self.right_node.depth if self.right_node else 0
+        left_depth = self.left_node.depth if not self.left_node is None else 0
+        right_depth = self.right_node.depth if not self.right_node is None else 0
         self.depth = 1 + max(left_depth, right_depth)
         self.balance = right_depth - left_depth
 
-    def compute_depth(self: Node) -> int:
+    def compute_depth(self: Node[K]) -> int:
         """
         Recursively computes true depth of the subtree. Should only
         be needed for debugging. Unless something is wrong, the
         depth field should reflect the correct depth of the subtree.
         """
-        left_depth = self.left_node.compute_depth() if self.left_node else 0
-        right_depth = self.right_node.compute_depth() if self.right_node else 0
+        left_depth = self.left_node.compute_depth() if not self.left_node is None else 0
+        right_depth = self.right_node.compute_depth() if not self.right_node is None else 0
         return 1 + max(left_depth, right_depth)
 
-    def rotate(self: Node) -> Node[K]:
+    def rotate(self: Node[K]) ->  Optional[Node[K]]:
         """
         Does rotating, if necessary, to balance this node, and
         returns the new top node.
         """
         # print self.x_center
         self.refresh_balance()
+        # print 'ok balance'
         if abs(self.balance) < 2:
             return self
         my_heavy = self.balance > 0
         child_heavy = self[my_heavy].balance > 0
         if my_heavy == child_heavy or self[my_heavy].balance == 0:
+            # print 'srotate'
             return self.srotate()
         else:
+            # print 'drotate'
+
             return self.drotate()
 
-    def srotate(self: Node) -> Node[K]:
+    def srotate(self: Node[K]) -> Optional[Node[K]]:
         """Single rotation. Assumes that balance is +-2."""
         heavy = self.balance > 0
         light = not heavy
+        # print f'balance: {self.balance}, {heavy}, {light}, {self}, {self[heavy]}'
         save = self[heavy]
+        # print f'{save}'
         # print("srotate: bal={},{}".format(self.balance, save.balance))
         # self.print_structure()
-        self[heavy] = save[light]
+        # print f'{save[light]}, {self[heavy]}'
+        self[heavy] = save[light] # here is the problem
+        # print 'ok'
         save[
             light
         ] = self.rotate()  # Needed to ensure the 2 and 3 are balanced under new subnode
+        assert not save is None
 
         # Some intervals may overlap both self.x_center and save.x_center
         # Promote those to the new tip of the tree
@@ -202,10 +211,15 @@ class Node[K]:
             # For now, this is the same as augmenting save.s_center, but that may
             # change.
             save.s_center.update(set[Interval[K]](promotees))
+        # print f'self 2: {self}'
+        
+        # print f'balance 2: {self.balance}'
+        
         save.refresh_balance()
+        assert not save is None
         return save
 
-    def drotate(self: Node) -> Node[K]:
+    def drotate(self: Node[K]) ->  Optional[Node[K]]:
         # First rotation
         my_heavy = self.balance > 0
         self[my_heavy] = self[my_heavy].srotate()
@@ -213,27 +227,41 @@ class Node[K]:
 
         # Second rotation
         result = self.srotate()
+        assert not result is None
 
         return result
 
-    def add(self: Node, interval: Interval[K]):
+    def add(self: Node[K], interval: Interval[K]) ->  Optional[Node[K]]:
         """
         Returns self after adding the interval and balancing.
         """
         if self.center_hit(interval):
+            # print 1
             self.s_center.add(interval)
             return self
         else:
+
             direction = self.hit_branch(interval)
-            if not self[direction]:
+            # print f'dorection: {self[direction]}'
+
+            # if not self[direction]:
+            if self[direction] is None:
+
                 self[direction] = self.from_interval(interval)
+                # print  'now here'
                 self.refresh_balance()
+                # print self
+                assert not self is None
                 return self
             else:
+                # print 'wtf'
                 self[direction] = self[direction].add(interval)
-                return self.rotate()
+                # print f'here entered {self}'
+                m = self.rotate()
+                # print f'M: {m}'
+                return m
 
-    def remove(self: Node, interval: Interval[K]):
+    def remove(self: Node[K], interval: Interval[K]):
         """
         Returns self after removing the interval and balancing.
 
@@ -244,7 +272,7 @@ class Node[K]:
         done = list[int]()
         return self.remove_interval_helper(interval, done, should_raise_error=True)
 
-    def discard(self: Node, interval: Interval[K]) -> Node[K]:
+    def discard(self: Node[K], interval: Interval[K]) ->  Optional[Node[K]]:
         """
         Returns self after removing interval and balancing.
 
@@ -254,8 +282,8 @@ class Node[K]:
         return self.remove_interval_helper(interval, done, should_raise_error=False)
 
     def remove_interval_helper(
-        self: Node, interval: Interval[K], done: list[int], should_raise_error: bool
-    ) -> Node[K]:
+        self: Node[K], interval: Interval[K], done: list[int], should_raise_error: bool
+    ) -> Optional[Node[K]]:
         """
         Returns self after removing interval and balancing.
         If interval doesn't exist, raise ValueError.
@@ -294,7 +322,7 @@ class Node[K]:
         else:  # interval not in s_center
             direction = self.hit_branch(interval)
 
-            if not self[direction]:
+            if self[direction] is None:
                 if should_raise_error:
                     raise ValueError("Wrong value")
                 done.append(1)
@@ -316,7 +344,7 @@ class Node[K]:
                 return self.rotate()
             return self
 
-    def search_overlap(self: Node, point_list: list[float]) -> set[Interval[K]]:
+    def search_overlap(self: Node[K], point_list: list[float]) -> set[Interval[K]]:
         """
         Returns all intervals that overlap the point_list.
         """
@@ -327,7 +355,7 @@ class Node[K]:
         return result
 
     def search_point(
-        self: Node, point: float, result: set[Interval[K]]
+        self: Node[K], point: float, result: set[Interval[K]]
     ) -> set[Interval[K]]:
         """
         Returns all intervals that contain point.
@@ -347,13 +375,13 @@ class Node[K]:
             return self[1].search_point(point, result)
         return result
 
-    def prune(self: Node) -> Node:
+    def prune(self: Node[K]) -> Optional[Node[K]]:
         """
         On a subtree where the root node's s_center is empty,
         return a new subtree with no empty s_centers.
         """
-        if not self[0] or not self[1]:  # if I have an empty branch
-            direction = not self[0]  # graft the other branch here
+        if self[0] is None or self[1] is None:  # if I have an empty branch
+            direction = self[0] is None # graft the other branch here
             # if trace:
             #    print('Grafting {} branch'.format(
             #       'right' if direction else 'left'))
@@ -388,7 +416,7 @@ class Node[K]:
             # if trace: heir.print_structure()
             return heir
 
-    def pop_greatest_child(self: Node) -> tuple[Node[K], Node[K]]:
+    def pop_greatest_child(self: Node[K]) -> tuple[Optional[Node[K]], Optional[Node[K]]]:
         """
         Used when pruning a node with both a left and a right branch.
         Returns (greatest_child, node), where:
@@ -404,7 +432,7 @@ class Node[K]:
         in his AVL tree article for reference.
         """
         # print('Popping from {}'.format(self.x_center))
-        if not self.right_node:  # This node is the greatest child.
+        if self.right_node is None:  # This node is the greatest child.
             # To reduce the chances of an overlap with a parent, return
             # a child node containing the smallest possible number of
             # intervals, as close as possible to the maximum bound.
@@ -423,8 +451,8 @@ class Node[K]:
                     temp.add(iv)
 
             # Create a new node with the largest x_center possible.
-            
-            child = Node(new_x_center, temp)
+            child = Optional[Node[K]]()
+            child = Node[K](new_x_center, temp)
             self.s_center -= child.s_center
 
             # print('Pop hit! Returning child   = {}'.format(
@@ -436,7 +464,7 @@ class Node[K]:
             if self.s_center:
                 # print('     and returning newnode = {}'.format( self ))
                 # self.verify()
-                return child, self
+                return child, Optional[Node[K]](self)
             else:
                 # print('     and returning newnode = {}'.format( self[0] ))
                 # if self[0]: self[0].verify()
@@ -462,7 +490,7 @@ class Node[K]:
                 # new_self.verify()
                 self.refresh_balance()
                 new_self = self.rotate()
-                return greatest_child, new_self
+                return Optional[Node[K]](greatest_child), Optional[Node[K]](new_self)
             else:
                 new_self = self.prune()
                 # print('and returning prune = {}'.format(
@@ -471,7 +499,7 @@ class Node[K]:
                 # if new_self: new_self.verify()
                 return greatest_child, new_self
 
-    def contains_point(self: Node, p):
+    def contains_point(self: Node[K], p):
         """
         Returns whether this node or a child overlaps p.
         """
@@ -481,7 +509,7 @@ class Node[K]:
         branch = self[p > self.x_center]
         return branch and branch.contains_point(p)
     
-    def contains_point_interval(self: Node, p):
+    def contains_point_interval(self: Node[K], p):
         """
         Returns whether this node or a child overlaps p.
         """
@@ -496,7 +524,7 @@ class Node[K]:
     def all_children(self) -> set[Interval[K]]:
         return self.all_children_helper(set[Interval[K]]())
 
-    def all_children_helper(self: Node, result: set[Interval[K]]) -> set[Interval[K]]:
+    def all_children_helper(self: Node[K], result: set[Interval[K]]) -> set[Interval[K]]:
         result.update(self.s_center)
         if self[0]:
             self[0].all_children_helper(result)
@@ -504,7 +532,7 @@ class Node[K]:
             self[1].all_children_helper(result)
         return result
 
-    def verify(self: Node, parents: set[float]):
+    def verify(self: Node[K], parents: set[float]):
         """
         ## DEBUG ONLY ##
         Recursively ensures that the invariants of an interval subtree
@@ -544,7 +572,7 @@ class Node[K]:
             ), f"Error: Out-of-order right child! {self.x_center}"
             self[1].verify(parents.union(set[float]([self.x_center])))
 
-    def __getitem__(self: Node, index: int) -> Node[K]:
+    def __getitem__(self: Node[K], index: int) -> Optional[Node[K]]:
         """
         Returns the left child if input is equivalent to False, or
         the right side otherwise.
@@ -554,7 +582,7 @@ class Node[K]:
         else:
             return self.left_node
 
-    def __getitem__(self: Node, index: bool) -> Node[K]:
+    def __getitem__(self: Node[K], index: bool) -> Optional[Node[K]]:
         """
         Returns the left child if input is equivalent to False, or
         the right side otherwise.
@@ -564,21 +592,21 @@ class Node[K]:
         else:
             return self.left_node
 
-    def __setitem__(self: Node, key: bool, value: Node[K]):
+    def __setitem__(self: Node[K], key: bool, value: Optional[Node[K]]):
         """Sets the left (0) or right (1) child."""
         if key:
             self.right_node = value
         else:
             self.left_node = value
 
-    def __setitem__(self: Node, key: int, value: Node[K]):
+    def __setitem__(self: Node[K], key: int, value: Optional[Node[K]]):
         """Sets the left (0) or right (1) child."""
         if key:
             self.right_node = value
         else:
             self.left_node = value
 
-    def __str__(self: Node):
+    def __str__(self: Node[K]):
         """
         Shows info about this node.
 
@@ -607,7 +635,7 @@ class Node[K]:
             count += self.right_node.count_nodes()
         return count
 
-    def depth_score(self: Node, n, m) -> float:
+    def depth_score(self: Node[K], n, m) -> float:
         """
         Calculates flaws in balancing the tree.
         :param n: size of tree
@@ -622,7 +650,7 @@ class Node[K]:
         f = 1 / float(1 + n - dopt)
         return f * self.depth_score_helper(1, dopt)
 
-    def depth_score_helper(self: Node, d, dopt) -> int:
+    def depth_score_helper(self: Node[K], d, dopt) -> int:
         """
         Gets a weighted count of the number of Intervals deeper than dopt.
         :param d: current depth, starting from 0
@@ -642,7 +670,7 @@ class Node[K]:
             count += self.left_node.depth_score_helper(d + 1, dopt)
         return count
 
-    def print_structure(self: Node, indent=0, tostring=False):
+    def print_structure(self: Node[K], indent=0, tostring=False):
         """
         For debugging.
         """
@@ -655,10 +683,10 @@ class Node[K]:
         if self.s_center:
             for iv in sorted(self.s_center):
                 rlist.append(sp + " " + str(iv) + nl)
-        if self.left_node:
+        if not self.left_node is None:
             rlist.append(sp + "<:  ")  # no CR
             rlist.append(self.left_node.print_structure(indent + 1, True))
-        if self.right_node:
+        if not self.right_node is None:
             rlist.append(sp + ">:  ")  # no CR
             rlist.append(self.right_node.print_structure(indent + 1, True))
         result = "".join(rlist)

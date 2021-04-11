@@ -13,6 +13,21 @@ def test1():
 
 test1()
 
+def get_len_distributions():
+    path = 'results/hg19_5_2/elementaries_hg19.bed'
+    # dict - len, count
+    d = dict[int,int]()
+    for i in open(path, 'r').readlines():
+        line = i.split('\t')
+        len_ = int(line[2]) - int(line[1])
+        if len_ in d:
+
+            d[len_] += 1
+        else:
+            d[len_] = 1
+    
+
+
 # from os.path import *
 # print os.environ
 # import os

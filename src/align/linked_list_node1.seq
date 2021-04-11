@@ -92,19 +92,20 @@ class Linked_list_node:
     #     self.next = other
     def __str__(self: Linked_list_node):
         s=""
+        walker = Optional[Linked_list_node]()
         walker = self
-        while walker:
-            s+=f'(chr: {walker.chr_}; begin: {walker.begin}; lens: {walker.lens}; gap: {walker.gap})->'
+        while not walker is None:
+            s+=f'(chr: {walker.chr_}; begin: {walker.begin}; end: {walker.end}; gap: {walker.gap}; score: {walker.score})->'
             walker = walker.next
         return s
-    def __len__(self: Linked_list_node):
-        i = 0
-        walker = self
-
-        while walker:
-            i+=1
-            walker = walker.next
-        return i
+    # def __len__(self: Linked_list_node):
+    #     i = 0
+    #     walker = self
+    #     assert False
+    #     while walker:
+    #         i+=1
+    #         walker = walker.next
+    #     return i
     def __eq__(self: Linked_list_node, other: Linked_list_node)-> bool:
         return self.begin == other.begin and self.end == other.end
 
