@@ -1,5 +1,5 @@
 from globals import *
-from pair import *
+# from pair import *
 import sys
 from math import ceil, exp
 
@@ -64,9 +64,14 @@ class Hash:
         return f'{self.hash}, {self.status}'
 
 
-type Minimizer(hash: Hash, loc:int):
-    def __eq__(m1: Minimizer, m2: Minimizer):
-        return (m1.loc,m1.hash) == (m2.loc,m2.hash)
+# class Minimizer:
+#     hash: Hash
+#     loc:int
+#     def __init__(self, hash, loc):
+#         self.hash = hash
+#         self.loc = loc
+#     def __eq__(m1: Minimizer, m2: Minimizer):
+#         return (m1.loc,m1.hash) == (m2.loc,m2.hash)
 
 # 14, 16
 # here we set up initial params for out algorithm
@@ -105,12 +110,12 @@ class Linked_list_node:
     count: int
 
     
-    next: Linked_list_node
+    next: Optional[Linked_list_node]
 
     potentional: bool
     
     
-    def __init__(self: Linked_list_node, first: int, ref:int, chr_:int):
+    def __init__(self: Optional[Linked_list_node], first: int, ref:int, chr_:int):
         self.first = first
         self.last = first
         self.ref = ref
@@ -120,7 +125,7 @@ class Linked_list_node:
         self.age = 0
         self.count = 0
         self.potentional = False
-    def __init__(self: Linked_list_node, first: int, ref:int,chr_:int, next: Linked_list_node):
+    def __init__(self: Linked_list_node, first: int, ref:int,chr_:int, next: Optional[ Linked_list_node ]):
         self.first = first
         self.last = first
         self.ref = ref
@@ -131,7 +136,7 @@ class Linked_list_node:
         self.count = 0
         self.potentional = False
 
-    def __init__(self: Linked_list_node, first: int, last:int, ref:int,chr_:int, next: Linked_list_node, age:int, count:int):
+    def __init__(self: Linked_list_node, first: int, last:int, ref:int,chr_:int, next: Optional[ Linked_list_node ], age:int, count:int):
         self.first = first
         self.last = last
         self.ref = ref
@@ -226,7 +231,7 @@ def overlap_SD(b1,e1,b2,e2):
             return False
     return True
 
-def add_to_tree_3(threads: Linked_list_node, minimizers_dict_list: list[pair[int,int]], current: int,current_chr:int, difference: int , index_set: list[pair[pair[int,int],pair[int,int]]] = list[pair[pair[int,int],pair[int,int]]](), croms = list[str], lens_dict = dict[int,int](), dict_final_sds = dict[str,list[str]]()):
+def add_to_tree_3(threads: Optional[Linked_list_node], minimizers_dict_list: list[tuple[int,int]], current: int,current_chr:int, difference: int , index_set: list[tuple[tuple[int,int],tuple[int,int]]] = list[tuple[tuple[int,int],tuple[int,int]]](), croms = list[str](), lens_dict = dict[int,int](), dict_final_sds = dict[str,list[str]]()):
     
     length = len(minimizers_dict_list)
     
@@ -236,12 +241,12 @@ def add_to_tree_3(threads: Linked_list_node, minimizers_dict_list: list[pair[int
     walker = threads
     previous = threads
     holder = threads
-    while threads and minimizer_index<length and ( (minimizers_dict_list[minimizer_index].first == threads.chr_ and minimizers_dict_list[minimizer_index].second < threads.first) or (minimizers_dict_list[minimizer_index].first < threads.chr_ )):
-        if minimizer_index<length and croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index].first != current_chr - 1:
+    while threads and minimizer_index<length and ( (minimizers_dict_list[minimizer_index][0] == threads.chr_ and minimizers_dict_list[minimizer_index][1] < threads.first) or (minimizers_dict_list[minimizer_index][0] < threads.chr_ )):
+        if minimizer_index<length and croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index][0] != current_chr - 1:
             minimizer_index += 1
             continue
         
-        walker = Linked_list_node(minimizers_dict_list[minimizer_index].second, minimizers_dict_list[minimizer_index].second, current, minimizers_dict_list[minimizer_index].first, threads,1,1)
+        walker = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1], current, minimizers_dict_list[minimizer_index][0], threads,1,1)
 
         if not (previous is threads):
             previous.next = walker
@@ -256,7 +261,7 @@ def add_to_tree_3(threads: Linked_list_node, minimizers_dict_list: list[pair[int
     threads = holder
 
     while walker:
-        if minimizer_index<length and  croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index].first != current_chr - 1:
+        if minimizer_index<length and  croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index][0] != current_chr - 1:
             minimizer_index += 1
             continue
         case_ = 0
@@ -266,15 +271,15 @@ def add_to_tree_3(threads: Linked_list_node, minimizers_dict_list: list[pair[int
         if do_dynamic_distance:
             alowd_distande_modified = max(alowed_distance, int((walker.last - walker.first) * 0.3))
         
-        if minimizer_index < length and walker.ref != current and walker.last < minimizers_dict_list[minimizer_index].second and walker.last + alowd_distande_modified >= minimizers_dict_list[minimizer_index].second and walker.chr_ ==  minimizers_dict_list[minimizer_index].first: # and walker.ref_last + alowd_distande_modified >= current:
-            walker.last = minimizers_dict_list[minimizer_index].second
+        if minimizer_index < length and walker.ref != current and walker.last < minimizers_dict_list[minimizer_index][1] and walker.last + alowd_distande_modified >= minimizers_dict_list[minimizer_index][1] and walker.chr_ ==  minimizers_dict_list[minimizer_index][0]: # and walker.ref_last + alowd_distande_modified >= current:
+            walker.last = minimizers_dict_list[minimizer_index][1]
             walker.ref_last = current
             walker.count+=1
             minimizer_index+=1
-        elif minimizer_index < length and (not walker.next or ( minimizers_dict_list[minimizer_index].first < walker.next.chr_ or (walker.next.first >= minimizers_dict_list[minimizer_index].second and walker.next.chr_ == minimizers_dict_list[minimizer_index].first)) ):
+        elif minimizer_index < length and (not walker.next or ( minimizers_dict_list[minimizer_index][0] < walker.next.chr_ or (walker.next.first >= minimizers_dict_list[minimizer_index][1] and walker.next.chr_ == minimizers_dict_list[minimizer_index][0])) ):
             # we set age to 0, we will increase it to one when we are on this node
-            walker.insert_after(minimizers_dict_list[minimizer_index].second, current, minimizers_dict_list[minimizer_index].first,0,1)
-            if minimizers_dict_list[minimizer_index].first == walker.chr_ and minimizers_dict_list[minimizer_index].second > walker.first and minimizers_dict_list[minimizer_index].second < walker.last:
+            walker.insert_after(minimizers_dict_list[minimizer_index][1], current, minimizers_dict_list[minimizer_index][0],0,1)
+            if minimizers_dict_list[minimizer_index][0] == walker.chr_ and minimizers_dict_list[minimizer_index][1] > walker.first and minimizers_dict_list[minimizer_index][1] < walker.last:
                 walker.age += 1
             minimizer_index+=1
             continue
@@ -319,14 +324,14 @@ def add_to_tree_3(threads: Linked_list_node, minimizers_dict_list: list[pair[int
         # print f'threads: {threads}' 
 
     while minimizer_index < length:
-        if minimizer_index<length and  croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index].first != current_chr - 1:
+        if minimizer_index<length and  croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index][0] != current_chr - 1:
             minimizer_index += 1
             continue
         if not threads:
-            threads = Linked_list_node(minimizers_dict_list[0].second, minimizers_dict_list[0].second,current,minimizers_dict_list[0].first, None, 1, 1)
+            threads = Linked_list_node(minimizers_dict_list[0][1], minimizers_dict_list[0][1],current,minimizers_dict_list[0][0], None, 1, 1)
             previous = threads
         else:
-            previous.insert_after(minimizers_dict_list[minimizer_index].second, current,minimizers_dict_list[minimizer_index].first)
+            previous.insert_after(minimizers_dict_list[minimizer_index][1], current,minimizers_dict_list[minimizer_index][0])
             previous = previous.next
         minimizer_index+=1
 
@@ -341,7 +346,7 @@ def get_minimizers(s:seq,
     chr_: int,
     kmer_size, 
     window_size, 
-    new_minimizers: dict[Hash, list[pair[int,int]]] = dict[Hash, list[int]](), 
+    new_minimizers:dict[int, list[tuple[int,int]]] = dict[int, list[int]](), # dict[Hash, list[tuple[int,int]]] = dict[Hash, list[int]](), 
     just_build_index: bool = False,
     just_find: bool = False,
     croms = list[str](),
@@ -350,13 +355,13 @@ def get_minimizers(s:seq,
     frequency = 0): 
 
     minimizers_dict = new_minimizers
-    threads = Linked_list_node(-1,-1,-1)
+    threads = Optional[Linked_list_node]() # Linked_list_node(-1,-1,-1)
     threads = None
     filtered = 0
     # making 2 lists, one for minimizers, and sliding winnow
 
-    window = list[Minimizer]()
-    index_set = list[pair[pair[int,int],pair[int,int]]]()
+    # window = list[tuple[int,int]]() # list[Minimizer]()
+    index_set = list[tuple[tuple[int,int],tuple[int,int]]]()
 
     MASK = (1 << (2 * kmer_size)) - 1
 
@@ -368,8 +373,8 @@ def get_minimizers(s:seq,
     last_hash = Hash(-1,0)
     for i in range(0,len(s)):
         # Updating positions of last 'N' and last uppercase letter n
-        if (s[i]== s'N' or s[i]== s'n'):
-            last_n = i
+        # if (s[i]== s'N' or s[i]== s'n'):
+        #     last_n = i
         last_u = i
         
         # hash_dna for 'N' returns 4, so just assign 0 instead, other letters asigned as usual
@@ -381,9 +386,10 @@ def get_minimizers(s:seq,
         # HAS_N   ->        2
         # HAS_UPPERCASE ->  0
         loc__ = i - kmer_size + 1
-        hh = Hash( h,
-            2 if last_n >= (loc__) else 0
-        )
+        hh = h 
+        # Hash( h,
+        #     2 if last_n >= (loc__) else 0
+        # )
         # hh will be new hash now
         newHash = hh
         main_count += 1
@@ -395,9 +401,9 @@ def get_minimizers(s:seq,
                     continue
                 threads = add_to_tree_3(threads, minimizers_dict[newHash], loc__,chr_,alowed_distance, index_set,croms, lens_dict,dict_final_sds  )
             if just_build_index:
-                minimizers_dict[newHash].append(pair(chr_,loc__))
+                minimizers_dict[newHash].append((chr_,loc__))
         elif just_build_index:
-            minimizers_dict[newHash] = [pair(chr_,loc__)]
+            minimizers_dict[newHash] = [(chr_,loc__)]
 
     walker = threads
     
@@ -423,7 +429,7 @@ def get_minimizers_winnowed(s:seq,
     chr_: int,
     kmer_size, 
     window_size, 
-    new_minimizers: dict[Hash, list[pair[int,int]]] = dict[Hash, list[int]](), 
+    new_minimizers: dict[int, list[tuple[int,int]]] = dict[int, list[int]](), # dict[Hash, list[tuple[int,int]]] = dict[Hash, list[int]](), 
     just_build_index: bool = False,
     just_find: bool = False,
     croms = list[str](),
@@ -432,12 +438,15 @@ def get_minimizers_winnowed(s:seq,
     frequency = 0): 
 
     minimizers_dict = new_minimizers
-    threads = Linked_list_node(-1,-1,-1)
+    threads = Optional[Linked_list_node]() # Linked_list_node(-1,-1,-1)
     threads = None
     # making 2 lists, one for minimizers, and winnow
 
-    window = list[Minimizer]()
-    index_set = list[pair[pair[int,int],pair[int,int]]]()
+    # Instead of using Cllass Minimizer, switch to tuple [int, int] - [0] hash, [1] location
+    # window = list[Minimizer]()
+    window = list[tuple[int,int]]()
+
+    index_set = list[tuple[tuple[int,int],tuple[int,int]]]()
 
     MASK = (1 << (2 * kmer_size)) - 1
 
@@ -446,7 +455,7 @@ def get_minimizers_winnowed(s:seq,
     last_u = last_n
     last_value = 0
     
-    last_hash = Hash(-1,0)
+    last_hash = -1 # Hash(-1,0)
     main_count = 0
 
     filtered = 0
@@ -465,34 +474,38 @@ def get_minimizers_winnowed(s:seq,
             continue
         # HAS_N   ->        2
         # HAS_UPPERCASE ->  0
-        hh = Hash( h,
-            2 if last_n >= (i - kmer_size + 1) else (0 if last_u >= (i - kmer_size + 1)  else 0)
-        )
+        hh = h
+        # Hash( h,
+        #     2 if last_n >= (i - kmer_size + 1) else (0 if last_u >= (i - kmer_size + 1)  else 0)
+        # )
         
         # here we ensure that correct elements are in winnow
-        while (len(window) > 0 and not (window[-1].hash < hh)):
+        # while (len(window) > 0 and not (window[-1].hash < hh)):
+        while (len(window) > 0 and not (window[-1][0] < hh)):
             window.pop()
-        while (len(window)>0 and window[-1].loc < ((i - kmer_size + 1) - window_size)):
+        # while (len(window)>0 and window[-1].loc < ((i - kmer_size + 1) - window_size)):
+        while (len(window)>0 and window[-1][1] < ((i - kmer_size + 1) - window_size)):
+
             window.pop(0)
         
-        window.append(Minimizer(hh, i - kmer_size + 1))
+        window.append((hh, i - kmer_size + 1))
 
         if (i - kmer_size + 1 < window_size):
             continue
 
-        if ((len(minimizers_dict) == 0) or  not window[0].hash == last_hash):
+        if ((len(minimizers_dict) == 0) or  not window[0][0] == last_hash):
             main_count += 1
-            newHash = Hash(window[0].hash.hash,window[0].hash.status)
+            newHash = window[0][0] # Hash(window[0][1].hash,window[0][1].status)
             if newHash in minimizers_dict:
                 if just_find:
                     if frequency and len(minimizers_dict[newHash]) >= frequency:
                         filtered += 1
                         continue
-                    threads = add_to_tree_3(threads, minimizers_dict[newHash], window[0].loc,chr_,alowed_distance, index_set,croms, lens_dict,dict_final_sds  )
+                    threads = add_to_tree_3(threads, minimizers_dict[newHash], window[0][1],chr_,alowed_distance, index_set,croms, lens_dict,dict_final_sds  )
                 if just_build_index:
-                    minimizers_dict[newHash].append(pair(chr_,window[0].loc))
+                    minimizers_dict[newHash].append((chr_,window[0][1]))
             elif just_build_index:
-                minimizers_dict[newHash] = [pair(chr_,window[0].loc)]
+                minimizers_dict[newHash] = [(chr_,window[0][1])]
                 
             last_hash = newHash
     walker = threads
@@ -514,7 +527,7 @@ def get_minimizers_winnowed(s:seq,
     return index_set, main_count, filtered
 
 
-
+from bio import *
 
 def main_f(
     ref_path: str,
@@ -524,7 +537,7 @@ def main_f(
     kmer_size: int,
     window_size: int,
     file_for_storing: str,
-    new_minimizers: dict[Hash, list[pair[int,int]]] = dict[Hash,list[pair[int,int]]](),
+    new_minimizers: dict[int, list[tuple[int,int]]] = dict[int,list[tuple[int,int]]](),# dict[Hash, list[tuple[int,int]]] = dict[Hash,list[tuple[int,int]]](),
     just_build_dict = False,
     just_find = False,
     croms = list[str](),
@@ -566,7 +579,7 @@ def main_paralled(
     frequency = 0
     dict_final_sds = dict[str,list[str]]()
     lens_dict  = dict[int,int]()
-    new_minimizers = dict[Hash,list[pair[int,int]]]()
+    new_minimizers =  dict[int,list[tuple[int,int]]]() #dict[Hash,list[tuple[int,int]]]()
     # First we build dictionary for first sequence
     chr_index = 0
     croms = ['hg19_' + ref_chr + '_n', 'hg19_' + query_chr + ('_y' if is_ref_complement else '_n')]
@@ -655,7 +668,7 @@ def main_parallel_one(
 
     dict_final_sds = dict[str,list[str]]()
     lens_dict  = dict[int,int]()
-    new_minimizers = dict[Hash,list[pair[int,int]]]()
+    new_minimizers = dict[int,list[tuple[int,int]]]()# dict[Hash,list[tuple[int,int]]]()
     # First we build dictionary for first sequence
     chr_index = 0
     croms = [f'{name}_{ref_chr}_n', f'{name}_{ref_chr}_y']
@@ -759,7 +772,7 @@ def _main_fun(pair_fa):
     print ('Finding SDs...')
     croms = list[str]()
     lens_dict  = dict[int,int]()
-    new_minimizers = dict[Hash, list[pair[int,int]]]()
+    new_minimizers =  dict[int, list[tuple[int,int]]]() # dict[Hash, list[tuple[int,int]]]()
     dict_final_sds = dict[str,list[str]]()
     # First, build dict for mainFa, cointaining positive and negative (maybe seperate it to 2 different ones for speed)
     name = mainFa.split("/")[-1][0:-3].split('_')[0]

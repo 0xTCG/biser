@@ -11,7 +11,7 @@ def test1():
     print (l1.intersection(l2))
 
 
-test1()
+# test1()
 
 def get_len_distributions():
     path = 'results/hg19_5_2/elementaries_hg19.bed'
@@ -27,6 +27,54 @@ def get_len_distributions():
             d[len_] = 1
     
 
+from bio import *
+
+def extract_elems(path_elems, path_fasta, path_out):
+    fa_file = FASTA(path_fasta)
+    # out_f = open(path_out, 'w')
+    dict_ = dict[str, seq]()
+    for i in fa_file:
+        dict_[i.name] = i.seq
+
+    elem_dict = dict[str, list[str]]()
+    count = 0
+    for i in open(path_elems, 'r').readlines():
+        print (count)
+        count += 1
+        line = i.split('\t')
+        # if line[3] == '0_3_12':
+        chr_ = line[0].split('#')[1]
+        s_for_save = ''
+        if line[-1] == '+':
+            # out_f.write(f'>{line[0]}-{line[1]}-{line[2]}\n{fa_file[ chr_ ][int(line[1]) : int(line[2])]}\n')
+            s_for_save = f'>{line[0]}-{line[1]}-{line[2]}\n{dict_[ chr_ ][int(line[1]) : int(line[2])]}\n'
+        else:
+            # out_f.write(f'>{line[0]}-{line[1]}-{line[2]}\n{~fa_file[ chr_ ][int(line[1]) : int(line[2])]}\n')
+            s_for_save = f'>{line[0]}-{line[1]}-{line[2]}\n{~dict_[ chr_ ][int(line[1]) : int(line[2])]}\n'
+        if line[3] in elem_dict:
+            elem_dict[line[3]].append(s_for_save)
+        else:
+            elem_dict[line[3]] = [s_for_save]
+    
+    for name in elem_dict:
+        out_f = open(path_out + name + '.fa', 'w')
+        for i in elem_dict[name]:
+            out_f.write(i)
+        out_f.close()
+
+
+
+
+
+
+# def main():
+#     from sys import *
+#     extract_elems(sys.srgv[1],sys.srgv[2], sys.srgv[3] )
+    
+
+
+# main()
+# extract_elems('/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_m/elementaries.bed','/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_hard_50.fa' , '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_m/elems_fas/' )
 
 # from os.path import *
 # print os.environ
@@ -38,3 +86,354 @@ def get_len_distributions():
 # print os.getenv('VSCODE_IPC_HOOK_CLI')
 # print os.system('/home/hiseric1/new_sedef/biser/src/align')
 # print os.path.splitext('/home/hiseric1/new_sedef/biser/')
+
+
+def count_elems():
+    path = '/home/hiseric1/new_sedef/biser/src/results/4_all/same/hg19_hg19/elems.txt'
+    set_of_elems = set()
+    count  = 0
+    for i in open(path, 'r').readlines():
+        if len(i.split('\t')) > 1:
+            set_of_elems.add(i.split('\t')[0])
+            count += 1
+    print (len(set_of_elems), count)
+
+# count_elems()
+
+def append_():
+    path1 = '/home/hiseric1/new_sedef/biser/src/results/sedef_mm8.bed'
+    path2 = '/home/hiseric1/new_sedef/seq/search/data/mm8_hard.bed'
+
+    out_ = open('/home/hiseric1/new_sedef/biser/src/results/sedef_mm8_hard_oldaln.bed', 'w')
+
+    l1 = []
+    for i in open(path1, 'r').readlines():
+        l1.append('\t' + i.strip())
+
+    i_ = 0
+    for i in open(path2, 'r').readlines():
+        out_.write(i.strip() + l1[i_] + '\n')
+        i_ += 1
+        # l1.append('\t' + i.strip())
+
+# append_()
+
+from bio import *
+
+def change_(list_dots_to_change, dict_dots, range_len):
+    # assert len(list_dots_to_change) % 2 == 0
+    # assert range_len > 0
+    if len(list_dots_to_change) > 0:
+        # print sorted(list_dots_to_change)
+        # print (range_len)
+        if range_len == 0:
+            print sorted(list_dots_to_change)
+            print (range_len)
+        assert range_len > 0
+    if range_len == 0 or len(list_dots_to_change) == 0:
+        return
+    
+    for i in list_dots_to_change:
+        if range_len > dict_dots[i]:
+            # assert dict_dots[i] >= 0
+            dict_dots[i] = range_len # len(list_dots_to_change) // 2
+        
+def get_mappings_2(s1, s2, cigar, dict_dots, bs1, chr1, bs2, chr2, rev, consider_first, consider_second, mapper1, mapper2, biser_set_of_dots):
+    main_count = 0
+    for i in s1:
+        if i.isupper() and str(i) != 'N' and not mapper1[(chr1, bs1)] in biser_set_of_dots:
+            dict_dots[(chr1, bs1)] = 1000
+            main_count += 1
+        bs1 += 1
+    for i in s2:
+        if i.isupper() and str(i) != 'N' and not mapper2[(chr2, bs2)] in biser_set_of_dots:
+            dict_dots[(chr2, bs2)] = 1000
+            main_count += 1
+        if not rev:
+            bs2 += 1
+        else:
+            bs2 -= 1
+
+    return main_count, len(s1), len(s2)
+    
+
+
+
+def get_mappings(s1, s2, cigar, dict_dots, bs1, chr1, bs2, chr2, rev, consider_first, consider_second, mapper1, mapper2, biser_set_of_dots):
+    count_s1 = 0
+    count_s2 = 0
+    main_count = 0
+    # print cigar
+    list_dots_to_change = []
+    
+    all_ = 0
+    range_len = 0
+    for num, lett in cigar:
+        # print num, lett, main_count
+        all_ += num
+        
+        if lett == 'M':
+            for i in range(num):
+                if s1[count_s1].isupper() and s2[count_s2].isupper():
+                    main_count += 1
+                    range_len += 1
+                    # dict_dots[(chr1, count_s1 + bs1)] = True
+                    if (chr1, count_s1 + bs1) in mapper1 and not mapper1[(chr1, count_s1 + bs1)] in biser_set_of_dots:
+                        list_dots_to_change.append( (chr1, count_s1 + bs1) )
+                    # elif len(list_dots_to_change) > 0:
+                    # else:
+                    #     change_(list_dots_to_change, dict_dots, range_len)
+                    #     range_len = 0
+                    #     list_dots_to_change = []
+
+                    if not rev:
+                        # dict_dots[(chr2, count_s2 + bs2)] = True 
+                        if (chr2, count_s2 + bs2) in mapper2 and not mapper2[(chr2, count_s2 + bs2)] in biser_set_of_dots:
+                            list_dots_to_change.append((chr2, count_s2 + bs2))
+                        # elif len(list_dots_to_change) > 0:
+                        # else:
+                        #     change_(list_dots_to_change, dict_dots, range_len)
+                        #     range_len = 0
+                        #     list_dots_to_change = []
+
+                    else:
+                        # dict_dots[ (chr2, bs2 - count_s2) ] = True
+                        # if consider_second:
+                        if (chr2, bs2 - count_s2) in mapper2 and not mapper2[(chr2, bs2 - count_s2)] in biser_set_of_dots:
+                            list_dots_to_change.append((chr2, bs2 - count_s2) )
+                        # elif len(list_dots_to_change) > 0:
+                        # else:
+                        #     change_(list_dots_to_change, dict_dots, range_len)
+                        #     range_len = 0
+                        #     list_dots_to_change = []
+                    
+                elif s1[count_s1].isupper() :
+                    if (chr1, count_s1 + bs1) in mapper1 and not mapper1[(chr1, count_s1 + bs1)] in biser_set_of_dots and dict_dots[(chr1, count_s1 + bs1)] <= 0:
+                        dict_dots[(chr1, count_s1 + bs1)] = -2
+
+                    change_(list_dots_to_change, dict_dots, range_len)
+                    range_len = 0
+                    list_dots_to_change = []
+                elif s2[count_s2].isupper() :
+
+                    if not rev:
+                        if (chr2, count_s2 + bs2) in mapper2 and not mapper2[(chr2, count_s2 + bs2)] in biser_set_of_dots and dict_dots[(chr2, count_s2 + bs2)] <= 0:
+                            dict_dots[(chr2, count_s2 + bs2)] = -2
+                    else:
+                        if (chr2, bs2 - count_s2) in mapper2 and not mapper2[(chr2, bs2 - count_s2)] in biser_set_of_dots and dict_dots[(chr2, bs2 - count_s2)] <= 0:
+                            dict_dots[ (chr2, bs2 - count_s2) ] = -2
+                    
+                    change_(list_dots_to_change, dict_dots, range_len)
+                    range_len = 0
+                    list_dots_to_change = []
+                else:
+                    change_(list_dots_to_change, dict_dots , range_len)
+                    list_dots_to_change = []
+                    range_len = 0
+
+                count_s1 += 1
+                count_s2 += 1
+        
+        elif lett == 'D':
+            if len(list_dots_to_change) > 0:
+                change_(list_dots_to_change, dict_dots, range_len)
+                list_dots_to_change = []
+                range_len = 0
+
+            for i in range(num):
+                if s1[count_s1].isupper() and s1[count_s1] != 'N' and not mapper1[(chr1, count_s1 + bs1)] in biser_set_of_dots and  dict_dots[(chr1, count_s1 + bs1)] == 0:
+                    dict_dots[(chr1, count_s1 + bs1)] = -3
+
+                count_s1 += 1
+
+        elif lett == 'I':
+            if len(list_dots_to_change) > 0:
+                change_(list_dots_to_change, dict_dots, range_len)
+                list_dots_to_change = []
+                range_len = 0
+            
+            for i in range(num):
+                if not s2[count_s2].isupper() or s2[count_s2] == 'N':
+                    count_s2 += 1
+                    continue
+
+                holder = (chr2, count_s2 + bs2)
+                if  rev:
+                    holder = (chr2, bs2 - count_s2)
+                if not mapper2[holder] in biser_set_of_dots and  dict_dots[holder] == 0:
+                    dict_dots[holder] = -3
+                count_s2 += 1
+        else:
+            print f'HERE PROBL: {lett}'
+
+
+    # print count_s1, len(s1), count_s2, len(s2)
+    # print f'All: {all_}'
+    # just return as already covered by cigar
+    # if count_s1 != len(s1) or count_s2 != len(s2):
+    #     return 0,0,0
+    return main_count, len(s1), len(s2)
+
+
+def do_mapp(chr, h_b,h_e,s_b, s_e, s_seq):
+    mapper = dict()
+    # print s_seq
+    
+    for i in s_seq:
+        if str(i).isupper() and str(i) != 'N':
+            # mapper[(chr, h_b)] = (chr, s_b)
+            mapper[(chr, s_b)] = (chr, h_b)
+            # print (s_b, h_b) 
+            h_b += 1
+        s_b+= 1
+    # print h_b, h_e, s_b , s_e
+    assert h_b == h_e + 1 or h_b == h_e
+    assert s_b == s_e or s_b == s_e + 1
+    return mapper
+
+
+
+
+def check_cigars():
+    path = '/home/hiseric1/new_sedef/biser/src/results/sedef_mm8_hard_oldaln.bed' # '/home/hiseric1/new_sedef/biser/src/results/uncovered3.bed'
+    path2 = '/home/hiseric1/new_sedef/seq/search/data/genomes/mm8/mm8.fa'
+
+    path_biser = "/home/hiseric1/new_sedef/biser/src/results/mm8_1_500_100/final.bed"
+    set_of_dots = set()
+    for i in open(path_biser, 'r').readlines():
+        line = i.split('\t')
+        chr1 = line[0].split('#')[1]
+        for i in range(int(line[1]), int(line[2])):
+            set_of_dots.add((chr1, i))
+        
+        chr1 = line[3].split('#')[1]
+
+        for i in range(int(line[4]), int(line[5])):
+            set_of_dots.add((chr1, i))
+
+
+    dict_fa = dict()
+
+
+    for i in FASTA(path2):
+        dict_fa[i.name] = i.seq
+
+    counter = 0
+    bad_cigar = 0
+    all_len = 0 
+    mapped = 0
+    dict_dots = dict()
+    dict_dots_2 = dict()
+    both = 0
+
+    for i in open(path, 'r'):
+        line = i.split('\t')
+        # print len(line)
+        # print line
+        
+        
+        if len(line) > 5:
+            # if line[9] == '+':
+            #     continue
+            counter += 1
+            # if counter > 1000:
+            #     break
+            # len_ = max(int(line[17]) - int(line[16]), int(line[20]) - int(line[19]))
+            # if line[0] != 'chr7' and line[3] != 'chr7':
+            #     continue
+            # print line
+
+            s1 = dict_fa[line[0]][int(line[16]) : int(line[17])]
+            for i__ in range(int(line[16]) , int(line[17]) + 1):
+                if not (line[0],i__) in dict_dots:
+                    dict_dots[(line[0],i__)] = 0
+
+            # if 'True' == line[-2]:
+            #     for i__ in range(int(line[1]) , int(line[2])):
+            #         if not (line[0],i__) in dict_dots_2:
+            #             dict_dots_2[(line[0],i__)] = False
+            # print line[-1], line[-2]
+            s2 = dict_fa[line[3]][int(line[19]) : int(line[20])] if line[9] == '+' else ~dict_fa[line[3]][int(line[19]) : int(line[20])] 
+            for i__ in range(int(line[19]), int(line[20]) + 1):
+                if not (line[3],i__) in dict_dots:
+                    dict_dots[(line[3],i__)] = 0
+            
+            mapper1 = do_mapp(line[0], int(line[1]),int(line[2]),int(line[16]), int(line[17]), s1)
+            # print 'ok1'
+            b__ = int(line[19]) if line[9] == '+' else  int(line[19]) + 1
+            mapper2 = do_mapp(line[3], int(line[4]), int(line[5]),b__, int(line[20]), s2 if line[9] == '+' else ~s2)
+            # print mapper2
+            # print 'ok2'
+            # if 'True' == line[-1]:
+            #     for i__ in range(int(line[4]) , int(line[5])):
+            #         if not (line[3],i__) in dict_dots_2:
+            #             dict_dots_2[(line[3],i__)] = False
+
+            # if 'True' == line[-1]  or 'True' == line[-2]:
+            for i__ in range(int(line[1]) , int(line[2])):
+                # if not (line[0],i__) in dict_dots_2:
+                if not (line[0],i__) in set_of_dots:
+                    dict_dots_2[(line[0],i__)] = False
+            for i__ in range(int(line[4]) , int(line[5])):
+                # if not (line[3],i__) in dict_dots_2:
+                if not (line[3],i__) in set_of_dots:
+                    dict_dots_2[(line[3],i__)] = False
+
+            #     both += 1
+
+
+            # print 'ok2'
+            # print counter
+            
+
+            # a,b,c = get_mappings(str(s1), str(s2), CIGAR(line[-3]) , dict_dots, int(line[16]), line[0], int(line[19]) if line[9] == '+' else int(line[20]), line[3] , line[9] != '+', 'True' == line[-2], 'True' == line[-1], mapper1, mapper2, set_of_dots)
+            try:
+            # a,b,c = get_mappings_2(str(s1), str(s2), CIGAR(line[-1]) , dict_dots, int(line[16]), line[0], int(line[19]) if line[9] == '+' else int(line[20]), line[3] , line[9] != '+', True, True, mapper1, mapper2, set_of_dots)
+                a,b,c = get_mappings(str(s1), str(s2), CIGAR(line[-1]) , dict_dots, int(line[16]), line[0], int(line[19]) if line[9] == '+' else int(line[20]), line[3] , line[9] != '+', True, True, mapper1, mapper2, set_of_dots)
+                
+                # print 'ok3'
+                all_len += b+c
+                mapped += a
+                if a==0 and b ==0 and c==0:
+                    bad_cigar += 1
+                assert line[8] == '+'
+            except:
+            #     # print e
+                bad_cigar += 1
+                continue
+            # break
+    print bad_cigar, counter, mapped, all_len
+    all_ = 0
+    covered = 0
+    # set_chr = set()
+    dict_stats = dict()
+    max_m = 0
+    for i in dict_dots:
+        all_ += 1
+        m = 0
+        if dict_dots[i] == 0:
+            m = -1
+        elif dict_dots[i] < 0:
+            m = dict_dots[i]
+        else:
+            m = dict_dots[i] // 100 if dict_dots[i] // 100 <= 10 else 10
+        if dict_dots[i] > max_m:
+            max_m = dict_dots[i] 
+        
+        if m in dict_stats:
+            dict_stats[m] += 1
+        else:
+            dict_stats[m] = 1
+
+    
+        
+        # if dict_dots[i] :
+        #     covered += 1
+    
+    print f'All: {all_}, {covered}, {max_m}, {both}, {len(dict_dots_2)}'
+    print dict_stats
+    for i in sorted(dict_stats):
+        print f'<{(i + 1) * 100}, {dict_stats[i]}'
+
+
+check_cigars()

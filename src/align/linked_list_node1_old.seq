@@ -1,6 +1,5 @@
 
 class Linked_list_node:
-    id: int
     begin: int
 
     end: int
@@ -15,14 +14,12 @@ class Linked_list_node:
     
     next: Optional[Linked_list_node]
 
-    mappings: dict[int, int]
-
 
     potentional: bool
     score: int
     
     
-    def __init__(self: Linked_list_node,id:int, begin: int, end: int, chr_:int,next: Optional[Linked_list_node], age: int,count: int, potentional: bool, score:int, gap:int, inner_gap:int):
+    def __init__(self: Linked_list_node, begin: int, end: int, chr_:int,next: Optional[Linked_list_node], age: int,count: int, potentional: bool, score:int, gap:int, inner_gap:int):
         
         self.begin = begin
         self.end = end
@@ -35,20 +32,15 @@ class Linked_list_node:
         self.score = score
         self.gap = gap
         self.inner_gap = inner_gap
-        self.mappings = dict[int,int]()
 
     def __init__(self: Linked_list_node):
-        self.id = 0
         self.begin = 0
         self.end = 0
-        self.mappings = dict[int,int]()
 
-
-    def __init__(self: Linked_list_node,id:int, first: int, chr_:int):
+    def __init__(self: Linked_list_node, first: int, chr_:int):
         
-        self.id = id
         self.begin = first
-        self.end = first #+ 10
+        self.end = first + 10
 
         self.chr_ = chr_
         # self.next = Linked_list_node()
@@ -61,13 +53,10 @@ class Linked_list_node:
         self.score = 0
         self.gap = 0
         self.inner_gap = 0
-        self.mappings = dict[int,int]()
 
-
-    def __init__(self: Linked_list_node, id:int,first: int,chr_:int, next_: Optional[Linked_list_node] ):
-        self.id = id
+    def __init__(self: Linked_list_node, first: int,chr_:int, next_: Optional[Linked_list_node] ):
         self.begin = first
-        self.end = first #+ 10
+        self.end = first + 10
         self.chr_ = chr_
         self.next = next_
         self.age = 0
@@ -76,13 +65,9 @@ class Linked_list_node:
         self.score = 0
         self.gap = 0
         self.inner_gap = 0
-        self.mappings = dict[int,int]()
-
-
-    def __init__(self: Linked_list_node, id:int,first: int, last:int,chr_:int, next_: Optional[Linked_list_node],  age:int, count:int):
-        self.id = id
+    def __init__(self: Linked_list_node, first: int, last:int,chr_:int, next_: Optional[Linked_list_node],  age:int, count:int):
         self.begin = first
-        self.end = first #+ 10
+        self.end = first + 10
         self.chr_ = chr_
 
         self.next = next_
@@ -93,13 +78,15 @@ class Linked_list_node:
         self.score = 0
         self.gap = 0
         self.inner_gap = 0
-        self.mappings = dict[int,int]()
 
-
-    def insert_after(self: Linked_list_node, id:int, first: int,chr_:int, age: int = 1, count:int = 1):
-        new_node = Linked_list_node(id, first,first,chr_, self.next,age,count)
+    def insert_after(self: Linked_list_node, first: int,chr_:int, age: int = 1, count:int = 1):
+        new_node = Linked_list_node(first,first,chr_, self.next,age,count)
         self.next = new_node
-
+    
+    def insert_after2(self: Linked_list_node, begin: int, lens: int, chr_:int,next:Optional[Linked_list_node], age: int,count: int, potentional: bool, score:int, gap:int, inner_gap:int):
+        new_node = Linked_list_node(begin,lens,chr_, self.next,age,count,potentional,score,gap,inner_gap)
+        self.next = new_node
+        
 
     # def insert_after_node(self: Linked_list_node,other:Linked_list_node):
     #     self.next = other
@@ -108,7 +95,7 @@ class Linked_list_node:
         walker = Optional[Linked_list_node]()
         walker = self
         while not walker is None:
-            s+=f'(id: {self.id}, chr: {walker.chr_}; begin: {walker.begin}; end: {walker.end}; gap: {walker.gap}; score: {walker.score})->'
+            s+=f'(chr: {walker.chr_}; begin: {walker.begin}; end: {walker.end}; gap: {walker.gap}; score: {walker.score})->'
             walker = walker.next
         return s
     # def __len__(self: Linked_list_node):
@@ -122,8 +109,6 @@ class Linked_list_node:
     def __eq__(self: Linked_list_node, other: Linked_list_node)-> bool:
         return self.begin == other.begin and self.end == other.end
 
-    # def __hash(self: Linked_list_node):
-    #     return self.id
 
     # def swap(self: Linked_list_node, other: Linked_list_node):
     #     self.begin, other.begin = other.begin, self.begin
@@ -144,4 +129,3 @@ class Linked_list_node:
 
 
         
-

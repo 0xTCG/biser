@@ -188,7 +188,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ] ; then # || tru
 				samtools faidx $j
 
 				# final one:
-				echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc biser_search.seq -r ${r} -q ${q} -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
+				echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc run -release biser_search.seq -r ${r} -q ${q} -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
 				
 				# echo "/home/hiseric1/new_sedef/sedef/sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/"
 

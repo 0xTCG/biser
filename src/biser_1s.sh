@@ -167,7 +167,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ]; then
 	# ARRAY=()
 	for i in $validchrs; do 
         
-		echo "${TIME} -f'TIMING %e %M' seqc biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -r ${r} -q ${q} -o ${output}/seeds ${input} ${input} $i >${output}/log/seeds/${i}_.log 2>${output}/log/seeds/${i}_2.log"
+		echo "${TIME} -f'TIMING %e %M' seqc run -release biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -r ${r} -q ${q} -o ${output}/seeds ${input} ${input} $i >${output}/log/seeds/${i}_.log 2>${output}/log/seeds/${i}_2.log"
 		
 	done | tee "${output}/seeds.comm" | ${TIME} -f'Seeding time: %E' parallel --will-cite -j ${jobs} --bar --joblog "${output}/seeds.joblog"
 	
@@ -234,9 +234,11 @@ sc_mem=`grep TIMING ${logs}/*.log | awk '{if($3>m)m=$3}END{print m}'`
 sc_mem_k=`echo "${sc_mem} / 1024" | bc`
 echo "Memory used for align: ${sc_mem_k} MB"
 
+
+
+cat ${output2}/* >${output}/final.bed
+echo "Doing decomposition..."
+uf ${output}/final.bed >${output}/elementaries.txt
 #Finished
 finished=`grep Finished ${logs}/*.log | awk '{s+=1}END{print s}'`
 echo "Finished: ${finished}/${count_all}"
-
-cat ${output2}/* >${output}/final.bed
-uf ${output}/final.bed >${output}/elementaries.txt

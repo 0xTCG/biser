@@ -136,6 +136,71 @@ def get_random_sequence_from_sequence(s, index):
     return s[index: index + len_]
     
 
+def get_complex_elems( min_core_len = 100, max_core_len= 2000, out = 'align/results/test_elems/elems_test.fa', out_elems_path = 'align/results/test_elems/elems_test_rez.bed'):
+    list_of_elems = [get_random_sequence(random.randint(min_core_len, max_core_len)) for i in range(0,5)]
+    # for i in list_of_elems:
+    #     print (i, len(i))
+
+    # chrA
+    seq1 = list_of_elems[0] + list_of_elems[1] + list_of_elems[2] + list_of_elems[3] + list_of_elems[2] + list_of_elems[4]
+    # chrB
+    seq2 = list_of_elems[0] + list_of_elems[1] + list_of_elems[2] + list_of_elems[4]
+    # chrC
+    seq3 = list_of_elems[1] + list_of_elems[2] + list_of_elems[3] + list_of_elems[2]
+
+
+
+    out_w = open(out, 'w')
+    out_w.write(f'>chrA+-0-{len(seq1)}\n{seq1}\n>chrB+-0-{len(seq2)}\n{seq2}\n>chrC+-0-{len(seq3)}\n{seq3}')
+    out_elems = open(out_elems_path, 'w')
+    # 1st elem
+    out_elems.write(f'chrA\t0\t{len(list_of_elems[0])}\t0\t{len(list_of_elems[0])}\t+\n')
+    out_elems.write(f'chrB\t0\t{len(list_of_elems[0])}\t0\t{len(list_of_elems[0])}\t+\n')
+    out_elems.write('\n')
+
+    # 2nd elem
+    out_elems.write(f'chrA\t{len(list_of_elems[0])}\t{len(list_of_elems[0]) + len(list_of_elems[1])}\t1\t{len(list_of_elems[1])}\t+\n')
+    out_elems.write(f'chrB\t{len(list_of_elems[0])}\t{len(list_of_elems[0]) + len(list_of_elems[1])}\t1\t{len(list_of_elems[1])}\t+\n')
+    out_elems.write(f'chrC\t0\t{len(list_of_elems[1])}\t1\t+\n')
+    out_elems.write('\n')
+    # 3rd elem
+    s1 = len(list_of_elems[0] + list_of_elems[1])
+    e1 = len(list_of_elems[0] + list_of_elems[1] + list_of_elems[2])
+    out_elems.write(f'chrA\t{s1}\t{e1}\t2\t{len(list_of_elems[2])}\t+\n')
+    out_elems.write(f'chrB\t{s1}\t{e1}\t2\t{len(list_of_elems[2])}\t+\n')
+    s1 += len(list_of_elems[2] + list_of_elems[3])
+    e1 += len( list_of_elems[3]+ list_of_elems[2])
+    out_elems.write(f'chrA\t{s1}\t{e1}\t2\t{len(list_of_elems[2])}\t+\n')
+    out_elems.write(f'chrC\t{len(list_of_elems[1])}\t{len(list_of_elems[1]) + len(list_of_elems[2])}\t2\t{len(list_of_elems[2])}\t+\n')
+    s1 = len(list_of_elems[1] + list_of_elems[2] + list_of_elems[3])
+    e1 = len(list_of_elems[1] + list_of_elems[2] + list_of_elems[3] + list_of_elems[2])
+    out_elems.write(f'chrC\t{s1}\t{e1}\t2\t{len(list_of_elems[2])}\t+\n')
+    out_elems.write('\n')
+
+
+    # 4th elem
+    s1 = len(list_of_elems[0] + list_of_elems[1] + list_of_elems[2])
+    e1 = len(list_of_elems[0] + list_of_elems[1] + list_of_elems[2] + list_of_elems[3] )
+    out_elems.write(f'chrA\t{s1}\t{e1}\t3\t{len(list_of_elems[3])}\t+\n')
+    s1 = len(list_of_elems[1] + list_of_elems[2])
+    e1 = len(list_of_elems[1] + list_of_elems[2] + list_of_elems[3] )
+    out_elems.write(f'chrC\t{s1}\t{e1}\t3\t{len(list_of_elems[3])}\t+\n')
+    out_elems.write('\n')
+
+    #5th elem
+    s1 = len(list_of_elems[0] + list_of_elems[1] + list_of_elems[2] + list_of_elems[3] + list_of_elems[2])
+    e1 = len(list_of_elems[0] + list_of_elems[1] + list_of_elems[2] + list_of_elems[3] + list_of_elems[2] + list_of_elems[4] )
+    out_elems.write(f'chrA\t{s1}\t{e1}\t4{len(list_of_elems[4])}\t\t+\n')
+    s1 = len(list_of_elems[0] + list_of_elems[1] + list_of_elems[2])
+    e1 = len(list_of_elems[0] + list_of_elems[1] + list_of_elems[2] + list_of_elems[4] )
+    out_elems.write(f'chrB\t{s1}\t{e1}\t4\t{len(list_of_elems[4])}\t+\n')
+
+
+
+
+
+
+get_complex_elems()
 
 
 def main_funct(path, seq = ''):

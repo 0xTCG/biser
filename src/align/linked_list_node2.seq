@@ -1,0 +1,97 @@
+
+class Linked_list_node:
+
+    query: list[int]
+
+    first_ref_index: int
+
+
+    chr_: int
+    age: int
+    count: int
+    gap: int
+    inner_gap: int
+
+    
+    next: Optional[Linked_list_node]
+
+
+    potentional: bool
+    score: int
+    
+    
+    def __init__(self: Linked_list_node, query: list[int], first_ref_index: int, chr_:int,next: Optional[Linked_list_node], age: int,count: int, potentional: bool, score:int, gap:int, inner_gap:int):
+        
+        self.query = query
+        self.first_ref_index = first_ref_index
+
+        self.chr_ = chr_
+        self.next = next
+        self.age = age
+        self.count = count
+        self.potentional = potentional
+        self.score = score
+        self.gap = gap
+        self.inner_gap = inner_gap
+
+    def __init__(self: Linked_list_node):
+        self.query = []
+        self.first_ref_index = 0
+
+    def __init__(self: Linked_list_node, query: list[int], chr_:int, first_ref_index: int):
+        
+        self.query = query
+        self.first_ref_index = first_ref_index
+
+        self.chr_ = chr_
+        # self.next = Linked_list_node()
+        self.next = None
+
+        
+        self.age = 0
+        self.count = 0
+        self.potentional = False
+        self.score = 0
+        self.gap = 0
+        self.inner_gap = 0
+
+    def __init__(self: Linked_list_node, query: list[int], chr_:int, first_ref_index: int, next_: Optional[Linked_list_node] ):
+        self.query = query
+        self.first_ref_index = first_ref_index
+        self.chr_ = chr_
+        self.next = next_
+        self.age = 0
+        self.count = 0
+        self.potentional = False
+        self.score = 0
+        self.gap = 0
+        self.inner_gap = 0
+    def __init__(self: Linked_list_node, query: list[int], first_ref_index:int,chr_:int, next_: Optional[Linked_list_node],  age:int, count:int):
+        self.query = query
+        self.first_ref_index = first_ref_index
+        self.chr_ = chr_
+
+        self.next = next_
+
+        self.age = age
+        self.count = count
+        self.potentional = False
+        self.score = 0
+        self.gap = 0
+        self.inner_gap = 0
+
+    def insert_after(self: Linked_list_node, query: int, first_ref_index: int,chr_:int, age: int = 1, count:int = 1):
+        new_node = Linked_list_node([query], first_ref_index,chr_, self.next,age,count)
+        self.next = new_node
+
+    def __str__(self: Linked_list_node):
+        s=""
+        walker = Optional[Linked_list_node]()
+        walker = self
+        while not walker is None:
+            s+=f'(chr: {walker.chr_}; query: {walker.query}; first_ref_index: {walker.first_ref_index}; gap: {walker.gap}; score: {walker.score})->'
+            walker = walker.next
+        return s
+
+    def __eq__(self: Linked_list_node, other: Linked_list_node)-> bool:
+        return self.query == other.query
