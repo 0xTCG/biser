@@ -1,0 +1,56 @@
+from pickle import *
+from time import *
+
+def get_dict(path = "/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_position_conv") -> dict[str,dict[int,int]]:
+    dict_conv = load[dict[str,dict[int,int]]](gzFile(path,'r'))
+    return dict_conv
+# compare_sdquest_wgac()
+def firstOccurance(numbers, length, searchnum, isLower = True) -> int:
+    answer = -1  #If the number is not in the list it will return -1
+    start = 0
+    end = length - 1
+
+    while start <= end:
+        middle = (start + end)//2    #Finding the middle point of the list
+        
+        if numbers[middle][0] == searchnum:
+            answer = middle
+            end = middle - 1
+            break
+        elif numbers[middle][0] > searchnum:
+            if not isLower:
+                answer = middle
+            end = middle - 1    
+        else:
+            if isLower:
+                answer = middle
+            start = middle + 1
+    
+    return answer
+def convert_random_coordinates():
+    # chr16:16411466-16444465
+    # wgac_path = "search/data/wgac_without_cigar_remove_doubles.bed"
+    # wgac_path2 = "search/data/genomes/wgac_without_cigar_remove_doubles_rev_50.bed"
+    # file_ = open(wgac_path2,'w')
+    main_dict =  get_dict("/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_position_conv_50")
+    print 'Loaded dict'
+    main_dict_2 = dict[str,list[tuple[int,int]]]()
+    chr1 = 'chr14' #'chr16'
+    start = 106753091 # 14805546# 16411466
+    end = 106759387 # 14820195 # 16444465
+    with timing('Creating list'):
+        for i in main_dict:
+            if i != chr1:
+                continue
+            main_dict_2[i] = list[tuple[int,int]]()
+            for j in main_dict[i]:
+                main_dict_2[i].append((main_dict[i][j], j))
+            main_dict_2[i].sort()
+            print len(main_dict_2[i])
+    print 'Created list'
+    
+    start1  =    main_dict_2[chr1]   [   firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), start, False )  ][1]
+    end1    =    main_dict_2[chr1]   [   firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), end, True  )  ][1] # , start1, start1 + int(line[2])  - int(line[1]) )
+    print chr1, start1, end1
+
+convert_random_coordinates()

@@ -6,6 +6,10 @@ GETOPT="getopt"
 # TIME="/usr/bin/time"
 TIME="time"
 
+if [[ ! -f "${TIME}" ]]; then
+	TIME="/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time"
+fi
+
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     :
 elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -53,8 +57,8 @@ d="0"
 g="0"
 l="1"
 p="5000"
-r="100"
-q="700"
+r="700"
+q="100"
 
 while true; do
     case "$1" in
@@ -143,32 +147,32 @@ fi
 # first we find all potential regins within same species and merge them
 # ./new_sedef_ms.sh data/genomes/ -o same -l 1 -j 10 
 output ${output}
-mkdir ${output}/same
-./new_sedef_ms.sh ${input} -o "${output}/same/" -l ${l} -p ${p} -q ${q} -d ${d} -g ${g} -j ${jobs}
+mkdir ${output}/
+${TIME} -f'First search took: %E' ./new_sedef_ms.sh ${input} -o "${output}/same/" -l ${l} -r ${r} -p ${p} -q ${q} -d ${d} -g ${g} -j ${jobs}
 
 # now we do align of those putative SDs to find alignment and exact locations of those SDs
 # ./align_ms.sh data/genomes/ same
-./align_ms.sh ${input} "${output}/same/" ${jobs}
+${TIME} -f'First align took: %E' ./align_ms.sh ${input} "${output}/same/" ${jobs}
 
 # now we extract all sequences from same species we aligned
 # python3 chop_regions.py extract data/genomes sdregions same
 mkdir ${output}/sdregions
-python3 chop_regions.py extract ${input} ${output}/sdregions ${output}/same
+${TIME} -f'Extracting regions took: %E' python3 chop_regions.py extract ${input} ${output}/sdregions ${output}/same
 
 # now we search SD regions in other whole genomes
 #./biser_diff_specs.sh data/genomes/ sdregions8 -o different8 -l 1 -f -j 8
 echo 'Searching SDregions in genomes...'
-./biser_diff_specs.sh ${input} ${output}/sdregions -o ${output}/different -l ${l} -j ${jobs}
+${TIME} -f'Second search took: %E' ./biser_diff_specs.sh ${input} ${output}/sdregions -o ${output}/different -l ${l} -r ${r} -p ${p} -q ${q} -d ${d} -g ${g} -j ${jobs}
 
 # normalize coordinates
 python3 chop_regions.py normalize ${output}/different/
 
 # now we align those sequences
 # ./align_ms2.sh different8 data/genomes/
-./align_ms2.sh ${output}/different/ ${input}
+${TIME} -f'Second align took: %E' ./align_ms2.sh ${output}/different/ ${input}
 
 
 # at the end just concatinate everything into one file
 python3 chop_regions.py final ${output}/same/ ${output}/different/ ${output}/final.bed
 
-uf ${output}/final.bed >${output}/elementaries.txt
+${TIME} -f'Decomposition took: %E' uf ${output}/final.bed >${output}/elementaries.txt 2>${output}/elementaries_log.txt

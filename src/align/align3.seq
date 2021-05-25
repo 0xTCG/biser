@@ -1,12 +1,14 @@
+from linked_list_node3 import Linked_list_node
 import sys
 from time import time
+# from typing import Optional
 from bio import FASTA
 
 from time import *
 from globals import *
 from common import *
 # from util import *
-from pair import *
+# from pair import *
 from linked_list_node3 import *
 from bisect import bisect_left
 
@@ -115,7 +117,7 @@ min_mate_len = 9 # 300 # 100# 2# 100
 min_mate_similarity = 0.6
 
 
-def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair[int,int]], current: int,current_chr:int, difference: int , croms = list[str], lens_dict = dict[int,int](), dict_final_sds = dict[str,list[str]]() , best_nodes: list[tuple[int,int,int]] = list[tuple[int,int,int]](), first_query:int = -1, first_ref:int = -1) -> Linked_list_node:
+def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list: list[tuple[int,int]], current: int,current_chr:int, difference: int , croms = list[str](), lens_dict = dict[int,int](), dict_final_sds = dict[str,list[str]]() , best_nodes: list[tuple[int,int,int]] = list[tuple[int,int,int]](), first_query:int = -1, first_ref:int = -1) -> Optional[Linked_list_node]:
 
 	minimizer_index = len(minimizers_dict_list) - 1
 	node_counter = 0
@@ -126,12 +128,13 @@ def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair
 
 	# if certain values in the beginning of the minimizers_dict_list are lower that first node, add them all beforehand
 	walker = threads
+	previous = Optional[Linked_list_node]()
 	previous = threads #threads
 	previous = None
 	holder = threads
-	while threads and minimizer_index >= 0 and ( minimizers_dict_list[minimizer_index].second > threads.query[-1] + threads.lens[-1]  + difference - kmer_size): # and  current > threads.ref[-1] + threads.lens[-1]  + difference - kmer_size ):
+	while not threads is None and minimizer_index >= 0 and ( minimizers_dict_list[minimizer_index][1] > threads.query[-1] + threads.lens[-1]  + difference - kmer_size): # and  current > threads.ref[-1] + threads.lens[-1]  + difference - kmer_size ):
 		
-		walker = Linked_list_node(minimizers_dict_list[minimizer_index].second, minimizers_dict_list[minimizer_index].second, current, minimizers_dict_list[minimizer_index].first, threads, previous,0,1)
+		walker = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1], current, minimizers_dict_list[minimizer_index][0], threads, previous,0,1)
 		walker.score += kmer_size
 		node_counter += 1
 		if previous:
@@ -141,19 +144,19 @@ def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair
 		previous = walker
 		minimizer_index-=1
 
-	if threads and not walker is threads:
+	if not threads is None and not walker is threads:
 		threads.previous = walker
 
 	walker = threads
 	threads = holder
 	
-	while walker:
+	while not walker is None:
 		inserted = False
 		node_counter += 1
 
 		case_ = 0
 
-		if minimizer_index >= 0 and walker.ref[-1] != current and (walker.query[-1] + walker.lens[-1] - kmer_size ) <  minimizers_dict_list[minimizer_index].second and (walker.query[-1] + walker.lens[-1] + difference) >= minimizers_dict_list[minimizer_index].second and (walker.ref[-1] + walker.lens[-1] + difference ) >= current and (walker.ref[-1]  + walker.lens[-1] - kmer_size) < current:
+		if minimizer_index >= 0 and walker.ref[-1] != current and (walker.query[-1] + walker.lens[-1] - kmer_size ) <  minimizers_dict_list[minimizer_index][1] and (walker.query[-1] + walker.lens[-1] + difference) >= minimizers_dict_list[minimizer_index][1] and (walker.ref[-1] + walker.lens[-1] + difference ) >= current and (walker.ref[-1]  + walker.lens[-1] - kmer_size) < current:
 			
 			walker.lens[-1] += 1
 			walker.score += 1
@@ -168,9 +171,9 @@ def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair
 
 			# continue
 		# now the cse where we insert a new node
-		if minimizer_index >= 0 and (not walker.next or ( walker.next.query[-1] + walker.next.lens[-1] + difference < minimizers_dict_list[minimizer_index].second) ):
+		if minimizer_index >= 0 and (not walker.next or ( walker.next.query[-1] + walker.next.lens[-1] + difference < minimizers_dict_list[minimizer_index][1]) ):
 	
-			walker.insert_after(minimizers_dict_list[minimizer_index].second, current, minimizers_dict_list[minimizer_index].first,1,1)
+			walker.insert_after(minimizers_dict_list[minimizer_index][1], current, minimizers_dict_list[minimizer_index][0],1,1)
 			walker.next.score += kmer_size
 			minimizer_index-=1
 			inserted = True
@@ -184,6 +187,7 @@ def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair
 			# delete that node
 			if walker is threads:
 				# print f'pod 1'
+				help_ = Optional[Linked_list_node]
 				help_ = threads.next
 				threads.next = None
 				threads = help_
@@ -217,11 +221,11 @@ def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair
 		node_counter += 1
 
 		if not threads:
-			threads = Linked_list_node(minimizers_dict_list[minimizer_index].second, minimizers_dict_list[minimizer_index].second,current,minimizers_dict_list[minimizer_index].first, None, None, 1, 1)
+			threads = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1],current,minimizers_dict_list[minimizer_index][0], None, None, 1, 1)
 			threads.score += kmer_size
 			previous = threads
 		else:
-			previous.insert_after(minimizers_dict_list[minimizer_index].second, current,minimizers_dict_list[minimizer_index].first)
+			previous.insert_after(minimizers_dict_list[minimizer_index][1], current,minimizers_dict_list[minimizer_index][0])
 
 			previous = previous.next
 			previous.score += kmer_size
@@ -231,7 +235,7 @@ def add_to_tree_align(threads: Linked_list_node, minimizers_dict_list: list[pair
 
 
 
-def dict_align(s1:seq,s2:seq, best_nodes,first_q, first_r) -> Linked_list_node:
+def dict_align(s1:seq,s2:seq, best_nodes,first_q, first_r) -> Optional[Linked_list_node]:
 	len_ref		= len(s1)
 	len_query 	= len(s2)
 
@@ -240,10 +244,10 @@ def dict_align(s1:seq,s2:seq, best_nodes,first_q, first_r) -> Linked_list_node:
 	
 	kmer_size = 10
 
-	ref_dict = dict[int, list[pair[int,int]]]()
+	ref_dict = dict[int, list[tuple[int,int]]]()
 	step = 1
 	loc = 0
-	threads = Linked_list_node(0,0,0)
+	threads = Optional[Linked_list_node]()
 	threads = None
 	dict_final_sds = dict[str,list[str]]()
 
@@ -251,17 +255,17 @@ def dict_align(s1:seq,s2:seq, best_nodes,first_q, first_r) -> Linked_list_node:
 		i_ = int(i.as_int())
 
 		if i_ in ref_dict:
-			ref_dict[i_].append(pair(0,loc))
+			ref_dict[i_].append((0,loc))
 		else:
-			ref_dict[i_] = [pair(0,loc)]
+			ref_dict[i_] = [(0,loc)]
 		loc += 1
 
 	loc = 0
 	step = 1
 
-	helper = list[pair[int,int]]()
+	helper = list[tuple[int,int]]()
 	for i in s2.kmers[Kmer[10]](step):
-		print loc
+		# print loc
 		i_ = int(i.as_int()) 
 		if i_ in ref_dict:
 

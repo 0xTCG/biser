@@ -1,4 +1,4 @@
-from align_hit import *
+# from align_hit import *
 from common import *
 from segment import *
 from refine import *

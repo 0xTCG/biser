@@ -92,7 +92,7 @@ def build_dict(path, d = dict()):
         d[i].merge_overlaps()
         for inerv in d[i]:
             coverage += inerv.end - inerv.begin
-    km = path.split("/")[1]
+    # km = path.split("/")[1]
     # print (coverage_before)
     # print (f'{km}\t{counters[0]}\t{counters[1]}\t{counters[2]}')
     return d, count_sds, coverage

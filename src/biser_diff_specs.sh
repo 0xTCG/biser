@@ -61,8 +61,8 @@ d="0"
 g="0"
 l="1"
 p="5000"
-r="100"
-q="700"
+r="700"
+q="100"
 
 while true; do
     case "$1" in
@@ -193,7 +193,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ] ; then # || tru
                     mkdir "${output}/${filename1}_${filename2}/aligned"
                     samtools faidx ${input2}/SD_regions_${filename1}.fa
                     # final one:
-                    echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -r ${r} -q ${q} -k 14 -w 16 -o ${output}/${filename1}_${filename2}/seeds ${input2}/SD_regions_${filename1}.fa $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
+                    echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc run -release biser_search.seq -p ${p} -d ${d} -g ${g} -f ${l} -r ${r} -q ${q} -k 14 -w 16 -o ${output}/${filename1}_${filename2}/seeds ${input2}/SD_regions_${filename1}.fa $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
                     
                     # echo "/home/hiseric1/new_sedef/sedef/sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/"
                 fi

@@ -1,6 +1,6 @@
 
 # import util
-
+import sys
 from align3 import *
 from PrioritySearch import *
 
@@ -21,14 +21,15 @@ def process_item(x, y, line = ''):
 	
 	# print 'ancors 2:'
 	# t = time()
-	# anchors = align_new(x,y,-1, -1)
+	anchors = align_new(x,y,-1, -1)
 	# print time() - t
 	# print len(anchors)
 
 	# if line != '' :
-	from old_align.Seq.chain import *
+	# best anchoring (old one actually):
+	# from old_align.Seq.chain import *
 	# t = time()
-	anchors = generate_anchors2(str(x),str(y), Hit.from_bed(line), 10)
+	# anchors = generate_anchors2(str(x),str(y), Hit.from_bed(line), 10)
 		# print time() - t
 		# print len(anchors2)
 		# for i in anchors2:
@@ -44,7 +45,7 @@ def process_item(x, y, line = ''):
 	#  t = time()
 	# print anchors
 	
-	print f'Ancors generated. # of anchros: {len(anchors)}'
+	# print f'Ancors generated. # of anchros: {len(anchors)}'
 	# Chain them
 	chains = list[list[int]]()
 	# with timing('Chain'):
@@ -108,7 +109,8 @@ def get_cigar(anchors, chain, s1, s2):
 		else:
 			print 'error main'
 			print gap1, gap2
-			sys.exit(1)
+			print 
+			# sys.exit(1)
 	match_reg = anchors[chain[-1]][2]
 	cigar.append( (match_reg, 'M') )
 	all_match += match_reg
@@ -190,7 +192,10 @@ with timing ('Everything'):
 	for xchr, xs, xe, ychr, ys, ye, rev, line in coords:
 		s1 = ref[xchr][xs:xe]
 		s2 = ref[ychr][ys:ye] if not rev else ~ref[ychr][ys:ye]
+		print count, xchr, xs, xe, ychr, ys, ye, rev
+
 		anchors, chains = process_item(s1, s2, line)
+		count += 1
 		for chain_ in chains:
 			# print chain_len(anchors, chain_)
 			if chain_len(anchors, chain_) > min_len:
@@ -198,7 +203,7 @@ with timing ('Everything'):
 				for i_ in range(len(chain_) - 1, -1, -1):
 					chain2.append(chain_[i_])
 				rez = get_cigar(anchors, chain2, s1, s2)
-				print rez
+				# print rez
 				# print len(s1),len( s2)
 				# print s1[rez[7] : rez[8]]
 				# print s2[rez[5] : rez[6]]

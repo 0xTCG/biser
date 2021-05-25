@@ -7,7 +7,7 @@ from bio import FASTA
 from bio.fmindex import FMDIndex, _enc, smems
 from time import timing
 
-type List = list
+# type List = list
 
 MIN = -999999999999999  # should be better :)
 min_len = 500
@@ -82,15 +82,15 @@ class PrioritySearchTree[T]:
 	"""
 
 
-	index: List[int]
+	index: list[int]
 	""" Index of the point in the original list; -1 for non-leaves """
-	x: List[T]  # coordinate for each leaf node
+	x: list[T]  # coordinate for each leaf node
 	""" Coordinate of each point; -1 for non-leaves """
-	max_x: List[int]
+	max_x: list[int]
 	""" Index of a leaf with the highest coordinate in the subtree """
-	score: List[int]  # scores for each leaf node
+	score: list[int]  # scores for each leaf node
 	""" Score of each point; -INF for non-leaves and deactivated points """
-	max_score: List[int]
+	max_score: list[int]
 	"""
 	Index of a leaf with the highest score in the subtree that has not
 	been recorded above this subtree

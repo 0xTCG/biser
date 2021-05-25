@@ -772,112 +772,112 @@ def get_position(ar: CIGAR, ppos:int):
 
 
 
-extend Align:
-	def __init__(self: Alignment, qstr: str, rstr:str, guide: list[Hit], side:int):
-		self.chr_a = qstr
-		prev = guide[0]
-		for index in range(1,len(guide)):
-			prev = guide[index-1]
-			cur = guide[index]
-			qs = cur.query_start
-			qe = cur.query_end
-			qps = prev.query_start 
-			qpe = prev.query_end
+# extend Align:
+# 	def __init__(self: Alignment, qstr: str, rstr:str, guide: list[Hit], side:int):
+# 		self.chr_a = qstr
+# 		prev = guide[0]
+# 		for index in range(1,len(guide)):
+# 			prev = guide[index-1]
+# 			cur = guide[index]
+# 			qs = cur.query_start
+# 			qe = cur.query_end
+# 			qps = prev.query_start 
+# 			qpe = prev.query_end
 
-			rs = cur.ref_start
-			re = cur.ref_end
-			rps = prev.ref_start
-			rpe = prev.ref_end
+# 			rs = cur.ref_start
+# 			re = cur.ref_end
+# 			rps = prev.ref_start
+# 			rpe = prev.ref_end
 
-			assert(qpe <= qs)
-			assert(rpe <= rs)
+# 			assert(qpe <= qs)
+# 			assert(rpe <= rs)
 
-			##check this assignment of self
-			self.end_a = qe
-			self.end_b = re
-			self.a+=qstr[qpe:qe]
-			self.b+=rstr[rpe:re]
+# 			##check this assignment of self
+# 			self.end_a = qe
+# 			self.end_b = re
+# 			self.a+=qstr[qpe:qe]
+# 			self.b+=rstr[rpe:re]
 
-			qgap = qs  - qpe
-			rgap = rs - rpe
-			if(qgap and rgap):
-				if(qgap <= 1000 and rgap <= 1000):
-					gap = Alignment(qstr[qpe:qgap],rstr[rpe:rgap])
-					self.append_cigar(gap.cigar)
-				else:
-					ma = max(qgap,rgap)
-					mi = min(qgap,rgap)
-					ma1 = Alignment(qstr[qpe:qpe+mi],rstr[rpe:rpe+mi])
-					if(qgap == mi):
-						ma1.append_cigar(str(ma-mi)+ 'I')
-					else:
-						ma1.append_cigar(str(ma-mi)+ 'D')
+# 			qgap = qs  - qpe
+# 			rgap = rs - rpe
+# 			if(qgap and rgap):
+# 				if(qgap <= 1000 and rgap <= 1000):
+# 					gap = Alignment(qstr[qpe:qgap],rstr[rpe:rgap])
+# 					self.append_cigar(gap.cigar)
+# 				else:
+# 					ma = max(qgap,rgap)
+# 					mi = min(qgap,rgap)
+# 					ma1 = Alignment(qstr[qpe:qpe+mi],rstr[rpe:rpe+mi])
+# 					if(qgap == mi):
+# 						ma1.append_cigar(str(ma-mi)+ 'I')
+# 					else:
+# 						ma1.append_cigar(str(ma-mi)+ 'D')
 
-					ma2 = Alignment(qstr[qs-mi:qs],rstr[rs-mi:rs])
-					if(qgap == mi):
-						ma1.prepend_cigar(str(ma-mi)+ 'I')
-					else:
-						ma1.prepend_cigar(str(ma-mi)+ 'D')
+# 					ma2 = Alignment(qstr[qs-mi:qs],rstr[rs-mi:rs])
+# 					if(qgap == mi):
+# 						ma1.prepend_cigar(str(ma-mi)+ 'I')
+# 					else:
+# 						ma1.prepend_cigar(str(ma-mi)+ 'D')
 
-					if(ma2.total_error()<ma1.total_error()):
-						self.append_cigar(ma2.cigar)
-					else:
-						self.append_cigar(ma1.cigar)
+# 					if(ma2.total_error()<ma1.total_error()):
+# 						self.append_cigar(ma2.cigar)
+# 					else:
+# 						self.append_cigar(ma1.cigar)
 
-			elif(qgap):
-				self.append_cigar(CIGAR(str(qgap) + 'D'))
+# 			elif(qgap):
+# 				self.append_cigar(CIGAR(str(qgap) + 'D'))
 			
-			elif(rgap):
-				self.append_cigar(CIGAR(str(rgap) + 'I'))
+# 			elif(rgap):
+# 				self.append_cigar(CIGAR(str(rgap) + 'I'))
 
-			self.append_cigar(cur.aln.cigar)
+# 			self.append_cigar(cur.aln.cigar)
 
-		qlo = self.start_a
-		qhi = self.end_a
-		rlo= self.start_b
-		rhi = self.end_b
+# 		qlo = self.start_a
+# 		qhi = self.end_a
+# 		rlo= self.start_b
+# 		rhi = self.end_b
 
-		assert(self.a == qstr[qlo:qhi])
-		assert(self.b == rstr[rlo:rhi])
+# 		assert(self.a == qstr[qlo:qhi])
+# 		assert(self.b == rstr[rlo:rhi])
 		
-		if(side):
-			qlo_n = max(0,qlo-side)
-			rlo_n = max(0,rlo-side)
-			if(qlo-qlo_n and rlo-rlo_n):
-				gap = Alignment(qstr[qlo_n:qlo],rstr[rlo_n:rlo])
-				gap.trim_front()
+# 		if(side):
+# 			qlo_n = max(0,qlo-side)
+# 			rlo_n = max(0,rlo-side)
+# 			if(qlo-qlo_n and rlo-rlo_n):
+# 				gap = Alignment(qstr[qlo_n:qlo],rstr[rlo_n:rlo])
+# 				gap.trim_front()
 
-				qlo_n = qlo - (gap.end_a - gap.start_a)
-				rlo_n = rlo - (gap.end_b - gap.start_b)
-				self.prepend_cigar(gap.cigar)
-				self.a = qstr[qlo_n:qlo] + self.a
-				self.b = rstr[rlo_n:rlo] + self.b
-				self.start_a = qlo #qlo = qlo_n
-				self.start_b = rlo #rlo = rlo_n
+# 				qlo_n = qlo - (gap.end_a - gap.start_a)
+# 				rlo_n = rlo - (gap.end_b - gap.start_b)
+# 				self.prepend_cigar(gap.cigar)
+# 				self.a = qstr[qlo_n:qlo] + self.a
+# 				self.b = rstr[rlo_n:rlo] + self.b
+# 				self.start_a = qlo #qlo = qlo_n
+# 				self.start_b = rlo #rlo = rlo_n
 
-			qhi_n = min(qhi+side,len(qstr))
-			rhi_n = min(rhi+side,len(rstr))
+# 			qhi_n = min(qhi+side,len(qstr))
+# 			rhi_n = min(rhi+side,len(rstr))
 
-			if(qhi_n-qhi and rhi_n-rhi):
-				gap = Alignment(qstr[qhi:qhi_n],rstr[rhi:rhi_n])
-				gap.trim_back()
+# 			if(qhi_n-qhi and rhi_n-rhi):
+# 				gap = Alignment(qstr[qhi:qhi_n],rstr[rhi:rhi_n])
+# 				gap.trim_back()
 
-				qhi_n = qhi + gap.end_a
-				rhi_n = rhi + gap.end_b
-				self.append_cigar(gap.cigar)
-				self.a += qstr[qhi:qhi_n]
-				self.b += rstr[rhi:rhi_n]
-				self.end_a = qhi_n #qhi = qhi_n; 
-				self.end_b = rhi_n #rhi = rhi_n;
+# 				qhi_n = qhi + gap.end_a
+# 				rhi_n = rhi + gap.end_b
+# 				self.append_cigar(gap.cigar)
+# 				self.a += qstr[qhi:qhi_n]
+# 				self.b += rstr[rhi:rhi_n]
+# 				self.end_a = qhi_n #qhi = qhi_n; 
+# 				self.end_b = rhi_n #rhi = rhi_n;
 
-		assert(qlo >= 0)
-		assert(rlo >= 0)
-		assert(qhi <= len(qstr))
-		assert(rhi <= len(rstr))
-		assert(self.a == qstr[qlo:qhi])
-		assert(self.b == rstr[rlo:rhi])
+# 		assert(qlo >= 0)
+# 		assert(rlo >= 0)
+# 		assert(qhi <= len(qstr))
+# 		assert(rhi <= len(rstr))
+# 		assert(self.a == qstr[qlo:qhi])
+# 		assert(self.b == rstr[rlo:rhi])
 
-		self.populate_nice_alignment()
+# 		self.populate_nice_alignment()
 
 
 

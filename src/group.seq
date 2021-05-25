@@ -47,13 +47,24 @@ def getIntTree(path, wgac, coordinates):
                 # print ovrlp1
                 # print ovrlp2
                 if  len(ovrlp1) > 0 or len(ovrlp2) > 0:
+                    # print sd
+                    # print line[0]
+                    sum__ = 0
                     for i_ in ovrlp1:
+                        sum__ += int(i_.end - i_.begin)
+                        # print i_
                         # print f'{i_.data}'
                         sd.clade.add(i_.data)
+                    # print line[3]
                     for i_ in ovrlp2:
+                        sum__ += int(i_.end - i_.begin)
+
+                        # print i_
                         # print f'{i_.data}'
                         sd.clade.add(i_.data)
-                    sd_l.append(sd)
+                    # print sum__, sd.mate1.end - sd.mate1.begin + sd.mate2.end - sd.mate2.begin
+                    if sum__ > (sd.mate1.end - sd.mate1.begin + sd.mate2.end - sd.mate2.begin) * 0.1:
+                        sd_l.append(sd)
 
                     assert len(sd.clade) > 0
                 
@@ -205,10 +216,10 @@ def group():
 
     # first create interval tree for SDs
     path_sds = '/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/final.bed' # 'same8/hg19_hg19/final.bed' # 'different8/final_all.bed' #'data/wgac_hard_aligned_2.bed'
-    elementary_path = '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # 'data/cores/out_hg19_new.txt' #'test/final.bed'
+    elementary_path = '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_m/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # 'data/cores/out_hg19_new.txt' #'test/final.bed'
     
 
-    coordinates = ('hg19#chr16', 7615224, 7623073)
+    coordinates = ('hg19#chr14',  43891932 , 43894603) # ('hg19#chr16', 7615224, 7623073)
     # print 'Reading SDs:'
     # dict_int_t, sd_l = getIntTree(path_sds, False, coordinates)
     distance_matrix = list[list[float]]()
@@ -237,7 +248,7 @@ def group():
         # end = int(line[3])
 
         clade = line[3]
-        chr1 = line[0][:-1]
+        chr1 = line[0] #[:-1]
         start = int(line[1])
         end = int(line[2])
 
@@ -263,8 +274,10 @@ def group():
                     # print list_elem, coordinates
                     coverage1 += list_elem[2] - list_elem[1]
                     for_saving.append(key)
+                    print list_elem
     for_saving = list[str](set[str](for_saving))
-    print coverage1, coordinates[2] -  coordinates[1]
+    print coverage1, coordinates[2] -  coordinates[1], len(for_saving), len(set(for_saving))
+    # print 'Those elems:'
     # for i in for_saving:
     #     print i, len(elem_dict[i] )
 
@@ -279,7 +292,9 @@ def group():
 
     small_int_tree = dict[str,IntervalTree[str]]()
     for key in for_saving:
+        print f'Key: {key}'
         for list_elem in elem_dict[key]:
+            print list_elem
             if list_elem[0] in small_int_tree:
                 small_int_tree[list_elem[0] ].add(Interval(list_elem[1],list_elem[2],list_elem[3]))
             else:
@@ -295,8 +310,8 @@ def group():
     
     min_indexes = (0,0)
     min_value = -1
-    out = open('results/output_distances.txt', 'w')
-    out_sds = open('results/output_sds.txt', 'w')
+    out = open('results/output_distances1.txt', 'w')
+    out_sds = open('results/output_sds1.txt', 'w')
 
 
     # print 'Building matrix:'

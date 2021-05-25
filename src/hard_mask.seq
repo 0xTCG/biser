@@ -1,4 +1,4 @@
-# from bio.fasta import FASTA
+from bio.fasta import *
 from pickle import *
 
 
@@ -10,7 +10,7 @@ list_u = set([s'A', s'C', s'G', s'T'])
 # list_u = set(['A', 'C', 'G', 'T'])
 # changed difference
 difference = 0#50
-def hard_mask(path: str, path_to_hard: str, path_to_dict: str = "search/data/position_conv"):
+def hard_mask(path: str, path_to_hard: str, path_to_dict: str = ""):
     # fr = FASTA(path)
     position_converter = dict[str,dict[int,int]]()
     write_f = open(path_to_hard,'w')
@@ -81,23 +81,27 @@ def hard_mask(path: str, path_to_hard: str, path_to_dict: str = "search/data/pos
                 for j in range(index_old - last_u, index_old):
                     help_dict[index_new] = j
                     index_new += 1
-            position_converter[i.name] = help_dict
+            if path_to_dict != "":
+                position_converter[i.name] = help_dict
             # assert len(help_dict2) == len(i.seq)
             write_f.write('\n')
-    f = gzFile(path_to_dict,'w')
-    dump[dict[str,dict[int,int]]](position_converter,f)
-    f.close()
+    if path_to_dict != "":
+        f = gzFile(path_to_dict,'w')
+        dump[dict[str,dict[int,int]]](position_converter,f)
+        f.close()
 
             
+import sys
+print sys.argv
+if len(sys.argv) == 4:
+    # first is location of FA file
+    # second parameter is output hard masked location and name
+    # third parameter is output of locations hard masked-soft maksed location and name
+    hard_mask(sys.argv[1], sys.argv[2], sys.argv[3])
+elif len(sys.argv) == 3:
+    # first is location of FA file
+    # second parameter is output hard masked location and name
+    hard_mask(sys.argv[1], sys.argv[2])
+else:
+    print "Not enough parameters."
 
-
-
-
-# hard_mask("data/hg19.fa", "data/hg19_hard_50.fa", "data/genomes/position_conv_50_rev")
-# hard_mask("data/genomes/mm10.fa", "data/genomes/mm10_hard_50.fa", "data/genomes/mm10_position_conv_50")
-# print 'Done one'
-# hard_mask("data/genomes/rheMac10.fa", "data/genomes/rheMac10_hard_50.fa", "data/genomes/rheMac10_position_conv_50")
-# hard_mask("data/genomes/panTro6.fa", "data/genomes/panTro6_hard_50.fa", "data/genomes/panTro6_position_conv_50")
-# hard_mask("data/genomes/gorGor6.fa", "data/genomes/gorGor6_hard_50.fa", "data/genomes/gorGor6_position_conv_50")
-# /home/hiseric1/new_sedef/seq/search/data/genomes/mm8/mm8.fa
-hard_mask("/home/hiseric1/new_sedef/seq/search/data/genomes/mm10/final/mm10.fa", "/home/hiseric1/new_sedef/seq/search/data/genomes/mm10/final/mm10_hard_50.fa", "/home/hiseric1/new_sedef/seq/search/data/genomes/mm10/final/mm10_position_conv_50")
