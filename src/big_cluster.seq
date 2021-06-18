@@ -1,12 +1,13 @@
 from uf_help2 import *
+import sys
 
 
 
 bed_file = '/home/hiseric1/new_sedef/biser/src/results/5_all/same/mm8_mm8/final.bed' # '/home/hiseric1/new_sedef/biser/src/results/5_all/final_7.bed' # '/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/final.bed' # 'final/final.bed' # 'data/wgac_hard_aligned_2.bed' #'final/final_adapted.bed'# 'data/wgac_hard_aligned_2_adapted.bed'
 write_path = '/home/hiseric1/new_sedef/biser/src/results/5_all/same/mm8_mm8/colors/' # '/home/hiseric1/new_sedef/biser/src/results/5_all/colors/'  #'/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors/' # 'test/final.bed' # 'final/final_adapted_elementaries.bed'# 'test/final.bed'
-# if len(sys.argv) > 1:
-#     bed_file = sys.argv[1]
-#     write_path = sys.argv[2]
+if len(sys.argv) > 1:
+    bed_file = sys.argv[1]
+    write_path = sys.argv[2]
 
 
 
@@ -73,8 +74,8 @@ with timing('read file'), open(bed_file) as f:
         for l_ in f:
             l = l_.split('\t')
             # print l
-            if how_many%1000 ==0:
-                print how_many
+            # if how_many%1000 ==0:
+            #     print how_many
             # print l
             
             how_many+=1
@@ -200,7 +201,7 @@ print len(output_dict)
 max_ = 0
 for i in output_dict:
     output = open(write_path + f'/{i}', 'w')
-    print f'color: {i}, len: {len(output_dict[i])}'
+    # print f'color: {i}, len: {len(output_dict[i])}'
     if len(output_dict[i]) > max_:
         max_ = len(output_dict[i])
     for j in output_dict[i]:

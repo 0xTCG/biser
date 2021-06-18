@@ -1,12 +1,5 @@
 #!/bin/bash
-# shopt -s nullglob
-# numfiles=(results/test1/*)
-# numfiles=${#numfiles[@]}
-# echo  ${numfiles}
 
-
-
-# --
 
 path="$1"
 jobs="15"
@@ -37,9 +30,10 @@ for i in ${path}/*; do
     # echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc decompose.seq ${i} ${output}/colors_elems/  >${output}/colors_logs/${f}_1 2>${output}/colors_logs/${f}_2"
     # echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc run -release decompose.seq ${i} ${output}/colors_elems/ ${numfiles} >${output}/colors_logs/${f}_1 2>${output}/colors_logs/${f}_2"
     if [[ $i == *.fa ]]; then
-        # samtools faidx $i
+        samtools faidx $i
+        echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc run -release decompose.seq ${i} ${output}/colors_elems/ >${output}/colors_logs/${f}_1 2>${output}/colors_logs/${f}_2"
 
-        echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' ./decompose ${i} ${output}/colors_elems/ >${output}/colors_logs/${f}_1 2>${output}/colors_logs/${f}_2"
+        # echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' ./decompose ${i} ${output}/colors_elems/ >${output}/colors_logs/${f}_1 2>${output}/colors_logs/${f}_2"
     fi
     # /cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' seqc decompose.seq ${i} results/hg19_5/colors_elems/ >results/l1
     # break

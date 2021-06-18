@@ -201,6 +201,59 @@ def build_dict_2(path, d = dict()):
     km = path.split("/")[1]
     return d, count_sds, coverage
 
+
+def modify_sequences(main_dict, bed_file):
+    from cigar import Cigar
+    from Bio.Seq import Seq
+    for i in open(bed_file, 'r'):
+        line = i.split('\t')
+        chr1 = line[0]
+        if chr1 == '#chr1':
+            continue
+        chr2 = line[3]
+
+        if chr1 == 'chrM' or chr2 == 'chrM':
+            continue
+        s1 = int(line[1])
+        e1 = int(line[2])
+
+        s2 = int(line[4])
+        e2 = int(line[5])
+        cigar = line[12]
+
+        seq1 = main_dict[chr1] [s1:e1]
+        seq2 = main_dict[chr2] [s2:e2] if line[9] == '+' else str( Seq(main_dict[chr2] [s2:e2]).reverse_complement() )
+        seq_new = ''
+
+        counter_1 = 0
+        counter_2 = 0
+
+        for num, let in Cigar(cigar).items():
+            # print (let, num)
+            if let == 'M':
+                seq_new += seq1[counter_1: counter_1+num]
+                # if seq1[counter_1: counter_1+num] != seq2[counter_2: counter_2+num]:
+                #     print (seq1[counter_1: counter_1+num])
+                #     print (seq2[counter_2: counter_2+num])
+                counter_1 += num
+                counter_2 += num
+            elif let == 'D':
+                counter_1 += num
+            elif let == 'I':
+                seq_new += seq2[counter_2: counter_2+num]
+                counter_2 += num
+        if line[9] == '-':
+            seq_new = str ( Seq(seq_new).reverse_complement() )
+        main_dict[chr2] = main_dict[chr2][:s2] + seq_new + main_dict[chr2][e2:]
+        # print (len(seq_new), len(seq2))
+        # print (seq_new)
+        # print (seq2)
+        assert len(seq_new) == len(seq2)
+
+
+
+
+
 def chop_this_region(s1,e1,s2,e2, threshold):
     
     while s1 < e1:
@@ -438,7 +491,7 @@ def extract_sequences(path, out_folder, input_beds):
             d__ = dict()
             d__, i__, j__ = build_dict(f'{input_beds}/{specie}_{specie}/aligned/', dict())
 
-            print (f'Dictionary built {i__}, {j__}')
+            # print (f'Dictionary built {i__}, {j__}')
             for i in d__:
                 for interval in d__[i]:
                     new_fa.write(f'>{i}-{interval.begin}-{interval.end}\n{main_fa_dict[i][interval.begin : interval.end]}\n')
@@ -461,29 +514,32 @@ def extract_sequences_2(path, out_folder, input_beds):
             # print (path_)
             if len(path_) > 2 and path_[1] == 'hard' and path_[2] == '50.fa':
                 specie = path_[0] # 'hg19'
-                print (specie)
+                # print (specie)
                 # continue
                 for item in read_fasta(f"{path}{specie}_hard_50.fa"):
                     main_fa_dict[f'{specie}#{item.defline}'] = item.sequence
                     # print(item)
-                print (len(main_fa_dict))
+                # print (len(main_fa_dict))
     else:
         specie = path.split('/')[-1].split('_')[0]
-        print (specie, path)
+        # print (specie, path)
         for item in read_fasta(f"{path}"):
-            print (f'{specie}#{item.defline}')
+            # print (f'{specie}#{item.defline}')
             main_fa_dict[f'{specie}#{item.defline}'] = item.sequence
     
     # Now we iterate trought different colors files and 
     count_array = []
     num_ov_neg = 0
+    
     for i in  os.listdir(input_beds):
-        print (i)
+        # print (i)
+        modify_sequences(main_fa_dict, f'{input_beds}/{i}')
+        # sys.exit(1)
         new_fa = open(f'{out_folder}/{i}.fa', 'w')
         d__ = dict()
         d__, i__, j__ = build_dict_2(f'{input_beds}/{i}', dict())
         count_array.append((i__, j__))
-        print (f'Dictionary built {i__}, {j__}')
+        # print (f'Dictionary built {i__}, {j__}')
         for chr_ in d__:
             for interval in d__[chr_]:
                 if chr_[-1] == '+':
@@ -496,6 +552,7 @@ def extract_sequences_2(path, out_folder, input_beds):
         new_fa.close()
     count_array.sort(reverse = True)
     print (f'Num of rev comp: {num_ov_neg}')
+    print ('10 biggest clusters: (#of sequences, coverage)')
     for i in count_array[:10]:
         print (i)
 
@@ -680,6 +737,7 @@ def main():
             d, i, s = build_dict(sys.argv[2])
             print (i, s)
         elif sys.argv[1] == 'extract_colors':
+            # path to genome(s), out_folder, input_beds
             extract_sequences_2( sys.argv[2], sys.argv[3], sys.argv[4])
 
 main()

@@ -1,4 +1,5 @@
 
+extension = 0 # 10
 class Linked_list_node:
     begin: int
 
@@ -40,7 +41,7 @@ class Linked_list_node:
     def __init__(self: Linked_list_node, first: int, chr_:int):
         
         self.begin = first
-        self.end = first + 10
+        self.end = first + extension
 
         self.chr_ = chr_
         # self.next = Linked_list_node()
@@ -56,7 +57,7 @@ class Linked_list_node:
 
     def __init__(self: Linked_list_node, first: int,chr_:int, next_: Optional[Linked_list_node] ):
         self.begin = first
-        self.end = first + 10
+        self.end = first + extension
         self.chr_ = chr_
         self.next = next_
         self.age = 0
@@ -67,7 +68,7 @@ class Linked_list_node:
         self.inner_gap = 0
     def __init__(self: Linked_list_node, first: int, last:int,chr_:int, next_: Optional[Linked_list_node],  age:int, count:int):
         self.begin = first
-        self.end = first + 10
+        self.end = first + extension
         self.chr_ = chr_
 
         self.next = next_

@@ -32,6 +32,7 @@ def process(threads: Optional[Linked_list_node], visited, difference = 50, retur
     
     walker = threads
     holder = threads
+    new_threads = Optional[Linked_list_node]()
     while walker:
         # add extend here and dont return anything if only one elem in the list!
         if walker.end - walker.begin > min_mate_len:
@@ -42,6 +43,7 @@ def process(threads: Optional[Linked_list_node], visited, difference = 50, retur
             # 	return_array.append((walker.chr_, walker.begin , walker.end - ( difference - walker.gap), walker.score ))
             # else:
             return_array.append((walker.chr_, walker.begin , walker.end , walker.score ))
+        
 
         # walker.begin = walker.end - ( difference - walker.gap)
         
@@ -58,11 +60,14 @@ def process(threads: Optional[Linked_list_node], visited, difference = 50, retur
     return return_array
 
 
+node_counter = 0
+making_new = 0
 
 def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list: list[tuple[int,int]], difference: int , return_array: list[list[ tuple[int,int,int, int]] ] = list[tuple[int,int,int]](), visited: list[list[bool]] = list[list[bool]]() ) -> Optional[Linked_list_node]:
-
+    global node_counter
     minimizer_index = len(minimizers_dict_list) - 1
-    node_counter = 0
+    global making_new
+    # node_counter = 0
 
     length = len(minimizers_dict_list)
 
@@ -115,7 +120,7 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
                 walker.count+=1
                 minimizer_index-=1
             else:
-                walker.end = minimizers_dict_list[minimizer_index][1] + 10
+                walker.end = minimizers_dict_list[minimizer_index][1] #+ 10
                 walker.score += 1
                 walker.inner_gap += 0
                 
@@ -134,7 +139,10 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
         elif minimizer_index >= 0 and (not walker.next or walker.next.chr_ < minimizers_dict_list[minimizer_index][0] or (walker.next.chr_ == minimizers_dict_list[minimizer_index][0] and walker.next.end + difference < minimizers_dict_list[minimizer_index][1]) ):
             walker.insert_after(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][0],1,1)
             walker.next.score += 1
+            walker.gap = 0
+
             minimizer_index-=1
+            making_new += 1
             
         
         walker.gap +=1
@@ -150,13 +158,14 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
                     temp_arr = process(threads, visited, difference)
                     if len(temp_arr) > 0:
                         return_array.append( temp_arr )
-                    walker = None
-                    holder = None
-                    previous = None
-                    while threads and threads.next:
-                        temp = threads.next
-                        threads.next = None
-                        threads = temp
+                    
+                    # walker = None
+                    # holder = None
+                    # previous = None
+                    # while threads and threads.next:
+                    #     temp = threads.next
+                    #     threads.next = None
+                    #     threads = temp
 
                     threads = None
 
@@ -224,6 +233,16 @@ def dict_align(s1, chr1, ref_dict: dict[int, list[tuple[int,int]]] = dict[int, l
         visited.append(False)
     return frequency
 
+
+
+# def just_color(s1, chr1, ref_dict):
+#     step = 1
+#     for i in s1.kmers[Kmer[10]](step):
+
+
+
+
+
 def get_coverage(visited, croms):
     all = 0
     covered = 0
@@ -243,7 +262,7 @@ def get_coverage(visited, croms):
 def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[list[ tuple[int,int,int,int]]](), visited = list[list[bool]] ()):
     loc = 0
     step = 1
-    difference = 60
+    difference = 70
 
     helper = list[tuple[int,int]]()
 
@@ -265,6 +284,8 @@ def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[li
 
     for i in s1.kmers[Kmer[10]](step):
         i_ = int(i.as_int())
+        print (ref_dict[i_])
+        continue
         if len(ref_dict[i_]) >= threshold:
             # print 'skipped', i, loc, len(ref_dict[i_]) , threshold
             loc += step
@@ -288,7 +309,7 @@ def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[li
         # avg_count +=1
         # print f'Cur loc: {loc}'
         loc += step
-
+    sys.exit(1)
     
 
 
@@ -449,7 +470,7 @@ def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=
     # print ref_dict
     output.close()
     cov, all = get_coverage(visited, croms)
-    print f'Elementary sets: {count3}\nAll elementaries: {count4}\nCovered: {cov}\nAll: {all}, So far: {count2}'
+    print f'Elementary sets: {count3}\nAll elementaries: {count4}\nCovered: {cov}\nAll: {all}, So far: {count2}\n{node_counter}\nNew: {making_new}'
     
 
 
@@ -462,7 +483,11 @@ def main():
         # decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/786.fa', 'results/', True)
         # decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/1863.fa', 'results/', True)
         # decompose('/home/hiseric1/new_sedef/biser/src/align/results/test1/0/0.fa', 'results/', True)
-        decompose('/home/hiseric1/new_sedef/biser/src/align/results/test1/4/116.fa', 'results/test2/', True)
+        # decompose('/home/hiseric1/new_sedef/biser/src/align/results/test1/4/116.fa', 'results/test2/', True)
+        # biser/src/results/updated/hg19_500_100/colors_fas
+        # decompose('/home/hiseric1/new_sedef/biser/src/results/updated/hg19_500_100/colors_fas/8.fa', 'results/test2/', True)
+        # decompose('/home/hiseric1/new_sedef/biser/src/results/updated/hg19_500_100/colors_fas/45.fa', 'results/test2/', True)
+        decompose('/home/hiseric1/new_sedef/biser/src/align/results/colors_modified/7.fa', 'results/test2/', True)
 
     elif len(sys.argv) == 2:
         decompose(sys.argv[1], 'results/')

@@ -1,8 +1,10 @@
 
 
-from fastcluster import average
+# from fastcluster import average
 import numpy as np
 from scipy.cluster.hierarchy import dendrogram
+from scipy.cluster.hierarchy import average, linkage
+
 from matplotlib import pyplot as plt
 import scipy
 import pandas as pd 
@@ -11,6 +13,12 @@ import scipy.cluster
 import json
 import matplotlib.pyplot as plt
 from functools import reduce
+from Bio.Phylo.TreeConstruction import _Matrix
+from Bio.Phylo.TreeConstruction import DistanceTreeConstructor, DistanceMatrix
+import pylab
+from Bio import Phylo
+# from skbio import DistanceMatrix
+# from skbio.tree import nj
 
 # X = [[0,0.4,0.5], [0.4,0,0.1],[0.5,0.1,0]]
 # labels = ['1__','2__','3_-____---']
@@ -24,38 +32,107 @@ sys.setrecursionlimit(200000)
 
 #Loading data
 
-file_ = open('results/output_distances.txt', 'r').readlines()
+# out = open('results/output_distances_npip.txt', 'w')
+# out_sds = open('results/output_npip.txt', 'w')
+# file_ = open('results/output_distances.txt', 'r').readlines()
+file_ = open('results/output_distances_npip.txt', 'r').readlines()
+
 matrix_len = file_[0]
 b = np.ones((int(matrix_len),int(matrix_len)))
+min_ = 2.0
 for i in file_[1:]:
     line = i.split('\t')
     c1 = int(line[0])
     c2 = int(line[1])
+    
     num = float(line[2])
+    if num < min_:
+        min_ = num
     b[c1][c2] = num
     b[c2][c1] = num
+
+
 X = b
+for i in range(0, len(X)):
+    X[i][i] = 0.0
+print (min_)
+
+s = ''
+
+# for i in X:
+#     for j in i:
+#         # print (i)
+#         s+= f'{round(j,3)}\t\t'
+#     s+= f'\n'
+# print (s)
+
 names = []
-for i in open('results/output_sds.txt', 'r'):
+# for i in open('results/output_sds.txt', 'r'):
+for i in open('results/output_npip.txt', 'r'):
+
 	line = i.split('\t')
 	# if (abs(int(line[1])-int(line[2])) < 2):
 	# 	continue
-	names.append(f'{line[0]}:{line[1]}-{line[2]}&{line[3]}:{line[4]}-{line[5]}')
+	# names.append(f'{line[0]}:{line[1]}-{line[2]}&{line[3]}:{line[4]}-{line[5]}')
+	names.append(f'{line[3]}')
+
 
 labels = names
+# sys.exit(1)
 
+# # this part for neighbour joining
+
+# print (X)
+X_sub = []
+for i in range(0,len(X)):
+    X_sub_one = []
+    for j in range (0,i+1):
+        X_sub_one.append(X[i][j])
+    X_sub.append(X_sub_one)
+
+X = X_sub
+
+# import numbers
+
+
+dm = DistanceMatrix(names=labels, matrix=X)
+constructor = DistanceTreeConstructor()
+tree = constructor.nj(dm)
+print(tree)
+Phylo.draw(tree)
+pylab.show()
+# print (m)
+
+
+
+# --------------
+# dm = DistanceMatrix(X, labels)
+# sys.exit(1)
+
+# tree = nj(dm)
+# nj()
+# print(tree.ascii_art())
+sys.exit(1)
+# ---------------------
 
 # calculating UPGMA
-x = average (X)
-file_1 = open('clustered_data2.txt','w')
+x = average(X) # average (X)
+
+file_1 = open('results/clustered_data2.txt','w')
 for i in x:
     file_1.write(f'{int(i[0])}\t{int(i[1])}\t{i[2]}\t{int(i[3])}\n')
 
 
 print("Done avg")
-fig = plt.figure(figsize=(350,120),  dpi=100)
+# fig = plt.figure(figsize=(350,120),  dpi=100)
+fig = plt.figure()
+
 # figsize=(200, 200)
-dn = dendrogram(x, labels=labels)
+dn = dendrogram(x, labels=labels, orientation='left')
+plt.xticks(rotation='horizontal')
+plt.yticks(rotation='horizontal')
+
+
 plt.savefig('results/image2.png', bbox_inches='tight')
 
 

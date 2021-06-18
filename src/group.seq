@@ -63,7 +63,7 @@ def getIntTree(path, wgac, coordinates):
                         # print f'{i_.data}'
                         sd.clade.add(i_.data)
                     # print sum__, sd.mate1.end - sd.mate1.begin + sd.mate2.end - sd.mate2.begin
-                    if sum__ > (sd.mate1.end - sd.mate1.begin + sd.mate2.end - sd.mate2.begin) * 0.1:
+                    if sum__ > (sd.mate1.end - sd.mate1.begin + sd.mate2.end - sd.mate2.begin) * 0: #.1:
                         sd_l.append(sd)
 
                     assert len(sd.clade) > 0
@@ -216,10 +216,10 @@ def group():
 
     # first create interval tree for SDs
     path_sds = '/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/final.bed' # 'same8/hg19_hg19/final.bed' # 'different8/final_all.bed' #'data/wgac_hard_aligned_2.bed'
-    elementary_path = '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_m/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # 'data/cores/out_hg19_new.txt' #'test/final.bed'
+    elementary_path = '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_m/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # 'data/cores/out_hg19_new.txt' #'test/final.bed'
     
 
-    coordinates = ('hg19#chr14',  43891932 , 43894603) # ('hg19#chr16', 7615224, 7623073)
+    coordinates =  ('hg19#chr16', 7631444, 7639283) # ('hg19#chr16', 10446237, 10586220) # ('hg19#chr14',  43891932 , 43894603) # ('hg19#chr16', 7615224, 7623073)
     # print 'Reading SDs:'
     # dict_int_t, sd_l = getIntTree(path_sds, False, coordinates)
     distance_matrix = list[list[float]]()
@@ -261,22 +261,44 @@ def group():
             elem_dict[clade] = [(chr1, start, end, clade)]
     print f'done reading elementaries {len(cores__)}, {len(elem_dict)}'
     for_saving = list[str]()
+    for_saving_set = dict[str, int]()
+
 
     coverage1 = 0
+    coordinates2 = [('hg19#chr16', 10446237, 10586220), ('hg19#chr16', 10964013, 11083747), ('hg19#chr16', 10624870, 10780247), ('hg19#chr16', 14204340, 14346299), ('hg19#chr16', 30346381, 30446477), ('hg19#chr16', 7577687 ,7903370)]
     for key in elem_dict:
         # print key
         for list_elem in elem_dict[key]:
             # print list_elem, coordinates
             # if list_elem[0][:-1] == coordinates[0]:
-            if list_elem[0] == coordinates[0]:
+            for i__ in coordinates2:
+                if list_elem[0] == i__[0]: # coordinates[0]:
 
-                if  list_elem[1] < coordinates[2] and list_elem[2] > coordinates[1]:
-                    # print list_elem, coordinates
-                    coverage1 += list_elem[2] - list_elem[1]
-                    for_saving.append(key)
-                    print list_elem
+                    if list_elem[1] < i__[2] and list_elem[2] > i__[1]: # list_elem[1] < coordinates[2] and list_elem[2] > coordinates[1]:
+                        # print list_elem, coordinates
+                        coverage1 += list_elem[2] - list_elem[1]
+                        for_saving.append(key)
+                        if key in for_saving_set:
+                            for_saving_set[key] += 1
+                        else:
+                            for_saving_set[key] = 1
+
+                        print list_elem
     for_saving = list[str](set[str](for_saving))
     print coverage1, coordinates[2] -  coordinates[1], len(for_saving), len(set(for_saving))
+    print 'One:'
+    max_ = 0
+    max_elem = ''
+    for i in for_saving_set:
+        # print i, for_saving_set[i]
+        if max_ < for_saving_set[i]:
+            max_ = for_saving_set[i]
+            max_elem = i
+    print 'Here:'
+    for i in elem_dict[max_elem]:
+        print i
+    # print elem_dict[max_elem]
+    # print for_saving_set
     # print 'Those elems:'
     # for i in for_saving:
     #     print i, len(elem_dict[i] )
@@ -292,9 +314,9 @@ def group():
 
     small_int_tree = dict[str,IntervalTree[str]]()
     for key in for_saving:
-        print f'Key: {key}'
+        # print f'Key: {key}'
         for list_elem in elem_dict[key]:
-            print list_elem
+            # print list_elem
             if list_elem[0] in small_int_tree:
                 small_int_tree[list_elem[0] ].add(Interval(list_elem[1],list_elem[2],list_elem[3]))
             else:
@@ -339,5 +361,97 @@ def group():
     out_sds.close()
 
 
+def group_specific_regions():
+    path_sds = '/home/hiseric1/new_sedef/biser/src/results/npip_hard.txt' # '/home/hiseric1/new_sedef/biser/src/results/chimp_hard6.txt' # '/home/hiseric1/new_sedef/biser/src/results/npip_hard.txt' # 'same8/hg19_hg19/final.bed' # 'different8/final_all.bed' #'data/wgac_hard_aligned_2.bed'
+    elementary_path = '/home/hiseric1/new_sedef/biser/src/results/hg19_elems_100mn/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/results/panTro6_decomp/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/final_elems/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_m/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # 'data/cores/out_hg19_new.txt' #'test/final.bed'
+    distance_matrix = list[list[float]]()
+
+    # elem_dict = dict[int, list[tuple[str, int,int, int]]]()
+    elem_dict = dict[str, list[tuple[str, int,int, str, str]]]()
+
+    for i in open(elementary_path,'r'):
+        # after that, we can build similarity matrix based on shared elemetnary sds]
+        line = i.split('\t')
+        
+        clade = line[3]
+        chr1 = line[0] #[:-1]
+        start = int(line[1])
+        end = int(line[2])
+        strand = (line[6])
+
+
+
+        if clade in elem_dict:
+            elem_dict[clade].append((chr1, start, end, clade, strand))
+        else:
+            elem_dict[clade] = [(chr1, start, end, clade, strand)]
+    
+    coordinates2 = []
+    print 'elems loaded'
+    species = 'hg19#'
+    for i in open(path_sds, 'r').readlines():
+        # print i
+        chr_,coordinates_1, coordinates_2, npip_k = i.split(' ')
+        # chr_,coordinates_1, coordinates_2 = i.split(' ')
+        # npip_k = ''
+        coordinates2.append( ( species+chr_, int(coordinates_1), int(coordinates_2), npip_k, list[tuple[int,int, str, str]]() ) )
+
+    for_saving = list[str]()
+    # print coordinates2
+    for key in elem_dict:
+        # print key
+        for list_elem in elem_dict[key]:
+            # print list_elem, coordinates
+            # if list_elem[0][:-1] == coordinates[0]:
+            for i__ in coordinates2:
+                # print i__
+                if list_elem[0] == i__[0]: # coordinates[0]:
+
+                    if list_elem[1] > i__[1] and list_elem[2] < i__[2]: # list_elem[1] < coordinates[2] and list_elem[2] > coordinates[1]:
+                        # print list_elem, i__
+                        # coverage1 += list_elem[2] - list_elem[1]
+                        for_saving.append(key)
+                        i__[4].append((list_elem[1], list_elem[2] - list_elem[1], key,list_elem[4] ))
+                        # if key in for_saving_set:
+                        #     for_saving_set[key] += 1
+                        # else:
+                        #     for_saving_set[key] = 1
+
+                        # print list_elem
+    for_saving = list[str](set[str](for_saving))
+
+    out = open('results/output_distances_hg19_100.txt', 'w')
+    out_sds = open('results/output_hg19_100.txt', 'w')
+
+
+    # print 'Building matrix:'
+    print f' len of sd_l : {len(coordinates2)}'
+    out.write(f'{len(coordinates2)}\n')
+    for i in range(0,len(coordinates2)):
+        # print i, len(sd_l)
+        coordinates2[i][4].sort()
+        out_sds.write(f'{coordinates2[i][0]}\t{coordinates2[i][1]}\t{coordinates2[i][2]}\t{coordinates2[i][3]}\t{coordinates2[i][4]}\n')
+        distance_matrix.append(list[float]())
+        for j in range(i+1,len(coordinates2)):
+            distance = 2.0
+            # here calculate similarities
+            # print i, j
+            if i != j:
+                set1 = set()
+                set2 = set()
+                for i__ in coordinates2[i][4]:
+                    set1.add(i__[2])
+                for i__ in coordinates2[j][4]:
+                    set2.add(i__[2])
+                distance =  1 - ( len( set1.intersection(set2) ) / len( set1.union( set2) ) )
+                # print distance
+                if distance != 1:
+                    # print f'{i}\t{j}\t{distance}'
+                    out.write(f'{i}\t{j}\t{distance}\n')
+    out.close()
+    out_sds.close()
+        
+
 with timing('all'):
-    group()
+    # group()
+    group_specific_regions()

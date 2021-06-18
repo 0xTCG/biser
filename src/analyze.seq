@@ -1,5 +1,6 @@
 from pickle import *
 from time import *
+import sys
 
 def get_dict(path = "/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_position_conv") -> dict[str,dict[int,int]]:
     dict_conv = load[dict[str,dict[int,int]]](gzFile(path,'r'))
@@ -32,25 +33,62 @@ def convert_random_coordinates():
     # wgac_path = "search/data/wgac_without_cigar_remove_doubles.bed"
     # wgac_path2 = "search/data/genomes/wgac_without_cigar_remove_doubles_rev_50.bed"
     # file_ = open(wgac_path2,'w')
-    main_dict =  get_dict("/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_position_conv_50")
+    # file_to_load = open('results/npip.txt', 'r')
+    file_to_load = open('results/coordinates_chimp6.txt', 'r')
+
+
+    list_of_coordinates = [] # [('chr16', 21400000, 21700000), ('chr16', 22500000, 22800000), ('chr16', 21800000, 22100000), ('chr16', 30200000, 30500000), ('chr16', 29400000, 30000000), ('chr16', 74400000, 74600000),('chr16', 29040000, 29240000), ('chr16', 28400000, 28600000), ('chr16', 28600000, 28800000), ('chr16', 14700000, 15400000), ('chr16', 18300000, 18800000), ('chr16', 16400000, 16900000) ]
+
+    for i in file_to_load.readlines():
+        # npip_k, rest = i.split(' ')
+        chr_, rest = i.split(':')
+        coordinates = rest.split('-')
+        list_of_coordinates.append( (chr_, int(coordinates[0]), int(coordinates[1]), '') )
+
+    print (list_of_coordinates)
+    # sys.exit(1)
+    # main_dict =  get_dict("/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_position_conv_50")
+    main_dict =  get_dict("/home/hiseric1/new_sedef/seq/search/data/genomes/panTro6_position_conv_50")
+
     print 'Loaded dict'
     main_dict_2 = dict[str,list[tuple[int,int]]]()
-    chr1 = 'chr14' #'chr16'
-    start = 106753091 # 14805546# 16411466
-    end = 106759387 # 14820195 # 16444465
+
+    # sys.exit(1)
     with timing('Creating list'):
         for i in main_dict:
-            if i != chr1:
-                continue
+            # if i != 'chr16':
+            #     continue
             main_dict_2[i] = list[tuple[int,int]]()
             for j in main_dict[i]:
                 main_dict_2[i].append((main_dict[i][j], j))
             main_dict_2[i].sort()
             print len(main_dict_2[i])
     print 'Created list'
-    
-    start1  =    main_dict_2[chr1]   [   firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), start, False )  ][1]
-    end1    =    main_dict_2[chr1]   [   firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), end, True  )  ][1] # , start1, start1 + int(line[2])  - int(line[1]) )
-    print chr1, start1, end1
+    for chr1, start, end, npip_k in list_of_coordinates:
+        print f'first : {(chr1, start, end, npip_k)}'
+        # chr1 = 'chr16' # 'chr14' #'chr16'
+        # start = 106753091 # 14805546# 16411466
+        # end = 106759387 # 14820195 # 16444465
+        
+        
+        start1  =    main_dict_2[chr1]   [   firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), start, False )  ][1]
+        end1    =    main_dict_2[chr1]   [   firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), end, True  )  ][1] # , start1, start1 + int(line[2])  - int(line[1]) )
+        print chr1, start1, end1
+        print '--'
 
 convert_random_coordinates()
+
+def get_wgac_here():
+    file_to_load = open('results/npip.txt', 'r')
+
+    list_of_coordinates = [] # [('chr16', 21400000, 21700000), ('chr16', 22500000, 22800000), ('chr16', 21800000, 22100000), ('chr16', 30200000, 30500000), ('chr16', 29400000, 30000000), ('chr16', 74400000, 74600000),('chr16', 29040000, 29240000), ('chr16', 28400000, 28600000), ('chr16', 28600000, 28800000), ('chr16', 14700000, 15400000), ('chr16', 18300000, 18800000), ('chr16', 16400000, 16900000) ]
+
+    for i in file_to_load.readlines():
+        npip_k, rest = i.split(' ')
+        chr_, rest = rest.split(':')
+        coordinates = rest.split('-')
+        list_of_coordinates.append( (chr_, int(coordinates[0]), int(coordinates[1]), npip_k) )
+    
+    
+
+    # print (list_of_coordinates)

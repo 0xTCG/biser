@@ -7,6 +7,9 @@ from time import *
 from linked_list_node1 import *
 # from bisect import bisect_left
 
+def hash_dna(c: seq) -> int:
+    k = int((c.__int__()))
+    return 0 if k == 4 else k
 
 def gap_size(e1,b2):
 	return b2 - e1
@@ -15,7 +18,7 @@ INDEX_CUTOFF = 0.1
 
 SEARCH_MAX_EDIT_ERROR = 0.15
 kmer_size = 10
-min_mate_len = 50 # 100# 2# 100
+min_mate_len = 100 # 50 # 100# 2# 100
 min_mate_similarity = 0.6
 id_generator = 0
 
@@ -273,6 +276,67 @@ def add_to_tree_align(threads: Optional[Linked_list_node], minimizers_dict_list:
 
 	return threads
 
+def get_minimizers_winnowed(s:seq,
+	kmer_size, 
+	window_size): 
+
+	# making 2 lists, one for minimizers, and winnow
+
+	# Instead of using Cllass Minimizer, switch to tuple [int, int] - [0] hash, [1] location
+	# window = list[Minimizer]()
+	window = list[tuple[int,int]]()
+
+	MASK = (1 << (2 * kmer_size)) - 1
+
+	h = 0
+	last_hash = -1
+	
+
+
+	for i in range(0,len(s)):
+		# Updating positions of last 'N' and last uppercase letter n
+		
+		h = ((h << 2) | hash_dna(s[i])) & MASK
+		
+		
+		if (i < kmer_size - 1):
+			continue
+		hh = h
+		while (len(window) > 0 and not (window[-1][0] < hh)):
+			window.pop()
+		# while (len(window)>0 and window[-1].loc < ((i - kmer_size + 1) - window_size)):
+		while (len(window)>0 and window[-1][1] < ((i - kmer_size + 1) - window_size)):
+
+			window.pop(0)
+		
+		window.append((hh, i - kmer_size + 1))
+
+		if (i - kmer_size + 1 < window_size):
+			continue
+
+		if (not window[0][0] == last_hash):
+			yield window[0]
+			
+
+def dict_align_winnowed(s1, chr1, ref_dict: dict[int, list[tuple[int,int]]] = dict[int, list[tuple[int,int]]](), visited = list[bool] ()):
+
+	step = 1
+	loc = 0
+	frequency = 0 
+
+	# visited = [False] * len(s)
+	for i in get_minimizers_winnowed(s1, 10, 14):
+		# visited.append(False)
+		frequency += 1
+		i_, loc = i # int(i.as_int())
+		if i_ in ref_dict:
+			ref_dict[i_].append((chr1,loc))
+		else:
+			ref_dict[i_] = [(chr1,loc)]
+	# print loc
+	for i in range(len(s1)):
+		visited.append(False)
+	return frequency
 
 
 def dict_align(s1, chr1, ref_dict: dict[int, list[tuple[int,int]]] = dict[int, list[tuple[int,int]]](), visited = list[bool] ()):
@@ -310,6 +374,54 @@ def get_coverage(visited, croms):
 		
 	return covered, all
 
+def find_elems_winnowed(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[list[ tuple[int,int,int,int]]](), visited = list[list[bool]] ()):
+	loc = 0
+	step = 1
+	difference = 50
+
+	helper = list[tuple[int,int]]()
+
+	threads = None # Optional[Linked_list_node]() # Linked_list_node(0,0)
+	
+	max_val = 0
+	avg = 0
+	avg_count = 0
+	visited_count = 0 
+	inside = 0
+	visited_count = 0 
+
+	for i in get_minimizers_winnowed(s1, 10, 14): # s1.kmers[Kmer[10]](step):
+		# i_ = int(i.as_int())
+		i_, loc = i
+		if len(ref_dict[i_]) >= threshold:
+			# print 'skipped', i, loc, len(ref_dict[i_]) , threshold
+			continue
+		if visited[chr1][loc]:
+			visited_count += 1
+			# print f'Visited: {loc}, {i}, {threads}'
+			if threads:
+				inside += 1
+				temp_arr = process(threads, visited , 0)
+				if len(temp_arr) > 0:
+					best_nodes.append( temp_arr )
+				threads = None
+			continue
+		# if i_ in ref_dict:
+		assert i_ in ref_dict
+		threads = add_to_tree_align(threads, ref_dict[i_], difference,best_nodes, visited)
+
+
+	
+
+
+	walker = threads
+	temp_arr = process(threads, visited, 0)
+	if len(temp_arr) > 0:
+		best_nodes.append( temp_arr )
+
+	threads = None
+	walker = None
+
 
 def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[list[ tuple[int,int,int,int]]](), visited = list[list[bool]] ()):
 	loc = 0
@@ -325,13 +437,6 @@ def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[li
 	avg_count = 0
 	visited_count = 0 
 	inside = 0
-	# for i in visited[chr1]:
-	# 	if i:
-	# 		visited_count+=1
-	# print f'Visited1`: {visited_count}'
-	# print len(visited)
-	# print len(visited[0])
-
 	visited_count = 0 
 
 	for i in s1.kmers[Kmer[10]](step):
@@ -353,31 +458,19 @@ def find_elems(s1:seq, chr1, ref_dict, threshold = 1 << 31, best_nodes = list[li
 			continue
 		# if i_ in ref_dict:
 		threads = add_to_tree_align(threads, ref_dict[i_], difference,best_nodes, visited)
-		# if len(ref_dict[i_]) > max_val:
-		# 	max_val = len(ref_dict[i_])
-		# avg += len(ref_dict[i_])
-		# avg_count +=1
-		# print f'Cur loc: {loc}'
+
 		loc += step
 
 	
 
 
-	# print f'Num of visited: {visited_count}, {inside}'
 	walker = threads
-	# best_nodes.append( walker )
 	temp_arr = process(threads, visited, 0)
-	# print (threads)
-	# print (temp_arr)
 	if len(temp_arr) > 0:
 		best_nodes.append( temp_arr )
 
-	# print max_val, avg_count, avg, avg / avg_count
 	threads = None
 	walker = None
-	# for i in best_nodes:
-	# 	print i
-	# return threads
 
 from bio.fasta import *
 
@@ -435,6 +528,8 @@ def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=
 			croms[counter] = i.name
 			croms_rev[i.name] = counter
 			frequency += dict_align(i.seq, counter, ref_dict, visited[-1])
+			# frequency += dict_align_winnowed(i.seq, counter, ref_dict, visited[-1])
+
 			# dict_seqc[i.name] = i.seq
 
 			counter += 1
@@ -488,6 +583,7 @@ def decompose(path_to_fa1,destination_path = 'test', fai = True, outpt_filename=
 				# print count, len(i.seq)
 				count2 += len(i.seq)
 				find_elems(i.seq, croms_rev[i.name], ref_dict, threshold, best_nodes, visited)
+				# find_elems_winnowed(i.seq, croms_rev[i.name], ref_dict, threshold, best_nodes, visited)
 			if len(best_nodes) > 0:
 				best_nodes = merge(best_nodes)
 			
@@ -535,8 +631,11 @@ def main():
 		# decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/786.fa', 'results/', True)
 		# decompose('/home/hiseric1/new_sedef/biser/src/results/5_all/same/hg19_hg19/colors_fas/1863.fa', 'results/', True)
 		# decompose('/home/hiseric1/new_sedef/biser/src/align/results/test1/0/0.fa', 'results/', True)
-		decompose('/home/hiseric1/new_sedef/biser/src/align/results/test1/4/116.fa', 'results/test/', True)
+		# decompose('/home/hiseric1/new_sedef/biser/src/align/results/test1/4/116.fa', 'results/test/', True)
 		# decompose('results/test_elems/elems_test.fa', 'results/test_elems/')
+		# decompose('/home/hiseric1/new_sedef/biser/src/results/updated/hg19_500_100/colors_fas/8.fa', 'results/test2/', True)
+		decompose('/home/hiseric1/new_sedef/biser/src/results/updated/hg19_500_100/colors_fas/45.fa', 'results/test2/', True)
+
 
 	elif len(sys.argv) == 2:
 		decompose(sys.argv[1], 'results/')
