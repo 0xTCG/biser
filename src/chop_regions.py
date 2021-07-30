@@ -480,7 +480,7 @@ def extract_sequences(path, out_folder, input_beds):
         # print (path_)
         if len(path_) > 2 and path_[1] == 'hard' and path_[2] == '50.fa':
             specie = path_[0] # 'hg19'
-            print (specie)
+            # print (specie)
             # continue
             new_fa = open(f'{out_folder}/SD_regions_{specie}.fa', 'w')
             for item in read_fasta(f"{path}{specie}_hard_50.fa"):
@@ -533,7 +533,8 @@ def extract_sequences_2(path, out_folder, input_beds):
     
     for i in  os.listdir(input_beds):
         # print (i)
-        modify_sequences(main_fa_dict, f'{input_beds}/{i}')
+        # this is for fixing sequences
+        # modify_sequences(main_fa_dict, f'{input_beds}/{i}')
         # sys.exit(1)
         new_fa = open(f'{out_folder}/{i}.fa', 'w')
         d__ = dict()

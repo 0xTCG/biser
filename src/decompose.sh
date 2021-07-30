@@ -3,7 +3,7 @@ beds_path="$1"
 fa_path="$2"
 output="$3"
 
-jobs=8
+jobs=15
 
 TIME=/usr/bin/time
 
@@ -35,4 +35,4 @@ ${TIME} -f 'Extracting sequences took %E (hh:mm:ss) time and %M KB memmory' pyth
 ${TIME} -f 'Decomposition took %E (hh:mm:ss) time and %M KB memmory' ./decompose2.sh ${temp_folder}/colors_fas/ ${output}
 
 
-cat ${output}/colors_elems/* >${output}/elementaries.bed
+cat ${output}/colors_elems/* >${output}/elementaries_fin.bed

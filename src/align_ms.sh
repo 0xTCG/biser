@@ -40,7 +40,7 @@ for i in $validchrs; do
             log_folder=${beds}/${filename1}_${filename2}/log_align/
             # echo "this ${i}    ${j}    ${filename1}    ${filename2} ${files}"
 
-            /cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' ./align.sh ${files} ${i} ${j} ${jobs} #>"${beds}/${filename1}_${filename2}/log_align/${filename1}_${filename2}.log"
+            ${TIME} -f'TIMING %e %M' ./align.sh ${files} ${i} ${j} ${jobs} #>"${beds}/${filename1}_${filename2}/log_align/${filename1}_${filename2}.log"
             cat ${align_folder}* >${beds}/${filename1}_${filename2}/final.bed
 
         fi

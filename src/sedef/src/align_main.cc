@@ -293,7 +293,6 @@ void generate_alignments(const string &ref_path, const string &bed_path,
   }
   FastaReference fr(ref_path);
   FastaReference fr2(ref_path2);
-  auto T = cur_time();
 
 
   int lines = 0, total = 0;

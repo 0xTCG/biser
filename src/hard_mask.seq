@@ -90,18 +90,75 @@ def hard_mask(path: str, path_to_hard: str, path_to_dict: str = ""):
         dump[dict[str,dict[int,int]]](position_converter,f)
         f.close()
 
+
+# ---- faster hardmask
+def hard_mask2(path: str, path_to_hard: str, path_to_dict: str = ""):
+    position_converter = dict[str,dict[int,int]]()
+    write_f = open(path_to_hard,'w')
+    for i in FASTA(path):
+        if not '_' in i.name:
+            write_f.write(f'>{i.name}\n')
+            first_upper = True
+            help_dict = dict[int,int]()
+            index_new = 0
+            index_old = 0
+
+            for letter in i.seq:
+                if letter in list_u:
+                    write_f.write(str(letter))
+                    if first_upper:
+                        help_dict[index_new] = index_old
+                        first_upper = False
+                    index_new += 1
+                    
+
+
+                elif not first_upper and letter in list_l:
+                    first_upper = True
+                    
+
+                index_old += 1
+
+                position_converter[i.name] = help_dict
+            write_f.write(f'\n')
+    f = gzFile(path_to_dict,'w')
+    dump[dict[str,dict[int,int]]](position_converter,f)
+    f.close()
+    # print position_converter
+
+                
+
+def fun1():
+    for i in FASTA('/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_hard_50.fa'):
+        print i.name
+        
+        for j in i.seq:
+            if j in list_l:
+                print 'there is'
+
             
+
+    
+
+
 import sys
 print sys.argv
 if len(sys.argv) == 4:
     # first is location of FA file
     # second parameter is output hard masked location and name
     # third parameter is output of locations hard masked-soft maksed location and name
-    hard_mask(sys.argv[1], sys.argv[2], sys.argv[3])
+    hard_mask2(sys.argv[1], sys.argv[2], sys.argv[3])
+
 elif len(sys.argv) == 3:
     # first is location of FA file
     # second parameter is output hard masked location and name
-    hard_mask(sys.argv[1], sys.argv[2])
+    hard_mask2(sys.argv[1], sys.argv[2])
 else:
+    fun1()
+    # hard_mask2('results/l1.fa', 'results/l1_hard.fa', 'results/l1_posconver')
     print "Not enough parameters."
 
+
+# /home/hiseric1/new_sedef/seq/search/data/genomes
+
+#/home/hiseric1/new_sedef/biser/src/results/hard_masked_genomes/

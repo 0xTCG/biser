@@ -1,6 +1,11 @@
 from pickle import *
 from time import *
 import sys
+from bio.fasta import *
+from bio import *
+from math import log
+
+
 
 def get_dict(path = "/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_position_conv") -> dict[str,dict[int,int]]:
     dict_conv = load[dict[str,dict[int,int]]](gzFile(path,'r'))
@@ -76,7 +81,274 @@ def convert_random_coordinates():
         print chr1, start1, end1
         print '--'
 
-convert_random_coordinates()
+# convert_random_coordinates()
+
+
+def format_str(lista):
+    s = ''
+    for i in lista:
+        s += f'{i}\t'
+    return s
+
+def calc_cigar(cigar):
+    sum1 = 0
+    sum2 = 0
+
+
+    for num, let in CIGAR(cigar):
+        if let == 'M':
+            sum1 += num
+            sum2 += num
+        elif let == 'D' or let == 'N':
+            sum1 += num
+        elif let == 'I'or let == 'S':
+            sum2 += num
+    return sum1,  sum2
+
+list_l = set([s'a', s'c', s'g', s't', s'N', s'n'])
+
+def modify_cigar(cigar, s1, s2):
+    
+    indel_a = 0
+    indel_b = 0
+    alignB = 0
+    matchB = 0
+    mismatchB = 0
+    transitionsB = 0
+    transversionsB = 0
+    align_length = 0
+    # m_region = 0
+
+    uppercaseA = 0
+    uppercaseB = 0
+    uppercaseMatches = 0
+
+    counter_s1 = 0
+    counter_s2 = 0
+    cigar_sub = ''
+
+    for num, let in CIGAR(cigar):
+
+        if let == 'M':
+            matches = 0
+            for j in range(num):
+                c_1 = 0
+                # if we stumple upon lowercase, mark them in cigar string
+                while counter_s1 < len(s1) and s1[counter_s1] in list_l:
+                    c_1 += 1
+                    counter_s1 += 1
+                if c_1 > 0:
+                    if matches != 0:
+                        cigar_sub += f'{matches}M'
+                        matches = 0
+                    cigar_sub += f'{c_1}N'
+                c_2 = 0
+                while counter_s2 < len(s2) and s2[counter_s2] in list_l:
+                    c_2 += 1
+                    counter_s2 += 1
+
+                if c_2 > 0:
+                    if matches != 0:
+                        cigar_sub += f'{matches}M'
+                        matches = 0
+                    cigar_sub += f'{c_2}S'
+                
+                matches += 1
+                matchB += s1[counter_s1] == s2[counter_s2]
+                if s1[counter_s1] != s2[counter_s2]:
+                    mismatchB += 1
+
+                    if s1[counter_s1] == 'A' or  s1[counter_s1] == 'G':
+                        transitionsB += s2[counter_s2] == 'A' or s2[counter_s2] == 'G'
+                        transversionsB += not (s2[counter_s2] == 'A' or s2[counter_s2] == 'G')
+                    if s1[counter_s1] == 'C' or  s1[counter_s1] == 'T':
+                        transitionsB += s2[counter_s2] == 'C' or s2[counter_s2] == 'T'
+                        transversionsB += not (s2[counter_s2] == 'C' or s2[counter_s2] == 'T')
+
+
+                counter_s1 += 1
+                counter_s2 += 1
+            uppercaseA += num
+            uppercaseB += num
+            uppercaseMatches += num
+            align_length += num
+
+
+            
+
+            if matches != 0:
+                cigar_sub += f'{matches}M'
+                matches = 0
+            
+        elif  let == 'D':
+            c_1 = 0
+            matches = 0
+            indel_a += num
+
+            for j in range(num):
+                while counter_s1 < len(s1) and s1[counter_s1] in list_l:
+                    c_1 += 1
+                    counter_s1 += 1
+
+                if c_1 > 0:
+                    if matches != 0:
+                        cigar_sub += f'{matches}D'
+                        matches = 0
+                    cigar_sub += f'{c_1}N'
+                counter_s1 += 1
+                
+                matches += 1
+            uppercaseA += num
+            align_length += num
+
+            
+            if matches != 0:
+                cigar_sub += f'{matches}D'
+                matches = 0
+        elif let == 'I':
+            c_1 = 0
+            matches = 0
+            indel_b += num
+
+            for j in range(num):
+                # if we stumple upon lowercase, mark them in cigar string
+                while counter_s2 < len(s2) and s2[counter_s2] in list_l:
+                    c_1 += 1
+                    counter_s2 += 1
+
+                if c_1 > 0:
+                    if matches != 0:
+                        cigar_sub += f'{matches}I'
+                        matches = 0
+                    cigar_sub += f'{c_1}S'
+                matches += 1
+                counter_s2 += 1
+            uppercaseB += num
+            align_length += num
+
+
+                
+            if matches != 0:
+                cigar_sub += f'{matches}I'
+                matches = 0
+    if counter_s2 != len(s2) or counter_s1 != len(s1):
+        print cigar
+        print cigar_sub
+        print calc_cigar(cigar_sub)
+
+        print s1
+        print s2
+        print counter_s2, len(s2)
+        print counter_s1, len(s1)
+
+    fracMatch = matchB / uppercaseB
+    fracMatchIndel = matchB / align_length
+
+    jcp = mismatchB / uppercaseB
+    jcK = -0.75 * log(1.0 - 4.0 / 3 * jcp)
+
+    p = transitionsB / (uppercaseB)
+    q = (transversionsB) / (uppercaseB)
+
+    w1 = 1.0 / (1 - 2.0 * p - q)
+    w2 = 1.0 / (1 - 2.0 * q)
+    k2K = 0.5 * log(w1) + 0.25 * log(w2)
+
+
+
+    assert counter_s2 == len(s2)
+    assert counter_s1 == len(s1)
+
+
+    # if cigar_sub != cigar:
+    #     print s1
+    #     print s2
+    #     print cigar_sub
+    #     print cigar
+    #     sys.exit(1)
+        
+
+
+
+
+        
+            
+
+def convert_biser_to_soft():
+    biser_path_hard = '/home/hiseric1/new_sedef/biser/src/results/new/hg19/final.bed' # "/home/hiseric1/new_sedef/biser/src/results/500_100/final.bed" # "search/data/wgac_without_cigar_remove_doubles.bed"
+    biser_path_soft = '/home/hiseric1/new_sedef/biser/src/results/new/hg19/final_soft.bed' # "/home/hiseric1/new_sedef/biser/src/results/500_100/final_soft.bed"
+    fa_hard = '/home/hiseric1/new_sedef/biser/src/results/hard_masked_genomes/hg19_hard.fa'
+    fa_soft = '/home/hiseric1/new_sedef/seq/search/data/genomes/hg19.fa'
+    file_ = open (biser_path_soft,'w')
+    main_dict =  get_dict("/home/hiseric1/new_sedef/biser/src/results/hard_masked_genomes/hg19_pc")
+    dict_fasta = dict()
+    for i in FASTA(fa_soft):
+        dict_fasta[i.name] = i.seq
+    print 'Loaded dict'
+    main_dict_2 = dict[str,list[tuple[int,int]]]()
+    with timing('Creating list'):
+        for i in main_dict:
+            main_dict_2[i] = list[tuple[int,int]]()
+            for j in main_dict[i]:
+                # main_dict_2[i].append((main_dict[i][j], j))
+                main_dict_2[i].append((j, main_dict[i][j]))
+
+            main_dict_2[i].sort()
+            print len(main_dict_2[i])
+    print 'Created list'
+    with timing('biser'):
+        for i in open(biser_path_hard,'r').readlines():
+            # print i
+            line = i.split('\t')
+            chr1 = line[0].split('#')[1]
+            chr2 = line[3].split('#')[1]
+            cigar = line[12]
+
+            # start1 is now coordinate of lb of index we are looking for
+            if not ("_" in line[0] or "_" in line[6]) and line[0] != 'chrom':
+                f_o_s1 = main_dict_2[chr1]   [ firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), int(line[1]), True ) ] 
+                f_o_e1 = main_dict_2[chr1]   [ firstOccurance(main_dict_2[chr1], len(main_dict_2[chr1]), int(line[2]) - 1, True  )] + 1
+
+                f_o_s2 = main_dict_2[chr2]   [ firstOccurance(main_dict_2[chr2], len(main_dict_2[chr2]), int(line[4]), True )]
+                f_o_e2 = main_dict_2[chr2]   [ firstOccurance(main_dict_2[chr2], len(main_dict_2[chr2]), int(line[5]) - 1, True  )] + 1
+                # print (f_o_s1, f_o_e1, f_o_s2, f_o_e2)
+                # print 'ok'
+                start1  =   f_o_s1[1]  + (int(line[1]) - f_o_s1[0])
+                end1    =   f_o_e1[1]  + (int(line[2]) - f_o_e1[0]) # , start1, start1 + int(line[2])  - int(line[1]) )
+                start2  =   f_o_s2[1]  + (int(line[4]) - f_o_s2[0])
+                end2    =   f_o_e2 [1] + (int(line[5]) - f_o_e2[0])#, start2, start2 + int(line[8])  - int(line[7]) )
+                # print FASTA(fa_soft)[chr1][start1:end1]
+                # s1 = FASTA(fa_hard)[chr1][int(line[1]):int(line[2])]
+                # print line
+                s1 = dict_fasta[chr1][start1:end1] # FASTA(fa_soft)[chr1][start1:end1]
+                s2 = dict_fasta[chr2][start2:end2] if (line[9] == '+') else ~dict_fasta[chr2][start2:end2]
+            
+                # if sum1 != len(s1) or sum2 != len(s2):
+
+                #     print i
+                #     print sum1, len(s1), sum2 , len(s2)
+                # print start1, end1, start2, end2
+                #     print int(line[1]) - f_o_s1[0], (int(line[2]) - f_o_e1[0]),(int(line[4]) - f_o_s2[0]), (int(line[5]) - f_o_e2[0])
+                # print f_o_s1, f_o_e1, f_o_ss2, f_o_e2
+
+                #     print s1
+                #     print s2
+                #     sys.exit(1)
+                # assert sum1 == len(s1)
+                # assert sum2 == len(s2)
+
+
+
+
+                s = format_str(line[10:])
+                file_.write(f'{line[0]}\t{start1}\t{end1}\t{line[3]}\t{start2}\t{end2}\t{line[6]}\t{line[7]}\t{line[8]}\t{line[9]}\t{s}\n')
+                modify_cigar(cigar, s1, s2)
+                # print(f'{line[0]}\t{start1}\t{end1}\t{line[3]}\t{start2}\t{end2}\t{line[6]}\t{line[7]}\t{line[8]}\t{line[9]}\t{s}\n')
+                
+                # break
+            # end2 = d2[line[6]][ int(line[8]) ]
+
+convert_biser_to_soft()
 
 def get_wgac_here():
     file_to_load = open('results/npip.txt', 'r')

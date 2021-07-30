@@ -79,7 +79,7 @@ for i in ${input}/* ; do
 
 
                 # cat ${i}/merged/seeds.bed >${i}/merged.bed
-                echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i}/merged/seeds.bed_merged ${fa2} >${i}/final.bed 2>${input}/log/aligned/${filename1}_${filename2}.log"
+                echo "${TIME} -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i}/merged/seeds.bed_merged ${fa2} >${i}/final.bed 2>${input}/log/aligned/${filename1}_${filename2}.log"
                 
             
             fi

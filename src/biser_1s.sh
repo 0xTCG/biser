@@ -60,7 +60,7 @@ d="0"
 g="0"
 l="1"
 p="5000"
-r="700"
+r="500"
 q="100"
 
 while true; do
@@ -219,7 +219,7 @@ for i in $files; do
 
     filename1=$(basename -- "$i")
 	# also put here to sedef exe
-    echo "/cvmfs/soft.computecanada.ca/gentoo/2020/usr/bin/time -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i} ${fa2} >${output2}/${filename1} 2>${logs}/${filename1}.log"
+    echo "${TIME} -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i} ${fa2} >${output2}/${filename1} 2>${logs}/${filename1}.log"
 	((count_all=count_all+1))
 done | ${TIME} -f'Align time: %E' parallel --will-cite -j ${jobs} --joblog "${output}/align.joblog"
 
