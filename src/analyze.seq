@@ -107,7 +107,7 @@ def calc_cigar(cigar):
 
 list_l = set([s'a', s'c', s'g', s't', s'N', s'n'])
 
-def modify_cigar(cigar, s1, s2):
+def modify_cigar(cigar, s1, s2, line, new_b1, new_e1, new_b2, new_e2):
     
     indel_a = 0
     indel_b = 0
@@ -117,6 +117,16 @@ def modify_cigar(cigar, s1, s2):
     transitionsB = 0
     transversionsB = 0
     align_length = 0
+    gaps = 0
+
+    align_len1 = 0
+    align_len2 = 0
+
+    align_all = 0
+
+
+
+
     # m_region = 0
 
     uppercaseA = 0
@@ -128,7 +138,6 @@ def modify_cigar(cigar, s1, s2):
     cigar_sub = ''
 
     for num, let in CIGAR(cigar):
-
         if let == 'M':
             matches = 0
             for j in range(num):
@@ -138,6 +147,9 @@ def modify_cigar(cigar, s1, s2):
                     c_1 += 1
                     counter_s1 += 1
                 if c_1 > 0:
+                    indel_a += c_1
+                    align_len1 += c_1
+                    gaps += c_1
                     if matches != 0:
                         cigar_sub += f'{matches}M'
                         matches = 0
@@ -148,22 +160,26 @@ def modify_cigar(cigar, s1, s2):
                     counter_s2 += 1
 
                 if c_2 > 0:
+                    indel_b += c_2
+                    gaps += c_2
+                    align_len2 += c_2
+
                     if matches != 0:
                         cigar_sub += f'{matches}M'
                         matches = 0
                     cigar_sub += f'{c_2}S'
                 
                 matches += 1
-                matchB += s1[counter_s1] == s2[counter_s2]
+                matchB += int(s1[counter_s1] == s2[counter_s2])
                 if s1[counter_s1] != s2[counter_s2]:
                     mismatchB += 1
 
-                    if s1[counter_s1] == 'A' or  s1[counter_s1] == 'G':
-                        transitionsB += s2[counter_s2] == 'A' or s2[counter_s2] == 'G'
-                        transversionsB += not (s2[counter_s2] == 'A' or s2[counter_s2] == 'G')
-                    if s1[counter_s1] == 'C' or  s1[counter_s1] == 'T':
-                        transitionsB += s2[counter_s2] == 'C' or s2[counter_s2] == 'T'
-                        transversionsB += not (s2[counter_s2] == 'C' or s2[counter_s2] == 'T')
+                    if s1[counter_s1] == s'A' or  s1[counter_s1] == s'G':
+                        transitionsB += int(s2[counter_s2] == s'A' or s2[counter_s2] == s'G')
+                        transversionsB += int(not (s2[counter_s2] == s'A' or s2[counter_s2] == s'G'))
+                    if s1[counter_s1] == s'C' or  s1[counter_s1] == s'T':
+                        transitionsB += int(s2[counter_s2] == s'C' or s2[counter_s2] == s'T')
+                        transversionsB += int(not (s2[counter_s2] == s'C' or s2[counter_s2] == s'T') )
 
 
                 counter_s1 += 1
@@ -172,9 +188,8 @@ def modify_cigar(cigar, s1, s2):
             uppercaseB += num
             uppercaseMatches += num
             align_length += num
-
-
-            
+            align_len1 += num
+            align_len2 += num
 
             if matches != 0:
                 cigar_sub += f'{matches}M'
@@ -184,6 +199,8 @@ def modify_cigar(cigar, s1, s2):
             c_1 = 0
             matches = 0
             indel_a += num
+            gaps += num
+
 
             for j in range(num):
                 while counter_s1 < len(s1) and s1[counter_s1] in list_l:
@@ -191,6 +208,10 @@ def modify_cigar(cigar, s1, s2):
                     counter_s1 += 1
 
                 if c_1 > 0:
+                    indel_a += c_1
+                    gaps += c_1
+                    align_len1 += c_1
+
                     if matches != 0:
                         cigar_sub += f'{matches}D'
                         matches = 0
@@ -200,6 +221,7 @@ def modify_cigar(cigar, s1, s2):
                 matches += 1
             uppercaseA += num
             align_length += num
+            align_len1 += num
 
             
             if matches != 0:
@@ -209,6 +231,10 @@ def modify_cigar(cigar, s1, s2):
             c_1 = 0
             matches = 0
             indel_b += num
+            gaps += num
+            align_len2 += num
+
+
 
             for j in range(num):
                 # if we stumple upon lowercase, mark them in cigar string
@@ -217,6 +243,11 @@ def modify_cigar(cigar, s1, s2):
                     counter_s2 += 1
 
                 if c_1 > 0:
+                    indel_b += c_1
+                    align_len2 += c_1
+
+                    gaps += c_1
+
                     if matches != 0:
                         cigar_sub += f'{matches}I'
                         matches = 0
@@ -240,6 +271,9 @@ def modify_cigar(cigar, s1, s2):
         print s2
         print counter_s2, len(s2)
         print counter_s1, len(s1)
+    
+    assert counter_s2 == len(s2)
+    assert counter_s1 == len(s1)
 
     fracMatch = matchB / uppercaseB
     fracMatchIndel = matchB / align_length
@@ -254,10 +288,30 @@ def modify_cigar(cigar, s1, s2):
     w2 = 1.0 / (1 - 2.0 * q)
     k2K = 0.5 * log(w1) + 0.25 * log(w2)
 
+    rev_comp = line[9] == '-'
+    same_chr = line[0] == line[3] and not rev_comp
 
+    b1 = int(line[1])
+    e1 = int(line[2])
 
-    assert counter_s2 == len(s2)
-    assert counter_s1 == len(s1)
+    b2 = int(line[4])
+    e2 = int(line[5])
+
+    BIG_OVERLAP_THRESHOLD = 100
+
+    overlap = 0 if not same_chr else max(0, min(e1,e2) - max(b1,b2))
+    too_big_overlap = (e1 - b1 - overlap) < BIG_OVERLAP_THRESHOLD or (e2 - b2 - overlap) < BIG_OVERLAP_THRESHOLD
+    too_big_overlap &= same_chr
+
+    errorScaled = (gaps + mismatchB) / (mismatchB + gaps + matchB)
+
+    align_all = gaps + uppercaseMatches
+
+    name = 'S'
+    alignB = matchB + mismatchB
+    #       0               1       2           3       4           5          6    7                                   8           9           10                          11          12  13                                                                  14          15          16                  17          18              19                  20                  21                  22    23      24        25          26           27                  28                  29             30                          
+    return f'{line[0]}\t{new_b1}\t{new_e1}\t{line[3]}\t{new_b2}\t{new_e2}\t{name}\t{(mismatchB + gaps) / align_all}\t{line[8]}\t{line[9]}\t{max(align_len2, align_len1)}\t{align_all}\t\tm={round(mismatchB/align_all*100, 1)}g={round(gaps/align_all*100, 1)}\t{indel_a}\t{indel_b}\t{alignB}\t{matchB}\t{mismatchB}\t{transitionsB}\t{transversionsB}\t{matchB / alignB}\t{matchB / align_all}\t{jcK}\t{k2K}\t{gaps}\t{uppercaseA}\t{uppercaseB}\t{uppercaseMatches}\t{uppercaseMatches}\t{cigar_sub}\t{1-errorScaled}'
+
 
 
     # if cigar_sub != cigar:
@@ -276,7 +330,7 @@ def modify_cigar(cigar, s1, s2):
 
 def convert_biser_to_soft():
     biser_path_hard = '/home/hiseric1/new_sedef/biser/src/results/new/hg19/final.bed' # "/home/hiseric1/new_sedef/biser/src/results/500_100/final.bed" # "search/data/wgac_without_cigar_remove_doubles.bed"
-    biser_path_soft = '/home/hiseric1/new_sedef/biser/src/results/new/hg19/final_soft.bed' # "/home/hiseric1/new_sedef/biser/src/results/500_100/final_soft.bed"
+    biser_path_soft = '/home/hiseric1/new_sedef/biser/src/results/new/hg19/final_soft2.bed' # "/home/hiseric1/new_sedef/biser/src/results/500_100/final_soft.bed"
     fa_hard = '/home/hiseric1/new_sedef/biser/src/results/hard_masked_genomes/hg19_hard.fa'
     fa_soft = '/home/hiseric1/new_sedef/seq/search/data/genomes/hg19.fa'
     file_ = open (biser_path_soft,'w')
@@ -340,11 +394,11 @@ def convert_biser_to_soft():
 
 
 
-                s = format_str(line[10:])
-                file_.write(f'{line[0]}\t{start1}\t{end1}\t{line[3]}\t{start2}\t{end2}\t{line[6]}\t{line[7]}\t{line[8]}\t{line[9]}\t{s}\n')
-                modify_cigar(cigar, s1, s2)
+                # s = format_str(line[10:])
+                # file_.write(f'{line[0]}\t{start1}\t{end1}\t{line[3]}\t{start2}\t{end2}\t{line[6]}\t{line[7]}\t{line[8]}\t{line[9]}\t{s}\n')
+                final = modify_cigar(cigar, s1, s2, line, start1,end1, start2, end2)
                 # print(f'{line[0]}\t{start1}\t{end1}\t{line[3]}\t{start2}\t{end2}\t{line[6]}\t{line[7]}\t{line[8]}\t{line[9]}\t{s}\n')
-                
+                file_.write(final+'\n')
                 # break
             # end2 = d2[line[6]][ int(line[8]) ]
 

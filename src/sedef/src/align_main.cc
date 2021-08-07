@@ -285,6 +285,7 @@ auto bucket_alignments(const string &bed_path, int nbins, string output_dir,
 void generate_alignments(const string &ref_path, const string &bed_path,
                          int kmer_size, string ref_path2 = "") {
   auto T = cur_time();
+  // int a___ = 3;
 
   auto schedule = bucket_alignments(bed_path, 1, "", false);
   if (ref_path2 == "")
