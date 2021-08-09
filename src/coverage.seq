@@ -1,5 +1,6 @@
-from uf_help2 import *
+from sd import *
 import sys
+
 def analyze_region(s1,s2):
     if len(s1) != len(s2):
         print 'error lens'

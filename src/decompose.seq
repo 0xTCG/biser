@@ -4,7 +4,7 @@ import sys
 # import bio.bwt
 from time import *
 # from pair import *
-from linked_list_node1 import *
+from linked_list_node_decompose import *
 # from bisect import bisect_left
 
 def hash_dna(c: seq) -> int:

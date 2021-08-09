@@ -1,5 +1,5 @@
 
-from tree2 import *
+from tree import *
 
 
 def get_int_tree(path, lens_dict):

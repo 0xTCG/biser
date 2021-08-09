@@ -1,5 +1,5 @@
 from sd2 import *
-from tree2 import *
+from tree import *
 from time import *
 
 # this is script for creating distance matrix between all SDs
