@@ -9,7 +9,7 @@ Needed installations:
 
 ## Instalation
 
-BISER's depends on Seq, and to install it consult:
+BISER depends on Seq. To install it, consult:
 https://docs.seq-lang.org/intro.html#install
 
 For installign BISER, run the following:
@@ -46,7 +46,7 @@ For example, to run hg19_hard_masked.fa on 8 cores, type:
 
 All genome names must be in the following format `{species_name}_hard_50.fa`
 
-Optional parameters you can set (for both, one and multiple species):
+Optional parameters that you can set (for both, one and multiple species):
 * `-p <padding value>` - change padding (default 5000)
 * `-d <1/0>` - change to dynamic gap (max SD length set to 1Mbp)
 * `-l <1/0>` - if you want to use filtering
@@ -62,9 +62,9 @@ For multiple species, chromosome names are written in the following format `{spe
 
 ## Simulations
 Path for SD detection simulations:
-https://github.com/0xTCG/biser/blob/master/src/plot_simulations.ipynb   
+https://github.com/0xTCG/biser/blob/master/simulations/plot_simulations.ipynb
 
 
 Path for core detection simulations:
-https://github.com/0xTCG/biser/blob/master/src/simulate_cores.ipynb   
+https://github.com/0xTCG/biser/blob/master/simulations/simulate_cores.ipynb   
 
