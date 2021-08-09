@@ -19,63 +19,10 @@ def tau(edit_error, kmer_size):
     return a * b
 
 
-# writing_lengths = open('report_lens.txt', 'w')
-
-# Hash impllemented as a class, could switch just to int
-class Hash:
-    
-    status: int
-
-    hash: int
-
-    def __init__(self: Hash, _hash: Kmer[12], status: byte):
-        self.hash = _hash.as_int()
-        self.status = int(status)
-    def __init__(self: Hash, _hash: Kmer[12], status: int):
-        self.hash = int(_hash.as_int())
-        self.status = status
-    def __init__(self: Hash, _hash: Kmer[11], status: int):
-        self.hash = int(_hash.as_int())
-        self.status = status
-    def __init__(self: Hash, _hash: Kmer[10], status: int):
-        self.hash = int(_hash.as_int())
-        self.status = status
-    def __init__(self: Hash, _hash: int, status: int):
-        self.hash = _hash
-        self.status = status
-    def __init__(self: Hash):
-        self.hash = Kmer[12]('AAAAAAAAAAAAA').as_int()
-        self.status = 0
-    def __gt__(h1: Hash, h2: Hash):
-        return (h1.status, h1.hash) > (h2.status, h2.hash)
-    def __lt__(h1: Hash, h2: Hash):
-        return (h1.status, h1.hash) < (h2.status, h2.hash)
-    def __eq__(h1: Hash, h2: Hash):
-        return (h1.status, h1.hash) == (h2.status, h2.hash)
-    def __ge__(h1: Hash, h2: Hash):
-        return (h1.status, h1.hash) >= (h2.status, h2.hash)
-    def __ne__(h1: Hash, h2: Hash):
-        return (h1.status, h1.hash) != (h2.status, h2.hash)
-    def __le__(h1: Hash, h2: Hash):
-        return (h1.status, h1.hash) <= (h2.status, h2.hash)
-    def __hash__(self: Hash):
-        return self.hash.__hash__() ^ self.status.__hash__()
-    def __str__(self:Hash):
-        return f'{self.hash}, {self.status}'
-
-
-# class Minimizer:
-#     hash: Hash
-#     loc:int
-#     def __init__(self, hash, loc):
-#         self.hash = hash
-#         self.loc = loc
-#     def __eq__(m1: Minimizer, m2: Minimizer):
-#         return (m1.loc,m1.hash) == (m2.loc,m2.hash)
-
 # 14, 16
 # here we set up initial params for out algorithm
 # these can be changed as input parameters
+
 kmer_size = 14
 winnow_size = 16
 output = 'out'
@@ -283,7 +230,6 @@ def add_to_tree_3(threads: Optional[Linked_list_node], minimizers_dict_list: lis
                 walker.age += 1
             minimizer_index+=1
             continue
-            # probably put continue here
         
         walker.age += 1
         condition = (walker.count >= ceil(walker.age * tau_var))
@@ -346,7 +292,7 @@ def get_minimizers(s:seq,
     chr_: int,
     kmer_size, 
     window_size, 
-    new_minimizers:dict[int, list[tuple[int,int]]] = dict[int, list[int]](), # dict[Hash, list[tuple[int,int]]] = dict[Hash, list[int]](), 
+    new_minimizers:dict[int, list[tuple[int,int]]] = dict[int, list[int]](), 
     just_build_index: bool = False,
     just_find: bool = False,
     croms = list[str](),
@@ -355,12 +301,11 @@ def get_minimizers(s:seq,
     frequency = 0): 
 
     minimizers_dict = new_minimizers
-    threads = Optional[Linked_list_node]() # Linked_list_node(-1,-1,-1)
+    threads = Optional[Linked_list_node]() 
     threads = None
     filtered = 0
     # making 2 lists, one for minimizers, and sliding winnow
 
-    # window = list[tuple[int,int]]() # list[Minimizer]()
     index_set = list[tuple[tuple[int,int],tuple[int,int]]]()
 
     MASK = (1 << (2 * kmer_size)) - 1
@@ -370,9 +315,9 @@ def get_minimizers(s:seq,
     last_u = last_n
     last_value = 0
     main_count = 0
-    last_hash = Hash(-1,0)
+
     for i in range(0,len(s)):
-        # Updating positions of last 'N' and last uppercase letter n
+        # Updating positions of last 'N' and last uppercase letter n, but no need for this sinse we are using hard masked genomes
         # if (s[i]== s'N' or s[i]== s'n'):
         #     last_n = i
         last_u = i
@@ -442,7 +387,7 @@ def get_minimizers_winnowed(s:seq,
     threads = None
     # making 2 lists, one for minimizers, and winnow
 
-    # Instead of using Cllass Minimizer, switch to tuple [int, int] - [0] hash, [1] location
+    # Instead of using Class Minimizer, switch to tuple [int, int] - [0] hash, [1] location
     # window = list[Minimizer]()
     window = list[tuple[int,int]]()
 
