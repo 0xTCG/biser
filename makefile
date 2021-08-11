@@ -1,10 +1,10 @@
 all: sedef unionfind biser 
 
 sedef:
-	cd src/sedef && make -j release
+	cd src/align/sedef && make -j release
 
 unionfind:
-	g++ -O3 -w -o exec/uf src/uf.cpp
+	g++ -O3 -w -o exec/uf src/decomposition/uf.cpp
 	
 
 SEQ := $(shell command -v seqc)
@@ -22,8 +22,8 @@ endif
 ifndef CLANG
 	$(error "No CLANG found. Please install CLANG to proceed.")
 endif
-	seqc build -release src/biser_search.seq -o exec/biser_search
-	seqc build -release src/big_cluster.seq -o exec/big_cluster
-	seqc build -release src/decompose.seq -o exec/decompose
+	seqc build -release src/search/biser_search.seq -o exec/biser_search
+	seqc build -release src/decomposition/big_cluster.seq -o exec/big_cluster
+	seqc build -release src/decomposition/decompose.seq -o exec/decompose
 
 

@@ -57,7 +57,7 @@ for i in $files; do
     # echo "${i}"
 
     # echo "sedef_out/hg19_hg19/aligned2/${filename1}"
-    echo "${TIME} -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i} ${fa2} >${output}/${filename1} 2>${logs}/${filename1}.log"
+    echo "${TIME} -f'TIMING %e %M' ../src/align/sedef/sedef align generate --k 10 ${fa1} ${i} ${fa2} >${output}/${filename1} 2>${logs}/${filename1}.log"
     
 done | ${TIME} -f'Align time: %E' parallel --will-cite -j ${jobs} --joblog "${path}/align.joblog"
 

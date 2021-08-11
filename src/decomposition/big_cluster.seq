@@ -1,0 +1,177 @@
+from sd import *
+import sys
+
+
+
+# Examples: 
+# bed_file = 'mm8_mm8/final.bed'
+# write_path = 'mm8_mm8/colors/'
+
+if len(sys.argv) > 1:
+    bed_file = sys.argv[1]
+    write_path = sys.argv[2]
+
+
+
+sds = list[SD]()
+sds_2 = dict[str,list[Interval[bool]]]()
+sds_3 = dict[str,IntervalTree[bool]]()
+
+all_dots = list[Dot]()
+dots = dict[Dot, int]()
+chrs = dict[str, int]()
+
+# this represents in what set does dot with specified index belong
+belongs = dict[int, int]()
+
+# this represents dots for each set_id
+sets = dict[int, list[int]]()
+
+mates_list = list[tuple[Dot,Dot,Dot,Dot]]()
+
+
+wgac = False
+print 'loading alignments...'
+
+with timing('read file'), open(bed_file) as f:
+    pchr = ''
+    how_many = 0
+    if wgac:
+        
+        for l_ in f:
+            l = l_.split('\t')
+            
+            how_many+=1
+            if l[0] != pchr:
+                pchr = l[0]
+            if  abs(int(l[1]) - int(l[2]) ) <2:
+                continue
+            chr1 = l[0]
+            chr2 = l[6] 
+            sds.append(SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[7]), int(l[8])),
+                l[5] == '_',
+                CIGAR(l[-1])
+            ))
+            l1, l2 = sds[-1].get_all_dots()
+            all_dots.extend(l1)
+            all_dots.extend(l2)
+    else:
+
+        for l_ in f:
+            l = l_.split('\t')
+            how_many+=1
+
+            if l[0] != pchr:
+                pchr = l[0]
+            sds.append(SD(
+                Pos(chrs.setdefault(l[0], len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(l[3], len(chrs)), int(l[4]), int(l[5])),
+                l[9] == '-',
+                CIGAR(l[-1]), 
+                l_.strip()
+            ))
+            all_dots.extend(sds[-1].get_first())
+            all_dots.extend(sds[-1].get_last())
+
+
+for i in chrs:
+    i_ = i.split('_')
+    chrsIds[chrs[i]] = i_[0] + i[-1]
+
+help_all_dots = sorted(set[Dot](all_dots))
+help_all_dots_colors = list[int]()
+colors_dict = dict[int,int]()
+
+for i in range(0, len(help_all_dots)):
+    dots[help_all_dots[i]] = i
+    help_all_dots_colors.append(0)
+
+    belongs [i] = i
+
+    sets[i] = [i]
+
+print 'Done reading'
+
+def get_colors( help_all_dots_colors,start1, end1):
+    s = set[int]()
+    for i in help_all_dots_colors[start1 : end1 + 1]:
+        s.add(i)
+    return s
+
+def color_region (help_all_dots_colors,start1, end1, color_generator):
+    for i in range(start1 , end1 + 1):
+        help_all_dots_colors[i] = color_generator
+        
+
+def get_parent(colors_dict, parent):
+    # print parent
+
+    while colors_dict[parent] != parent:
+        parent = colors_dict[parent]
+    return colors_dict[parent]
+
+color_generator = 1
+# here we do coloring for spliting all SDs in larger groups:
+for sd in sds:
+    # print sd
+    s1, s2 =  sd.get_first()
+    e1, e2 =  sd.get_last()
+    start1 = dots[s1]
+    end1 = dots[e1]
+
+    start2 = dots[s2]
+    end2 = dots[e2]
+
+    colors_avail = get_colors( help_all_dots_colors,start1, end1 )
+    colors_avail = colors_avail.union( get_colors( help_all_dots_colors,start2, end2 ) )
+
+    if len(colors_avail) == 1:
+        if colors_avail.pop() == 0:
+
+            color_region (help_all_dots_colors,start1, end1, color_generator)
+            color_region (help_all_dots_colors,start2, end2, color_generator)
+            colors_dict[color_generator] = color_generator
+            color_generator+=1
+    else:
+        l_ = list[int] (colors_avail)
+        l_.sort()
+        
+        if l_[0] == 0:
+            l_.pop(0)
+        for i in l_:
+            colors_dict[i] = l_[0]
+        color_region (help_all_dots_colors,start1, end1, l_[0] )
+        color_region (help_all_dots_colors,start2, end2, l_[0] )
+
+
+print 'Done coloring'
+all_colors = set[int]()
+
+output_dict = dict[int, list[str]]()
+
+dict_lens = dict[int,int]()
+for i in sds:
+    color = get_parent(colors_dict, help_all_dots_colors[dots[i.get_first()[0]]])
+
+    if color in dict_lens:
+        dict_lens[color] += 1
+    else:
+        dict_lens[color] = 1
+    all_colors.add(color  )
+    output_dict.setdefault(color, [i.whole_line]).append(i.whole_line)
+
+print len(output_dict)
+max_ = 0
+for i in output_dict:
+    output = open(write_path + f'/{i}', 'w')
+    if len(output_dict[i]) > max_:
+        max_ = len(output_dict[i])
+    for j in output_dict[i]:
+        output.write(j + f'\t{i}\n')
+    output.close()
+
+print max_, len(output_dict)
+

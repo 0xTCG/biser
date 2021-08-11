@@ -1,0 +1,164 @@
+from bio.fasta import *
+from pickle import *
+
+
+# This is function for hard-masking genome but with leaving small gaps of N-s (set as difference parameter)
+# constants:
+list_l = set([s'a', s'c', s'g', s't', s'N', s'n'])
+list_u = set([s'A', s'C', s'G', s'T'])
+# list_l = set(['a', 'c', 'g', 't', 'N', 'n'])
+# list_u = set(['A', 'C', 'G', 'T'])
+# changed difference
+difference = 0#50
+def hard_mask(path: str, path_to_hard: str, path_to_dict: str = ""):
+    # fr = FASTA(path)
+    position_converter = dict[str,dict[int,int]]()
+    write_f = open(path_to_hard,'w')
+    # write_f = open("test.fa",'w')
+    for i in FASTA(path):
+        # if chr is one of regular ones:
+        # human chr(1-22;X;Y;M)
+        #  == "chr22" or i.name == "chr1"
+        if not '_' in i.name:
+            last_u = 0
+            last_n = 0
+            index_new = 0
+            index_old = 0
+            help_dict = dict[int,int]()
+            # help_dict2 = dict[int,int]()
+
+            write_f.write(f'>{i.name}\n')
+            for s in i.seq:
+                if s in list_u:
+                    if last_n != 0 and last_n <= difference:
+                        write_f.write(str(i.seq[index_old - last_n :index_old ]))
+                        for j in range(index_old - last_n, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+
+                            index_new += 1
+                        
+                        
+                    last_n = 0
+                    last_u += 1
+                elif s == s'N' or s == s'n':
+                    if last_u > 0:
+                        write_f.write(str(i.seq[index_old - last_u :index_old ]))
+                        for j in range(index_old - last_u, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+                            index_new += 1
+                        last_u = 0
+                    last_n += 1
+                else:
+                    if last_u > 0:
+                        write_f.write(str(i.seq[index_old - last_u :index_old ]))
+                        for j in range(index_old - last_u, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+                            index_new += 1
+                        last_u = 0
+                    if last_n != 0 and last_n <= difference:
+                        write_f.write(str(i.seq[index_old - last_n :index_old ]))
+                        for j in range(index_old - last_n, index_old):
+                            help_dict[index_new] = j
+                            # help_dict2[j] = index_new
+                            index_new += 1
+                        last_n = 0 
+                
+                # help_dict2[index_old] = index_new
+                index_old+=1
+                
+                
+            # just writewhat is left at the end
+            if last_n != 0 and last_n <= difference:
+                write_f.write(str(i.seq[index_old - last_n :index_old ]))
+                for j in range(index_old - last_n, index_old):
+                    help_dict[index_new] = j
+                    index_new += 1
+            if last_u > 0:
+                write_f.write(str(i.seq[index_old - last_u :index_old ]))
+                for j in range(index_old - last_u, index_old):
+                    help_dict[index_new] = j
+                    index_new += 1
+            if path_to_dict != "":
+                position_converter[i.name] = help_dict
+            # assert len(help_dict2) == len(i.seq)
+            write_f.write('\n')
+    if path_to_dict != "":
+        f = gzFile(path_to_dict,'w')
+        dump[dict[str,dict[int,int]]](position_converter,f)
+        f.close()
+
+
+# ---- faster hardmask
+def hard_mask2(path: str, path_to_hard: str, path_to_dict: str = ""):
+    position_converter = dict[str,dict[int,int]]()
+    write_f = open(path_to_hard,'w')
+    for i in FASTA(path):
+        if not '_' in i.name:
+            write_f.write(f'>{i.name}\n')
+            first_upper = True
+            help_dict = dict[int,int]()
+            index_new = 0
+            index_old = 0
+
+            for letter in i.seq:
+                if letter in list_u:
+                    write_f.write(str(letter))
+                    if first_upper:
+                        help_dict[index_new] = index_old
+                        first_upper = False
+                    index_new += 1
+                    
+
+
+                elif not first_upper and letter in list_l:
+                    first_upper = True
+                    
+
+                index_old += 1
+
+                position_converter[i.name] = help_dict
+            write_f.write(f'\n')
+    f = gzFile(path_to_dict,'w')
+    dump[dict[str,dict[int,int]]](position_converter,f)
+    f.close()
+    # print position_converter
+
+                
+
+def fun1():
+    for i in FASTA('/home/hiseric1/new_sedef/seq/search/data/genomes/hg19_hard_50.fa'):
+        print i.name
+        
+        for j in i.seq:
+            if j in list_l:
+                print 'there is'
+
+            
+
+    
+
+
+import sys
+print sys.argv
+if len(sys.argv) == 4:
+    # first is location of FA file
+    # second parameter is output hard masked location and name
+    # third parameter is output of locations hard masked-soft maksed location and name
+    hard_mask2(sys.argv[1], sys.argv[2], sys.argv[3])
+
+elif len(sys.argv) == 3:
+    # first is location of FA file
+    # second parameter is output hard masked location and name
+    hard_mask2(sys.argv[1], sys.argv[2])
+else:
+    fun1()
+    # hard_mask2('results/l1.fa', 'results/l1_hard.fa', 'results/l1_posconver')
+    print "Not enough parameters."
+
+
+# /home/hiseric1/new_sedef/seq/search/data/genomes
+
+#/home/hiseric1/new_sedef/biser/src/results/hard_masked_genomes/

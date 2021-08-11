@@ -1,0 +1,228 @@
+class Interval[K]:
+    begin: float
+    end: float
+    data: K
+
+    def __init__(self: Interval[K], begin: float, end: float, data: K):
+        self.begin = begin
+        self.end = end
+        self.data = data
+
+    def __init__(self: Interval[K], begin: int, end: int, data: K):
+        self.begin = float(begin)
+        self.end = float(end)
+        self.data = data
+
+    def __init__(self: Interval[K], begin: float, end: float):
+        self.begin = begin
+        self.end = end
+
+    def __init__(self: Interval[K], begin: int, end: int):
+        self.begin = float(begin)
+        self.end = float(end)
+
+    def __init__(self: Interval[K], begin: float, end: float):
+        self.begin = begin
+        self.end = end
+    
+    def __init__(self: Interval[K]):
+        self.begin = -1.0
+        self.end = -1.1
+        self.data = None
+
+    def overlaps_points(self: Interval[K], begin: float, end: float) -> bool:
+        return begin < self.end and end > self.begin
+
+    def overlaps_points_int(self: Interval[K], begin: int, end: int) -> bool:
+        return float(begin) < self.end and float(end) > self.begin
+    
+    def overlaps_more(self:Interval[K], begin: float, end: float, coverage: float) -> bool:
+        # if overlap points and coveres
+        if begin < self.end and end > self.begin:
+            b1 = max(begin, self.begin)
+            e1 = min(end, self.end)
+            l1 = abs(e1 - b1)
+            return (l1 / (self.end - self.begin)) >= coverage
+        return False
+    
+    def overlaps_percentage(self:Interval[K], begin: float, end: float) -> float:
+        # if overlap points and coveres
+        if begin < self.end and end > self.begin:
+            b1 = max(begin, self.begin)
+            e1 = min(end, self.end)
+            l1 = abs(e1 - b1)
+            return (l1 / (self.end - self.begin))
+        return 0.0
+
+
+
+
+
+    def overlaps_point(self: Interval[K], begin: float) -> bool:
+        return self.contains_point(begin)
+    
+    def overlaps_basepairs(self:Interval[K], other: Interval[K]):
+        if self.overlaps(other):
+            b1 = max(self.begin, other.begin)
+            e1 = min(self.end, other.end)
+            return e1 - b1
+        return 0.0
+
+    def overlaps_basepairs_2(self:Interval[K], begin_, end_):
+        if self.overlaps_points(begin_, end_):
+            b1 = max(self.begin, begin_)
+            e1 = min(self.end, end_)
+            return e1 - b1
+        return 0.0
+
+    def overlaps(self: Interval[K], interv: Interval[K]) -> bool:
+
+        return self.overlaps_points(interv.begin, interv.end)
+
+    def contains_point(self: Interval[K], p: float):
+        return self.begin <= p < self.end
+
+    def range_matches(self: Interval[K], other: Interval[K]):
+        return self.begin == other.begin and self.end == other.end
+
+    def contains_interval(self: Interval[K], other: Interval[K]):
+        return self.begin <= other.begin and self.end >= other.end
+    def contains_interval_points(self: Interval[K], begin: float, end: float):
+        return self.begin <= begin and self.end >= end
+
+    def distance_to(self: Interval[K], other: Interval[K]) -> float:
+
+        if self.overlaps(other):
+            return 0.0
+
+        if self.begin < other.begin:
+            return other.begin - self.end
+        else:
+            return self.begin - other.end
+
+    def distance_to_point(self: Interval[K], other: float) -> float:
+
+        if self.overlaps_point(other):
+            return 0.0
+
+        if self.end <= other:
+            return other - self.end
+        else:
+            return self.begin - other
+
+    def is_null(self: Interval[K]):
+
+        return self.begin >= self.end
+
+    def length(self: Interval[K]):
+        if self.is_null():
+            return 0
+        return self.end - self.begin
+
+    def __hash__(self: Interval[K]):
+        return hash((self.begin, self.end))
+    
+    def __len__(self: Interval[K]):
+        if self.is_null():
+            return 0
+        #this might be sloghtly inaccurate because of float begin and end,
+        # and Seq does not allow for len function to return float
+        return int(self.end - self.begin)
+
+    def __eq__(self: Interval[K], other: Interval[K]):
+        return (
+            self.begin == other.begin
+            and self.end == other.end
+            and self.data == other.data
+        )
+
+    def __ne__(self: Interval[K], other: Interval[K]):
+        return not self == other
+
+    def __cmp__(self: Interval[K], other: Interval[K]) -> int:
+        s = self
+        o = other
+        if s.begin < o.begin:
+            return -1
+        elif s.begin == o.begin:
+            if s.end < o.end:
+                return -1
+            elif s.end == o.end:
+                if s.data < o.data:
+                    return -1
+                elif s.data == o.data:
+                    return 0
+                else:
+                    return 1
+            else:
+                return 1
+        else:
+            return 1
+
+    def __cmp__f(self: Interval[K], other: float) -> int:
+        o = other
+        s = self
+        if s.begin < o:
+            return -1
+        elif s.begin == o:
+            if s.end < o:
+                return -1
+            else:
+                return 1
+        else:
+            return 1
+
+    def __str__(self: Interval[K]):
+
+        s_begin = str(int(self.begin))
+        s_end = str(int(self.end))
+        if 0:# not self.data:
+            return f"Interval({s_begin}, {s_end})"
+        else:
+            return f"Interval({s_begin}, {s_end}, {str(self.data)})"
+
+    def __lt__(self: Interval[K], other: Interval[K]):
+        return self.__cmp__(other) < 0
+
+    def __lt__(self: Interval[K], other: float):
+        return self.__cmp__f(other) < 0
+
+    def __gt__(self: Interval[K], other: Interval[K]):
+        return self.__cmp__(other) > 0
+
+    def __gt__(self: Interval[K], other: float):
+        return self.__cmp__f(other) > 0
+
+    def __le__(self: Interval[K], other: Interval[K]):
+        return self.__cmp__(other) <= 0
+
+    def __ge__(self: Interval[K], other: Interval[K]):
+        return self.__cmp__(other) >= 0
+
+    def _raise_if_null(self: Interval[K], other: Interval[K]):
+        if self.is_null() or other.is_null():
+            raise ValueError("Cannot compare null Intervals!")
+
+    def lt(self: Interval[K], other: Interval[K]):
+        self._raise_if_null(other)
+        return self.end <= other.begin
+
+    def le(self: Interval[K], other: Interval[K]):
+        self._raise_if_null(other)
+        return self.end <= other.end
+
+    def gt(self: Interval[K], other: Interval[K]):
+        self._raise_if_null(other)
+
+        return self.begin >= other.end
+
+    def ge(self: Interval[K], other: Interval[K]):
+        self._raise_if_null(other)
+        return self.begin >= other.begin
+
+    def _get_fields(self: Interval[K]):
+        return self.begin, self.end, self.data
+
+    def copy(self: Interval[K]):
+        return Interval[K](self.begin, self.end, self.data)
+

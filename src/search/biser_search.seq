@@ -1,0 +1,923 @@
+from globals import *
+import sys
+from math import ceil, exp
+
+import getopt
+
+def hash_dna(c: seq) -> int:
+    k = int((c.__int__()))
+    return 0 if k == 4 else k
+
+def tau(edit_error, kmer_size):
+    
+    ERROR_RATIO = (SEARCH_MAX_ERROR - SEARCH_MAX_EDIT_ERROR) / SEARCH_MAX_EDIT_ERROR
+    gap_error = min(1.0, ERROR_RATIO * edit_error)
+    a = (1 - gap_error) / (1 + gap_error)
+    b = 1 / (2 * exp(kmer_size * edit_error) - 1)
+    
+    return a * b
+
+
+# k and w
+# 14, 16
+# here we set up initial params for out algorithm
+# these can be changed as input parameters
+
+kmer_size = 14
+winnow_size = 16
+output = 'out'
+SEARCH_MAX_EDIT_ERROR_ = 0.15
+tau_var = tau(SEARCH_MAX_EDIT_ERROR_,kmer_size)
+biggest_len = 0
+query_threshold = 300 # 100
+ref_threshold = 1000
+
+out = 'new_sedef/'
+extend_var = 5000 # 10000# 5000
+overlap_percentage = 1 # 0.7
+alowed_distance = 250
+INDEX_CUTOFF = 0.001
+MAX_SD_LEN = 2000000000 # it was 1000000 for testing dynamic distance
+
+do_filtering = False
+do_dynamic_distance = False
+without_winnowing = False
+
+
+
+# Main class that holds information about nodes in linked list
+class Linked_list_node:
+    first: int
+    last: int
+    ref: int
+    ref_last: int
+
+    chr_: int
+    age: int
+    count: int
+
+    
+    next: Optional[Linked_list_node]
+
+    potentional: bool
+    
+    
+    def __init__(self: Optional[Linked_list_node], first: int, ref:int, chr_:int):
+        self.first = first
+        self.last = first
+        self.ref = ref
+        self.ref_last = ref
+        self.chr_ = chr_
+        self.next = None
+        self.age = 0
+        self.count = 0
+        self.potentional = False
+    def __init__(self: Linked_list_node, first: int, ref:int,chr_:int, next: Optional[ Linked_list_node ]):
+        self.first = first
+        self.last = first
+        self.ref = ref
+        self.ref_last = ref
+        self.chr_ = chr_
+        self.next = next
+        self.age = 0
+        self.count = 0
+        self.potentional = False
+
+    def __init__(self: Linked_list_node, first: int, last:int, ref:int,chr_:int, next: Optional[ Linked_list_node ], age:int, count:int):
+        self.first = first
+        self.last = last
+        self.ref = ref
+        self.ref_last = ref
+
+        self.chr_ = chr_
+
+        self.next = next
+        self.age = age
+        self.count = count
+        self.potentional = False
+
+    def insert_after(self: Linked_list_node, first: int, ref: int,chr_:int, age: int = 1, count:int = 1):
+        new_node = Linked_list_node(first,first, ref,chr_, self.next,age,count)
+        self.next = new_node
+
+    def __str__(self: Linked_list_node):
+        s=""
+        walker = self
+        while walker:
+            s+=f'({walker.first}:{walker.last}; ref: {walker.ref}, {walker.chr_}; {walker.age}/{walker.count}; {walker.potentional})->'
+            walker = walker.next
+        return s
+    def __len__(self: Linked_list_node):
+        i = 0
+        walker = self
+
+        while not walker is None:
+            i+=1
+            walker = walker.next
+        return i
+
+def do_extend(b1, e1, chr1, b2, e2, chr2, lens_dict):
+    is_same = chr1 == chr2
+    len_chr1 = lens_dict[chr1] - 1
+    len_chr2 = lens_dict[chr2] - 1
+
+    b1 = max(0, b1 - extend_var) 
+    e1 = min(len_chr1, e1 + extend_var) if not is_same else min(len_chr1, e1 + extend_var,b2)
+
+    b2 = max(0, b2 - extend_var) if not is_same else max(0, b2 - extend_var,e1)
+    e2 = min(len_chr2, e2 + extend_var)
+
+    return (b1, e1, b2, e2)
+
+def print_sd(walker: Linked_list_node, current: int, current_chr: int, croms, lens_dict, dict_final_sds):
+   
+    if walker.chr_ < len(croms) and current_chr< len(croms):
+
+        chr1 = croms[walker.chr_].split('_')[1]
+        chr2 = croms[current_chr].split('_')[1]
+
+        strand = 'n' if croms[walker.chr_].split('_')[2] == croms[current_chr].split('_')[2] else 'y'
+        strand_ = '+' if croms[walker.chr_].split('_')[2] == croms[current_chr].split('_')[2] else '-'
+
+        specie1 = croms[walker.chr_].split('_')[0]
+        specie2 = croms[current_chr].split('_')[0]
+
+        b1,e1,b2,e2 = 0,0,0,0
+        if strand_ == '-':
+            if chr1 == chr2 and specie1 == specie2:
+                len_r = lens_dict[current_chr]
+                b1,e1,b2,e2 = do_extend(walker.first, walker.last, walker.chr_, len_r - current, len_r - walker.ref,current_chr, lens_dict)
+            else:
+                len_q = lens_dict[walker.chr_]
+                b1,e1,b2,e2 = do_extend(len_q - walker.last, len_q - walker.first, walker.chr_, walker.ref, current,current_chr, lens_dict)
+           
+            
+        else:
+            b1,e1,b2,e2 = do_extend(walker.first, walker.last, walker.chr_, walker.ref, current,current_chr, lens_dict)
+
+        name = f'{chr1}.{specie1}_{chr2}.{specie2}_{strand}.bed' #if chr1 < chr2 else f'{chr2}_{chr1}_{strand}.bed'
+
+        s1 = f'{specie1}#{chr1}\t{b1}\t{e1}\t{specie2}#{chr2}\t{b2}\t{e2}\t\t\t+\t{strand_}\n'#\t{specie1}\t{specie2}\n'
+
+        if name in dict_final_sds:
+            dict_final_sds[name].append(s1)
+        else:
+            dict_final_sds[name] = [s1]
+
+    else:
+        raise ValueError('Rev comp intervals should not be here')
+
+
+def overlap_SD(b1,e1,b2,e2):
+    if (b1 <= e2 and b2 <= e1):
+        min_ = max(b1,b2)
+        max_ = min(e1,e2)
+        diff = max_ - min_
+        
+        if diff / (e1-b1) >= overlap_percentage or diff / (e2-b2) >= overlap_percentage:
+            return False
+    return True
+
+def add_to_tree_3(threads: Optional[Linked_list_node], minimizers_dict_list: list[tuple[int,int]], current: int,current_chr:int, difference: int , index_set: list[tuple[tuple[int,int],tuple[int,int]]] = list[tuple[tuple[int,int],tuple[int,int]]](), croms = list[str](), lens_dict = dict[int,int](), dict_final_sds = dict[str,list[str]]()):
+    
+    length = len(minimizers_dict_list)
+    
+    minimizer_index = 0
+
+    # if certain values in the beginning of the minimizers_dict_list are lower that first node, add them all beforehand
+    walker = threads
+    previous = threads
+    holder = threads
+    while threads and minimizer_index<length and ( (minimizers_dict_list[minimizer_index][0] == threads.chr_ and minimizers_dict_list[minimizer_index][1] < threads.first) or (minimizers_dict_list[minimizer_index][0] < threads.chr_ )):
+        if minimizer_index<length and croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index][0] != current_chr - 1:
+            minimizer_index += 1
+            continue
+        
+        walker = Linked_list_node(minimizers_dict_list[minimizer_index][1], minimizers_dict_list[minimizer_index][1], current, minimizers_dict_list[minimizer_index][0], threads,1,1)
+
+        if not (previous is threads):
+            previous.next = walker
+        if minimizer_index == 0:
+            holder = walker
+        previous = walker
+        minimizer_index+=1
+    # put them on right spots
+    
+    walker = threads
+    previous = threads
+    threads = holder
+
+    while walker:
+        if minimizer_index<length and  croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index][0] != current_chr - 1:
+            minimizer_index += 1
+            continue
+        case_ = 0
+        alowd_distande_modified = alowed_distance
+
+        # here if do_dynamic_distance, we change value of max distance from where another kmer can be appended
+        if do_dynamic_distance:
+            alowd_distande_modified = max(alowed_distance, int((walker.last - walker.first) * 0.3))
+        
+        if minimizer_index < length and walker.ref != current and walker.last < minimizers_dict_list[minimizer_index][1] and walker.last + alowd_distande_modified >= minimizers_dict_list[minimizer_index][1] and walker.chr_ ==  minimizers_dict_list[minimizer_index][0]: # and walker.ref_last + alowd_distande_modified >= current:
+            walker.last = minimizers_dict_list[minimizer_index][1]
+            walker.ref_last = current
+            walker.count+=1
+            minimizer_index+=1
+        elif minimizer_index < length and (not walker.next or ( minimizers_dict_list[minimizer_index][0] < walker.next.chr_ or (walker.next.first >= minimizers_dict_list[minimizer_index][1] and walker.next.chr_ == minimizers_dict_list[minimizer_index][0])) ):
+            # we set age to 0, we will increase it to one when we are on this node
+            walker.insert_after(minimizers_dict_list[minimizer_index][1], current, minimizers_dict_list[minimizer_index][0],0,1)
+            if minimizers_dict_list[minimizer_index][0] == walker.chr_ and minimizers_dict_list[minimizer_index][1] > walker.first and minimizers_dict_list[minimizer_index][1] < walker.last:
+                walker.age += 1
+            minimizer_index+=1
+            continue
+        
+        walker.age += 1
+        condition = (walker.count >= ceil(walker.age * tau_var))
+        
+        if condition and (walker.last - walker.first) < MAX_SD_LEN :# and current - walker.ref >= 200 and walker.last - walker.first >= 200:  #walker.count * diff2 >= 500:
+            walker.potentional = True
+
+        elif (not condition) or (walker.last - walker.first) >= MAX_SD_LEN:
+            if walker.potentional:
+                # for last was previously used walker.first + current - walker.ref  (< walker.ref -> for checking how close they are?)
+                if current - walker.ref >= ref_threshold and walker.last - walker.first > query_threshold:
+                    
+                    if walker.chr_ != current_chr:
+                        print_sd(walker, walker.ref_last, current_chr, croms, lens_dict, dict_final_sds)
+
+                    else:
+                        ovrlp  = True 
+                        # before we were checking of regions overlap and if yes, that region would be discarded, but because of some SDs that are tandem repeats, some of those cases would be discarded, se we removed that part
+                        # overlap_SD(walker.first, walker.last, walker.ref, current) if croms[current_chr][-1] != 'y' and croms[walker.chr_][-1] != 'y' else overlap_SD(walker.first, walker.last, lens_dict[current_chr] - current, lens_dict[current_chr] - walker.ref) if croms[current_chr][-1] == 'y' else overlap_SD(lens_dict[walker.chr_] - walker.last, lens_dict[walker.chr_] -  walker.first, walker.ref, current)
+                        if ovrlp:
+                            print_sd(walker, walker.ref_last, current_chr, croms, lens_dict, dict_final_sds)
+                    
+                
+            if walker is threads:
+                threads = threads.next
+            else:
+                if walker.next is None:
+                    previous.next = None
+                else:
+                    case_ = 3
+                    previous.next = walker.next
+
+
+        if case_ != 3:
+            previous = walker
+        # print f'walker: {walker}' 
+        walker = walker.next
+        # print f'threads: {threads}' 
+
+    while minimizer_index < length:
+        if minimizer_index<length and  croms[current_chr][-1] == 'y' and minimizers_dict_list[minimizer_index][0] != current_chr - 1:
+            minimizer_index += 1
+            continue
+        if not threads:
+            threads = Linked_list_node(minimizers_dict_list[0][1], minimizers_dict_list[0][1],current,minimizers_dict_list[0][0], None, 1, 1)
+            previous = threads
+        else:
+            previous.insert_after(minimizers_dict_list[minimizer_index][1], current,minimizers_dict_list[minimizer_index][0])
+            previous = previous.next
+        minimizer_index+=1
+
+    # writing_lengths.write(f'{len(threads)}\t{len(minimizers_dict_list)}\n')
+    return threads
+
+        
+    
+
+# this is function that is being called if user wants not to do winnowing (for sake of a bigger sensitivity)
+def get_minimizers(s:seq,
+    chr_: int,
+    kmer_size, 
+    window_size, 
+    new_minimizers:dict[int, list[tuple[int,int]]] = dict[int, list[int]](), 
+    just_build_index: bool = False,
+    just_find: bool = False,
+    croms = list[str](),
+    lens_dict = dict[int,int](),
+    dict_final_sds = dict[str,list[str]](),
+    frequency = 0): 
+
+    minimizers_dict = new_minimizers
+    threads = Optional[Linked_list_node]() 
+    threads = None
+    filtered = 0
+    # making 2 lists, one for minimizers, and sliding winnow
+
+    index_set = list[tuple[tuple[int,int],tuple[int,int]]]()
+
+    MASK = (1 << (2 * kmer_size)) - 1
+
+    h = 0
+    last_n = - kmer_size - window_size
+    last_u = last_n
+    last_value = 0
+    main_count = 0
+
+    for i in range(0,len(s)):
+        # Updating positions of last 'N' and last uppercase letter n, but no need for this sinse we are using hard masked genomes
+        # if (s[i]== s'N' or s[i]== s'n'):
+        #     last_n = i
+        last_u = i
+        
+        # hash_dna for 'N' returns 4, so just assign 0 instead, other letters asigned as usual
+        h = ((h << 2) | hash_dna(s[i])) & MASK
+        
+        
+        if (i < kmer_size - 1):
+            continue
+        # HAS_N   ->        2
+        # HAS_UPPERCASE ->  0
+        loc__ = i - kmer_size + 1
+        hh = h 
+        # Hash( h,
+        #     2 if last_n >= (loc__) else 0
+        # )
+        # hh will be new hash now
+        newHash = hh
+        main_count += 1
+
+        if newHash in minimizers_dict:
+            if just_find:
+                if frequency and len(minimizers_dict[newHash]) > frequency:
+                    filtered += 1
+                    continue
+                threads = add_to_tree_3(threads, minimizers_dict[newHash], loc__,chr_,alowed_distance, index_set,croms, lens_dict,dict_final_sds  )
+            if just_build_index:
+                minimizers_dict[newHash].append((chr_,loc__))
+        elif just_build_index:
+            minimizers_dict[newHash] = [(chr_,loc__)]
+
+    walker = threads
+    
+    while walker and just_find:
+        if walker.potentional and (walker.last - walker.first > query_threshold or walker.count >= 4):
+
+            # switched on ref_last for more precise coordinate
+            end_ = walker.ref_last # walker.ref  + (walker.last - walker.first) if walker.ref  + (walker.last - walker.first) < lens_dict[chr_] else lens_dict[chr_] - 1
+            if walker.chr_ != chr_:
+                print_sd(walker, end_, chr_, croms, lens_dict,dict_final_sds )
+            else:
+                current = end_
+                current_chr = chr_
+                ovrlp  = True # overlap_SD(walker.first, walker.last, walker.ref, current) if croms[current_chr][-1] != 'y' and croms[walker.chr_][-1] != 'y' else overlap_SD(walker.first, walker.last, lens_dict[current_chr] - current, lens_dict[current_chr] - walker.ref) if croms[current_chr][-1] == 'y' else overlap_SD(lens_dict[walker.chr_] - walker.last, lens_dict[walker.chr_] -  walker.first, walker.ref, current)
+                if ovrlp:
+                    print_sd(walker, current, current_chr, croms, lens_dict, dict_final_sds)
+        walker = walker.next
+
+    return index_set, main_count, filtered
+
+# This function in being called if user wants to use winnowing
+def get_minimizers_winnowed(s:seq,
+    chr_: int,
+    kmer_size, 
+    window_size, 
+    new_minimizers: dict[int, list[tuple[int,int]]] = dict[int, list[int]](), # dict[Hash, list[tuple[int,int]]] = dict[Hash, list[int]](), 
+    just_build_index: bool = False,
+    just_find: bool = False,
+    croms = list[str](),
+    lens_dict = dict[int,int](),
+    dict_final_sds = dict[str,list[str]](),
+    frequency = 0): 
+
+    minimizers_dict = new_minimizers
+    threads = Optional[Linked_list_node]() # Linked_list_node(-1,-1,-1)
+    threads = None
+    # making 2 lists, one for minimizers, and winnow
+
+    # Instead of using Class Minimizer, switch to tuple [int, int] - [0] hash, [1] location
+    # window = list[Minimizer]()
+    window = list[tuple[int,int]]()
+
+    index_set = list[tuple[tuple[int,int],tuple[int,int]]]()
+
+    MASK = (1 << (2 * kmer_size)) - 1
+
+    h = 0
+    last_n = - kmer_size - window_size
+    last_u = last_n
+    last_value = 0
+    
+    last_hash = -1 # Hash(-1,0)
+    main_count = 0
+
+    filtered = 0
+
+    for i in range(0,len(s)):
+        # Updating positions of last 'N' and last uppercase letter n - this can be removed
+        if (s[i]== s'N' or s[i]== s'n'):
+            last_n = i
+        last_u = i
+        
+        # hash_dna for 'N' returns 4, just assign 0 instead, other letters asigned as usual
+        h = ((h << 2) | hash_dna(s[i])) & MASK
+        
+        
+        if (i < kmer_size - 1):
+            continue
+        # HAS_N   ->        2
+        # HAS_UPPERCASE ->  0
+        hh = h
+        # Hash( h,
+        #     2 if last_n >= (i - kmer_size + 1) else (0 if last_u >= (i - kmer_size + 1)  else 0)
+        # )
+        
+        # here we ensure that correct elements are in winnow
+        # while (len(window) > 0 and not (window[-1].hash < hh)):
+        while (len(window) > 0 and not (window[-1][0] < hh)):
+            window.pop()
+        # while (len(window)>0 and window[-1].loc < ((i - kmer_size + 1) - window_size)):
+        while (len(window)>0 and window[-1][1] < ((i - kmer_size + 1) - window_size)):
+
+            window.pop(0)
+        
+        window.append((hh, i - kmer_size + 1))
+
+        if (i - kmer_size + 1 < window_size):
+            continue
+
+        if ((len(minimizers_dict) == 0) or  not window[0][0] == last_hash):
+            main_count += 1
+            newHash = window[0][0] # Hash(window[0][1].hash,window[0][1].status)
+            if newHash in minimizers_dict:
+                if just_find:
+                    if frequency and len(minimizers_dict[newHash]) >= frequency:
+                        filtered += 1
+                        continue
+                    threads = add_to_tree_3(threads, minimizers_dict[newHash], window[0][1],chr_,alowed_distance, index_set,croms, lens_dict,dict_final_sds  )
+                if just_build_index:
+                    minimizers_dict[newHash].append((chr_,window[0][1]))
+            elif just_build_index:
+                minimizers_dict[newHash] = [(chr_,window[0][1])]
+                
+            last_hash = newHash
+    walker = threads
+
+    while walker and just_find:
+        if walker.potentional and (walker.last - walker.first > query_threshold or walker.count >= 4):
+
+            end_ = walker.ref_last # walker.ref  + (walker.last - walker.first) if walker.ref  + (walker.last - walker.first) < lens_dict[chr_] else lens_dict[chr_] - 1
+            if walker.chr_ != chr_:
+                print_sd(walker, end_, chr_, croms, lens_dict,dict_final_sds )
+            else:
+                current = end_
+                current_chr = chr_
+                ovrlp  = True # overlap_SD(walker.first, walker.last, walker.ref, current) if croms[current_chr][-1] != 'y' and croms[walker.chr_][-1] != 'y' else overlap_SD(walker.first, walker.last, lens_dict[current_chr] - current, lens_dict[current_chr] - walker.ref) if croms[current_chr][-1] == 'y' else overlap_SD(lens_dict[walker.chr_] - walker.last, lens_dict[walker.chr_] -  walker.first, walker.ref, current)
+                if ovrlp:
+                    print_sd(walker, current, current_chr, croms, lens_dict, dict_final_sds)
+        walker = walker.next
+
+    return index_set, main_count, filtered
+
+
+from bio import *
+
+def main_f(
+    ref_path: str,
+    ref_chr: str,
+    chr_index: int,
+    is_ref_complement: bool,
+    kmer_size: int,
+    window_size: int,
+    file_for_storing: str,
+    new_minimizers: dict[int, list[tuple[int,int]]] = dict[int,list[tuple[int,int]]](),# dict[Hash, list[tuple[int,int]]] = dict[Hash,list[tuple[int,int]]](),
+    just_build_dict = False,
+    just_find = False,
+    croms = list[str](),
+    lens_dict  = dict[int,int](), 
+    dict_final_sds = dict[str,list[str]]()
+):
+
+    ref     = s''
+    # try:
+    fr = FASTA(ref_path)
+
+    if not is_ref_complement:
+        ref = fr[ref_chr]
+    else:
+        ref = ~fr[ref_chr]
+    # global lens_dict
+
+    lens_dict[chr_index] = abs(len(ref))
+
+    # with timing(f'{ref_chr}'):
+    rez =  get_minimizers_winnowed(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds )
+    fr.close()
+
+    return rez
+    # except:
+    #     print(f'This file does not exist: {ref_path}')
+    #     sys.exit(1)
+        # return list[pair[pair[int,int],pair[int,int]]](), 0,0
+def main_paralled(
+    ref_path: str,
+    ref_chr: str,
+    query_path: str,
+    query_chr: str,
+    is_ref_complement: bool,
+    kmer_size: int,
+    window_size: int,
+):
+    #this frequency variable is for filtering top frquent k-mers
+    frequency = 0
+    dict_final_sds = dict[str,list[str]]()
+    lens_dict  = dict[int,int]()
+    new_minimizers =  dict[int,list[tuple[int,int]]]() #dict[Hash,list[tuple[int,int]]]()
+    # First we build dictionary for first sequence
+    chr_index = 0
+    croms = ['hg19_' + ref_chr + '_n', 'hg19_' + query_chr + ('_y' if is_ref_complement else '_n')]
+    ref     = s''
+    fr = FASTA(ref_path)
+    if not is_ref_complement:
+        ref = fr[ref_chr]
+    else:
+        ref = ~fr[ref_chr]
+    fr.close()
+    lens_dict[chr_index] = abs(len(ref))
+    just_build_dict = True
+    just_find = False
+    with timing(f'Building dict {ref_chr}, {query_chr}'):
+        if without_winnowing:
+            i, frequency, filtered = get_minimizers(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds )
+        else:
+            i, frequency, filtered = get_minimizers_winnowed(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds )
+    
+    max_len = 0
+
+    n = frequency
+    m = len(new_minimizers)
+
+    avg = int(n/m * 2)
+    hist = dict[int,int]()
+    for i in new_minimizers:
+        if not len(new_minimizers[i]) in hist:
+            hist[ len(new_minimizers[i]) ] = 1
+        else:
+            hist[len(new_minimizers[i])] += 1
+            
+        if len(new_minimizers[i]) > max_len:
+            max_len = len(new_minimizers[i])
+    print f'Max len: {max_len}, {avg}, {n}, {m}'
+    ignore = int( frequency - (frequency * INDEX_CUTOFF) / 100 )
+
+    sum = 0
+    threshold = 1 << 31
+    filtered = 0
+    # here we calculate threshold which tells us what is maximum length of a list of kmers
+    for i in sorted(hist.keys()):
+        sum += hist[i] * i
+        if sum <= ignore:
+            threshold = i
+            
+        else:
+
+            filtered += hist[i] * i
+
+    # Now we find matching subsequences in first seq
+    chr_index = 1
+    ref     = s''
+    fr = FASTA(query_path)
+    if not is_ref_complement:
+        ref = fr[query_chr]
+    else:
+        ref = ~fr[query_chr]
+    # global lens_dict
+    lens_dict[chr_index] = abs(len(ref))
+    just_build_dict = False
+    just_find = True
+    with timing(f'Finding {ref_chr}, {query_chr}'):
+        if without_winnowing:
+            get_minimizers(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds, threshold )
+        else:
+            get_minimizers_winnowed(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds, threshold )
+
+    
+    return dict_final_sds
+
+# this is main function for parallel call if one chr is specified, it finds all SDs within that chr and between that chr and all other chromosomes that are lexicographically bigger than it
+def main_parallel_one(
+    ref_path: str,
+    ref_chr: str,
+    query_path: str,
+    kmer_size: int,
+    window_size: int,
+):
+
+    frequency = 0
+    filtered = 0
+
+    include_undefined = True
+    name = ref_path.split("/")[-1][0:-3].split('_')[0]
+
+    dict_final_sds = dict[str,list[str]]()
+    lens_dict  = dict[int,int]()
+    new_minimizers = dict[int,list[tuple[int,int]]]()# dict[Hash,list[tuple[int,int]]]()
+    # First we build dictionary for first sequence
+    chr_index = 0
+    croms = [f'{name}_{ref_chr}_n', f'{name}_{ref_chr}_y']
+    ref     = s''
+    fr = FASTA(ref_path)
+    # here we first build dictionary and find potential regions in reference chromosome
+    for chr_index in range(0,len(croms)):
+        name, chr_str, strand_ = croms[chr_index].split('_')
+
+        if strand_ == 'n':
+            ref = fr[ref_chr]
+        else:
+            ref = ~fr[ref_chr]
+        lens_dict[chr_index] = abs(len(ref))
+        just_build_dict = True
+        just_find = True
+        
+        if without_winnowing:
+            l__, frequency, filtered = get_minimizers(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds )
+        else:
+            l__, frequency, filtered = get_minimizers_winnowed(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds )
+    
+    # Now we find matching subsequences in all other chromosomes that are bigger than out ref_chr if both specie are same, if not, take all chromosomes from another specie
+    name = query_path.split("/")[-1][0:-3].split('_')[0]
+
+    
+    max_len = 0
+    assert filtered == 0
+    
+    occurence = 0
+    
+    threshold = 1 << 31
+    if do_filtering:
+        ignore = int( (frequency * INDEX_CUTOFF) )
+        sum = 0
+        hist = dict[int,int]()
+        for i in new_minimizers:
+            if not len(new_minimizers[i]) in hist:
+                hist[ len(new_minimizers[i]) ] = 1
+            else:
+                hist[len(new_minimizers[i])] += 1
+                
+            if len(new_minimizers[i]) > max_len:
+                max_len = len(new_minimizers[i])
+
+        for i in sorted(hist.keys(), reverse = True): #, reverse = True
+            sum += hist[i] #* i
+            if sum <= ignore:
+                threshold = i
+                occurence += hist[i]
+
+            else:
+                break
+
+    # here we read all other chromosomes:
+    for i in open(query_path+'.fai', 'r').readlines():
+
+        line = i.split('\t') 
+
+        if include_undefined or (not '_' in line[0] and line[0] != 'chrM'):
+            if query_path != ref_path or line[0] > ref_chr:
+                croms.append(f'{name}_{line[0]}_n')
+    # now we iterate through those chrs:
+    if query_path != ref_path:
+        fr = FASTA(query_path)
+    for chr_index in range(2, len(croms)):
+        name, chr_str, strand_ = croms[chr_index].split('_')
+
+        ref     = s''
+        
+        if strand_ == 'n':
+            ref = fr[chr_str]
+        else:
+            ref = ~fr[chr_str]
+
+        lens_dict[chr_index] = abs(len(ref))
+        just_build_dict = False
+        just_find = True
+        query_chr = chr_str
+        with timing(f'Finding in {ref_chr}, {query_chr}'):
+            if without_winnowing:
+                l1__,m_, f_ = get_minimizers(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds, threshold )
+                
+            else:
+                l1__,m_, f_ = get_minimizers_winnowed(ref, chr_index, kmer_size, window_size,new_minimizers, just_build_dict,just_find,croms,lens_dict, dict_final_sds, threshold )
+                
+
+    fr.close()
+    print f'FILTERED {occurence }'
+
+
+    return dict_final_sds
+
+
+# this is funtion for finding all SDs on one core within one or more sequences
+def _main_fun(pair_fa):
+    include_undefined = False
+    saveDict = True
+    print f'pair:  {pair_fa}'
+    mainFa, second_fa = pair_fa
+    print ('Finding SDs...')
+    croms = list[str]()
+    lens_dict  = dict[int,int]()
+    new_minimizers =  dict[int, list[tuple[int,int]]]() # dict[Hash, list[tuple[int,int]]]()
+    dict_final_sds = dict[str,list[str]]()
+    # First, build dict for mainFa, cointaining positive and negative (maybe seperate it to 2 different ones for speed)
+    name = mainFa.split("/")[-1][0:-3].split('_')[0]
+
+    for i in open(mainFa+'.fai', 'r').readlines():
+
+        line = i.split('\t')
+        if include_undefined or (not '_' in line[0] and line[0] != 'chrM'):
+            croms.append(f'{name}_{line[0]}_n')
+
+            croms.append(f'{name}_{line[0]}_y')
+    
+    main_index_n = 0
+    frequency = 0
+
+    with timing(f'Building dict {mainFa}'):
+        for i in range(0, len(croms)):
+            # print f'building index for {croms [i]}'
+
+            main_index_n = i
+            name, chr_str, strand_ = croms[i].split('_')
+            
+            just_build_dict = True
+            just_find = True if mainFa == second_fa else False
+            is_rev_comp = True if strand_ == 'y' else False
+
+            l__, frequency, filtered =main_f(mainFa,chr_str, main_index_n,is_rev_comp, kmer_size,winnow_size,f'{output}/{croms[i]}.bed',new_minimizers, just_build_dict, just_find,croms,lens_dict, dict_final_sds)
+
+    main_index_n = len(croms) - 1 # last index
+    print('Done buiding main dict')
+    
+    occurence = 0
+    # here we determine threshold for filtering most frequent kmers
+    threshold = 1 << 31
+    if do_filtering:
+        ignore = int( (frequency * INDEX_CUTOFF) )
+        sum = 0
+        hist = dict[int,int]()
+        for i in new_minimizers:
+            if not len(new_minimizers[i]) in hist:
+                hist[ len(new_minimizers[i]) ] = 1
+            else:
+                hist[len(new_minimizers[i])] += 1
+                
+        for i in sorted(hist.keys(), reverse = True): #, reverse = True
+            sum += hist[i] #* i
+            if sum <= ignore:
+                threshold = i
+                occurence += hist[i]
+            else:
+                break
+    # After we built dictionary, we iterate trought second_fa file and do the search 
+    
+    print f'FILTERED {occurence}'
+    if mainFa != second_fa:
+        name = second_fa.split("/")[-1][0:-3].split('_')[0]
+        with timing(f'Finding {second_fa}'):
+            for i in open(second_fa+'.fai', 'r').readlines():
+
+                # print i
+                line = i.split('\t')
+                if (not '_' in line[0]) and (line[0] != 'chrM'):
+
+                    chr_ = line[0]
+                    chr_str = f'{name}_{chr_}_n'
+                    print f'Finding query {chr_str} in ref'
+                    croms.append(chr_str)
+
+                    main_index_n += 1
+                    just_build_dict = False
+                    just_find = True
+                    main_f(second_fa,chr_, main_index_n,False, kmer_size,winnow_size,f'{output}/{croms[main_index_n]}.bed',new_minimizers, just_build_dict,just_find,croms,lens_dict,dict_final_sds)
+    return dict_final_sds
+
+
+opts, args = getopt.getopt(sys.argv[1:], "n:k:r:w:o:d:s:g:f:p:m:q:")
+
+def get_fas():
+    for i in ["data/genomes/hg19_hard_50.fa","data/genomes/mm10_hard_50.fa","data/genomes/rheMac10_hard_50.fa"]:
+        for j in ["data/genomes/hg19_hard_50.fa","data/genomes/mm10_hard_50.fa","data/genomes/rheMac10_hard_50.fa"]:
+            if i <= j:
+                print(i,j)
+                yield (i,j)
+
+def print_dict(dict_final_sds):
+    print f'writing in {out}'
+
+    for i in dict_final_sds:
+        file_ = open(out + i,'w')
+        for i in dict_final_sds[i]:
+            # print i
+            file_.write(i)
+        file_.close()
+
+with timing('whole code'):
+    simulation = False
+    # sys.exit(1)
+
+    
+
+    out = 'test/'
+    main_fa = "data/genomes/hg19_hard_50.fa"
+    chr1_in = ''
+    chr2_in = ''
+    
+
+    strand_r = False
+
+    second_fa = main_fa
+    print opts
+    print args
+    if len(opts) > 0:
+        # here we read initial input params
+        for o, a in opts:
+            if o in ("-k", "--kmer"):
+                kmer_size = int(a)
+            elif o in ("-w", "--window"):
+                winnow_size = int(a)
+            elif o in ("-o", "--output"):
+                out = a 
+                if a[-1] != '/':
+                    out+='/'
+            elif o in ("-d", "--dynamic"):
+                if a == '1':
+                    do_dynamic_distance = True
+                    MAX_SD_LEN = 1000000 # it was 1000000 for testing dynamic distance
+
+                else:
+                    do_dynamic_distance = False
+            elif o in ("-s", "--strand"):
+                if a == 'y':
+                    strand_r = True
+                else:
+                    strand_r = False
+            elif o in ("-g", "--dowinnowing"):
+                if a == '1':
+                    without_winnowing = True
+                else:
+                    without_winnowing = False
+            elif o in ("-f", "--filtering"):
+                if a == '1':
+                    do_filtering = True
+                else:
+                    do_filtering = False
+            elif o in ("-p", "--padding"):
+                extend_var = int(a)
+            elif o in ("-m", "--simulation"):
+                simulation = True
+            elif o in ("-r", "--ref"):
+                ref_threshold = int(a)
+            elif o in ("-q", "--query"):
+                query_threshold = int(a)
+    
+    if simulation:
+        if len(args) != 2:
+            print 'Wrong format of parameters'
+            sys.exit(1)
+        print args
+        # sys.exit(1)
+        
+        path = args[0] #'test/simulations/fa_files2/'
+        out = args[1] #'test/simulations/results2/'
+        for i in range(1, 1001):
+            main_fa = f'{path}{i}.fa'
+            second_fa = f'{path}{i}_sds.fa'
+            d = _main_fun((main_fa, second_fa))
+            print_dict(d)
+        sys.exit(1)
+
+
+    if len(args) == 2:
+        main_fa = args[0]
+        second_fa = args[1]
+    elif len(args) == 4:
+        main_fa = args[0]
+        second_fa = args[1]
+        chr1_in = args[2]
+        chr2_in = args[3]
+    elif len(args) == 3:
+        main_fa = args[0]
+        second_fa = args[1]
+        chr1_in = args[2]
+    else:
+        print 'Wrong formatting'
+        # sys.exit(1)
+
+    print f'Input: {main_fa}\t{second_fa}\t{chr1_in}\t{chr2_in}, {kmer_size}, {winnow_size}'
+
+    tau_var = tau(SEARCH_MAX_EDIT_ERROR_,kmer_size)
+
+    if chr1_in != '' and chr2_in != '':
+        with timing(f'{chr1_in} and {chr2_in}, Reverse: {strand_r}'):
+            assert chr1_in <= chr2_in
+            d = main_paralled( main_fa, chr1_in, second_fa, chr2_in, strand_r, kmer_size, winnow_size )
+            print_dict(d)
+    elif chr1_in != '' and chr2_in == '':
+        with timing(f'{chr1_in}'):
+            d = main_parallel_one( main_fa,chr1_in, second_fa, kmer_size, winnow_size)
+            print_dict(d)
+    else:
+        with timing('Runtime'):
+            d = _main_fun((main_fa, second_fa))
+            print_dict(d)

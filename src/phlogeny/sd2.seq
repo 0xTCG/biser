@@ -1,0 +1,160 @@
+class Mate:
+    chr_: str
+    begin: int
+    end: int
+    specie: str
+
+    def __init__(self: Mate, chr_: str, begin: int, end: int):
+        self.chr_ = chr_
+        self.begin = begin
+        self.end = end
+        self.specie = 'hg19'
+
+    def __init__(self: Mate, chr_: str, begin: int, end: int, specie: str):
+        self.chr_ = chr_
+        self.begin = begin
+        self.end = end
+        self.specie = 'hg19'
+    def __lt__(self: Mate, other:Mate):
+        return (self.chr_, self.begin, self.end) < (other.chr_, other.begin,other.end)
+    
+    def __eq__(self: Mate, other:Mate):
+        return (self.chr_, self.begin, self.end) == (other.chr_, other.begin,other.end)
+
+    def __ge__(self: Mate, other:Mate):
+        return (self.chr_, self.begin, self.end) >= (other.chr_, other.begin,other.end)
+
+    def __gt__(self: Mate, other:Mate):
+        return (self.chr_, self.begin, self.end) > (other.chr_, other.begin,other.end)
+
+
+    def __le__(self: Mate, other:Mate):
+        return (self.chr_, self.begin, self.end) <= (other.chr_, other.begin,other.end)
+    
+    def __str__(self:Mate):
+        return f'{self.chr_}\t{self.begin}\t{self.end}'
+
+class SD:
+    mate1: Mate
+    mate2: Mate
+    is_rev: bool
+    cigar: str
+    match_: int
+    miss: int
+    gap: int
+    similarity: float
+    clade: set[str]
+    clade_coverage: float
+
+    def __init__(self: SD, chr_1: str, begin1: int, end1: int, chr_2: str, begin2: int, end2: int, specie1: str, specie2: str,is_rev: bool, match_:int, miss:int, gap:int, similarity:float, cigar:str):
+        self.mate1 =  Mate(chr_1,begin1,end1, specie1)
+        self.mate2 =  Mate(chr_2,begin2,end2, specie2)
+        self.is_rev = is_rev
+        self.match_ = match_
+        self.miss = miss
+        self.gap = gap
+        self.cigar = cigar
+        self.similarity = similarity
+        self.clade = set[str]()
+        self.clade_coverage = 0.0
+    
+    def __init__(self: SD, chr_1: str, begin1: int, end1: int, chr_2: str, begin2: int, end2: int, specie1: str, specie2: str,is_rev: bool):
+        self.mate1 =  Mate(chr_1,begin1,end1, specie1)
+        self.mate2 =  Mate(chr_2,begin2,end2, specie2)
+        self.is_rev = is_rev
+        self.match_ = 0
+        self.miss = 0
+        self.gap = 0
+        self.similarity = 0.0
+        self.clade = set[str]()
+        self.clade_coverage = 0.0
+    def __init__(self: SD, chr_1: str, begin1: int, end1: int, chr_2: str, begin2: int, end2: int, specie1: str, specie2: str,is_rev: bool, cigar: str):
+        self.mate1 =  Mate(chr_1,begin1,end1, specie1)
+        self.mate2 =  Mate(chr_2,begin2,end2, specie2)
+        self.is_rev = is_rev
+        self.match_ = 0
+        self.miss = 0
+        self.gap = 0
+        self.similarity = 0.0
+        self.clade = set[str]()
+        self.clade_coverage = 0.0
+        self.cigar = cigar
+    def __init__(self: SD, mate1: Mate, mate2: Mate,is_rev: bool):
+        self.mate1 =  mate1
+        self.mate2 =  mate2
+        self.is_rev = is_rev
+        self.match_ = 0
+        self.miss = 0
+        self.gap = 0
+        self.similarity = 0.0
+        self.clade = set[str]()
+        self.clade_coverage = 0.0
+
+    
+    def __lt__(self: SD, other:SD):
+        return (self.mate1, self.mate2) < (other.mate1, other.mate1)
+    
+
+    def __le__(self: SD, other:SD):
+        return (self.mate1, self.mate2) <= (other.mate1, other.mate1)
+    
+    def __ge__(self: SD, other:SD):
+        return (self.mate1, self.mate2) >= (other.mate1, other.mate1)
+    
+
+    def __eq__(self: SD, other:SD):
+        return (self.mate1, self.mate2) == (other.mate1, other.mate2)
+    def __gt__(self: SD, other:SD):
+        return (self.mate1, self.mate2) > (other.mate1, other.mate1)
+    
+    def __str__(self:SD):
+        starnd = '+\t+'
+        if self.is_rev:
+            starnd = '+\t-'
+
+        return f'{self.mate1}\t{self.mate2}\t\t\t{starnd}\t{self.mate1.specie}\t{self.mate2.specie}\tc: {self.clade}, {self.clade_coverage}'
+    
+    def get_clade_coverage(self:SD):
+        return self.clade_coverage
+    
+    def overlaps(self:SD, other:SD, distance = 0):
+        if self.mate1.chr_ == other.mate1.chr_ and self.mate2.chr_ == other.mate2.chr_ and self.mate1.begin - distance < other.mate1.end and self.mate1.end > other.mate1.begin - distance and self.mate2.begin - distance < other.mate2.end and self.mate2.end > other.mate2.begin - distance:
+            return True
+        return False
+
+    def merge(self:SD, other:SD) -> SD:
+        if self.overlaps(other): 
+            begin1 = min (self.mate1.begin,other.mate1.begin)
+            end1 = max (self.mate1.end,other.mate1.end)
+
+            begin2 = min (self.mate2.begin,other.mate2.begin)
+            end2 = max (self.mate2.end,other.mate2.end)
+
+            ret_sd = SD(self.mate1.chr_,begin1,end1, self.mate2.chr_, begin2, end2,self.mate1.specie, self.mate2.specie, self.is_rev)
+            if (ret_sd.mate1.chr_ == ret_sd.mate2.chr_ and ret_sd.mate1.end > ret_sd.mate2.begin):
+                return None
+            else:
+
+                return ret_sd
+        else:
+            return None
+    
+    def merge_full(self:SD, other:SD, difference: int = 500) -> SD:
+        if self.overlaps(other, difference): 
+            begin1 = min (self.mate1.begin , other.mate1.begin ) 
+            end1 = max (self.mate1.end ,other.mate1.end) 
+
+            begin2 = min (self.mate2.begin, other.mate2.begin) 
+            end2 = max (self.mate2.end, other.mate2.end)
+
+            ret_sd = SD(self.mate1.chr_,begin1,end1, self.mate2.chr_, begin2, end2, self.mate1.specie, self.mate2.specie, self.is_rev)
+            return ret_sd
+        else:
+            return None
+
+def from_bed_(line):
+    i = line.split('\t')
+    if len(i) >= 11:
+        return SD(i[0],int(i[1]),int(i[2]),i[3],int(i[4]),int(i[5]), i[10],i[11],i[8] != i[9])
+    else:
+        return SD(i[0],int(i[1]),int(i[2]),i[3],int(i[4]),int(i[5]), 'hg19', 'hg19',i[8] != i[9])
