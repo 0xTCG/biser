@@ -50,7 +50,7 @@ fi
 eval set -- "$PARSED"
 
 output="sedef_out"
-jobs=10
+jobs=8
 force="n"
 wgac=""
 translate=""
@@ -67,8 +67,10 @@ SEQ=`command -v seqc`
 
 SEQ_PATH=`dirname ${SEQ}`
 
-LD_LIBRARY_PATH=`cd $SEQ_PATH && cd .. && cd lib/seq && pwd`
-SEQ_LIBRARY_PATH=LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=`cd $SEQ_PATH && cd .. && cd lib/seq && pwd`
+export SEQ_LIBRARY_PATH=LD_LIBRARY_PATH
+
+
 
 
 
@@ -154,7 +156,7 @@ if [ -e "${output}" ]; then
     	rm -rf "${output}"
     else
     	echo " Please delete ${output} or run with -f/--force if you want to start anew."
-    	# exit 1
+    	exit 1
     fi
 fi
 mkdir -p "${output}"
