@@ -1,0 +1,179 @@
+from hash import *
+from avl import *
+from util import *
+from globals import *
+# import copy
+# def lower_bound(d:  dict[Hash, str],m: Hash):
+#     k = list[Hash]()
+#     for i in d:
+#         if i>=m:
+#             k.append(i)
+
+#     return k.sort()
+
+class SlidingMap:
+    storage: AVL[Hash, int]
+    boundary: AVLNode[Hash,int]
+
+    # typename std::map<Hash, char>::iterator boundary
+    query_size: int
+    intersection:int
+    limit: float
+    kmer_size:int
+
+    estimate_memoize: dict[int, int]
+    searchGlob: Search
+
+    def __init__(self:SlidingMap,kmer_size:int, s: Search):
+        self.kmer_size=kmer_size
+        self.query_size=0
+        self.intersection = 0
+        self.limit = 0.0
+        self.storage = AVL[Hash, int]()
+        self.estimate_memoize =  dict[int, int]()
+        self.boundary = None# self.storage.find_max()
+        self.searchGlob = s
+    
+    def __init__(self:SlidingMap,other: SlidingMap):
+        self.kmer_size=other.kmer_size
+        self.query_size=other.query_size
+        self.intersection = other.intersection
+        self.limit = other.limit
+
+        self.storage, self.estimate_memoize, self.boundary = other.returnCopyStorage()
+
+        self.searchGlob = other.searchGlob
+    
+    def returnCopyStorage(self):
+        newStorage = AVL[Hash, int]()
+        new_boundary = AVLNode[Hash,int]()
+        new_boundary = None
+        for i in self.storage:
+
+            newStorage[i.key] = i.value
+            if self.boundary and i.key == self.boundary.key:
+                new_boundary = newStorage.find(i.key)
+            
+        newEstimate_memoize =  dict[int, int]()
+        for i in self.estimate_memoize:
+            newEstimate_memoize[i] = self.estimate_memoize[i]
+        return newStorage, newEstimate_memoize, new_boundary
+
+                
+    def jaccard(self:SlidingMap):
+        if (self.intersection >= self.limit):
+            return self.intersection
+        else:
+            return int(self.intersection - self.limit)
+    
+    def add(self:SlidingMap, h: Hash, BIT: int):
+        FULL = 3
+        it = self.storage.lower_bound(h)
+
+        inserted = False
+
+        if it and it.key == h:
+            if (it.value & BIT):
+                return False
+            it.value |= BIT
+        else:
+            it = self.storage.insert(h,BIT)
+            inserted = True
+
+        assert(it)
+        assert(self.boundary or not self.query_size)
+        
+        if (self.boundary and self.query_size and it.key < self.boundary.key):
+            self.intersection += int(it.value == FULL)
+            if (inserted):
+                self.intersection -= int(self.boundary.value == FULL)
+                self.boundary = self.boundary.next_smaller()
+        
+        return True
+
+
+    def remove(self:SlidingMap,h:Hash, BIT: int):#, FULL: int
+        FULL = 3
+
+        it = self.storage.lower_bound(h)
+        
+        if ((not it) or it.key != h or not(it.value & BIT)):
+            return False
+        
+        assert(self.boundary or not self.query_size)
+        if (self.query_size and it.key <= self.boundary.key):
+            self.intersection -= int(it.value == FULL)
+            if (it.value == BIT):
+                self.boundary = self.boundary.next_larger()
+                if (self.boundary):
+                    self.intersection += int(self.boundary.value == FULL)
+        
+        assert(it)
+
+        if (it.value == BIT):
+            assert(it)
+            assert(it != self.boundary)
+            temp1 = Hash()
+            if self.boundary:
+                temp1 = self.boundary.key
+
+            self.storage.delete(it.key)
+            #  ! find better way, maybe just next one?
+            if self.boundary and self.boundary.key != temp1:
+                self.boundary = self.storage.find(temp1)
+            
+        else:
+            it.value &= ~BIT
+        return True
+
+
+    def add_to_query(self: SlidingMap,h:Hash):
+        if (not self.add(h, 1)):
+            return
+        self.query_size+=1
+        self.limit = float(relaxed_jaccard_estimate(self.query_size, self.kmer_size, self.estimate_memoize,self.searchGlob))
+
+        assert(self.boundary or self.query_size == 1)
+        if (not self.boundary):
+            self.boundary = self.storage.find_min()
+        else:
+            assert(self.boundary)
+            self.boundary = self.boundary.next_larger()
+        assert(self.boundary)
+        self.intersection += int(self.boundary.value == 3)
+
+
+    def remove_from_query(self: SlidingMap,h:Hash):
+        if (not self.remove(h, 1)):
+            return
+        self.query_size -= 1
+        self.limit = relaxed_jaccard_estimate(self.query_size, self.kmer_size, self.estimate_memoize,self.searchGlob)
+
+        min_node = self.storage.find_min()
+        assert(min_node)
+        assert(self.boundary != min_node or not self.query_size)
+        if (self.boundary):
+            self.intersection -= int(self.boundary.value == 3)
+        
+        if (self.boundary == min_node):
+            self.boundary = None
+        else:
+            self.boundary = self.boundary.next_smaller()
+
+    def add_to_reference(self: SlidingMap,h:Hash):
+        # hash1.statuses.index("HAS_N")   ->        2
+        # hash1.statuses.index("HAS_UPPERCASE") ->  0
+        # hash1.statuses.index("ALL_LOWERCASE") ->  1
+        if (h.status != 2):
+            self.add(h, 2)
+    
+    def remove_from_reference(self: SlidingMap,h:Hash):
+        if (h.status != 2):
+            self.remove(h, 2)
+
+
+
+
+
+
+

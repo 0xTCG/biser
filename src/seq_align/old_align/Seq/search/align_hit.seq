@@ -1,0 +1,902 @@
+from bio import CIGAR
+from common import *
+#from hit import *
+from globals import *
+from hash import *
+
+
+def ceq(a:str, b:str):
+	if(a == '-' or b == '-'):
+		return False
+	if(a.upper() == 'N' or b.upper() == 'N'):
+		return False
+	return(a.upper() == b.upper())
+
+
+class AlignmentError:
+	gaps: int
+	gap_bases: int
+	mismatches: int
+	matches: int
+	
+	def __init__(self: Alignment, gaps:int, gap_bases:int, mismatches:int, matches:int):
+		self.gaps = gaps
+		self.gap_bases = gap_bases
+		self.mismatches = mismatches
+		self.matches = matches
+
+class Anchor:
+	q: int
+	r: int
+	l: int
+	has_u: bool
+
+	def __init__(self: Anchor, q: int, r:int, l: int, has_u: bool):
+		self.q = q
+		self.r = r
+		self.l = l
+		self.has_u = has_u
+
+
+
+class Alignment:
+	chr_a: str
+	start_a: int
+	end_a: int
+	chr_b: str
+	start_b: int
+	end_b: int
+
+	a: str
+	b: str
+	align_a: str
+	align_b: str
+	alignment: str
+	cigar: CIGAR
+	error: AlignmentError
+	def __init__(self: Alignment):
+		self.start_a = 0
+		self.start_b = 0
+		self.end_a = 0
+		self.end_b = 0
+	def __init__(self: Alignment, fa: str, fb: str):
+		self.chr_a = 'A'
+		self.chr_b = 'B'
+		self.start_a = 0
+		self.start_b = 0
+		self.end_a = len(fa)
+		self.end_b = len(fb)
+		self.a = fa
+		self.b = fb
+		xa = seq(fa)
+		xb = seq(fb)
+		alig = Align()
+		aln = xa.align(xb,a=alig.MATCH,b=alig.MISMATCH,gapo=-alig.GAP_OPEN,gape=-alig.GAP_EXTEND)
+		self.cigar = aln.cigar
+		self.populate_nice_alignment()
+
+
+	def __init__(self: Alignment, fa: str, fb: str, cigar: CIGAR):
+		self.chr_a = 'A'
+		self.chr_b = 'B'
+		self.start_a = 0
+		self.start_b = 0
+		self.end_a = len(fa)
+		self.end_b = len(fb)
+		self.a = fa
+		self.b = fb
+		self.cigar = cigar
+		self.populate_nice_alignment()
+
+	
+
+
+
+
+
+
+
+	def __init__(self: Alignment, qstr:str, rstr:str, guide:list[Anchor], guide_idx: list[int]):
+		self.chr_a = 'A'
+		self.chr_b = 'B'
+		if(len(guide_idx)):
+			self = Alignment()
+			break
+		
+		prev = guide_idx[0]
+		self.start_a = guide[prev].q
+		self.end_a = guide[prev].q + guide[prev].l
+		self.start_b = guide[prev].r
+		self.end_b = guide[prev].r + guide[prev].l
+		self.a = qstr[self.start_a:self.end_a]
+		self.b = rstr[self.start_b:self.end_b]
+		assert(self.end_a-self.start_a == self.end_b-self.start_b)
+		for index in range(1,len(guide_idx)):
+			prev = guide_idx(index-1)
+			cur = guide_idx(index)
+
+			qs = guide[cur].q
+			qe = guide[cur].q + guide[cur].l
+			qps = guide[prev].q
+			qpe = guide[prev].q + guide[prev].l
+
+			rs = guide[cur].r
+			re = guide[cur].r + guide[cur].l
+			rps = guide[prev].r
+			rpe = guide[prev].r + guide[prev].l
+
+			assert(qpe <= qs)
+			assert(rpe <= rs)
+
+			##check this assignment of self
+			self.end_a = qe
+			self.end_b = re
+			self.a+=qstr[qpe:qe]
+			self.b+=rstr[rpe:re]
+
+			qgap = qs  - qpe
+			rgap = rs - rpe
+			if(qgap and rgap):
+				if(qgap <= 1000 and rgap <= 1000):
+					gap = Alignment(qstr[qpe:qgap],rstr[rpe:rgap])
+					self.append_cigar(gap.cigar)
+				else:
+					ma = max(qgap,rgap)
+					mi = min(qgap,rgap)
+					ma1 = Alignment(qstr[qpe:qpe+mi],rstr[rpe:rpe+mi])
+					if(qgap == mi):
+						ma1.append_cigar(str(ma-mi)+ 'I')
+					else:
+						ma1.append_cigar(str(ma-mi)+ 'D')
+
+					ma2 = Alignment(qstr[qs-mi:qs],rstr[rs-mi:rs])
+					if(qgap == mi):
+						ma1.prepend_cigar(str(ma-mi)+ 'I')
+					else:
+						ma1.prepend_cigar(str(ma-mi)+ 'D')
+
+					if(ma2.total_error()<ma1.total_error()):
+						self.append_cigar(ma2.cigar)
+					else:
+						self.append_cigar(ma1.cigar)
+
+			elif(qgap):
+				self.append_cigar(CIGAR(str(qgap) + 'D'))
+			
+			elif(rgap):
+				self.append_cigar(CIGAR(str(rgap) + 'I'))
+
+			assert(qe-qs == re-rs)
+			self.append_cigar(str(qe-qs) + 'M')
+
+		qlo = self.start_a
+		qhi = self.end_a
+		rlo= self.start_b
+		rhi = self.end_b
+
+		assert(self.a == qstr[qlo:qhi])
+		assert(self.b == rstr[rlo:rhi])
+		assert(qlo >= 0)
+		assert(rlo >= 0)
+		assert(qhi <= len(qstr))
+		assert(rhi <= len(rstr))
+		assert(self.a == qstr[qlo:qhi])
+		assert(self.b == rstr[rlo:rhi])
+
+		self.populate_nice_alignment()
+
+
+		 
+	
+	def populate_nice_alignment(self: Alignment):
+		self.align_a = ""
+		self.align_b = ""
+		self.alignment = ""
+		ia = 0
+		ib = 0
+		for c in self.cigar:
+			for i in range(c[0]):
+				assert(c[1] != 'M' or ia < len(self.a))
+				assert(c[1] != 'M' or ib < len(self.b))
+				if(c[1] == 'M' and ceq(self.a[ia],self.b[ib])):
+					self.alignment += '|'
+				else:
+					self.alignment += '*'
+
+				
+				if(c[1] != 'D'):
+					self.align_b += self.b[ib]
+					ib +=1
+				else:
+					self.align_b += '-'
+				
+				if(c[1] != 'I'):
+					self.align_a += self.a[ia]
+					ia +=1	
+				else:
+					self.align_a += '-'
+		
+		self.error = AlignmentError(0,0,0,0)
+		for c in self.cigar:
+			if(c[1] != 'M'):
+				self.error.gaps+=1
+				self.error.gap_bases+=c[0]
+		
+		for i in range(len(self.alignment)):
+			if (self.align_a[i] != '-' and self.align_b[i] != '-'):
+				if(ceq(self.align_a[i],self.align_b[i])):
+					self.error.matches+=1
+				else:
+					self.error.mismatches+=1
+
+			
+			
+
+	def trim(self: Alignment):
+		i = 0
+		front = True
+		back = True
+		while(front == True and back == True):
+			if (self.cigar[i][1] == 'D' and front == True):
+				self.a = self.a[self.cigar[i][0]:]
+				self.start_a += self.cigar[i][0]
+			elif (self.cigar[i][1] == 'I' and front == True):
+				self.b = self.b[self.cigar[i][0]:]
+				self.start_b += self.cigar[i][0]
+			else:
+				front = False
+
+			if (self.cigar[len(self.cigar)-i][1] == 'D' and back == True):
+				self.a = self.a[:len(self.a)-self.cigar[i][0]]
+				self.end_a -= self.cigar[i][0]
+			elif (self.cigar[len(self.cigar)-i][1] == 'I' and back == True):
+				self.b = self.b[:len(self.b)-self.cigar[i][0]]
+				self.end_b -= self.cigar[i][0]
+			else:
+				back = False
+			i+=1
+
+		self.populate_nice_alignment()
+
+	def trim_front(self: Alignment):
+		max_score = 0
+		max_i = len(self.a)
+		alig = Align()
+		score = 0
+		i = len(self.alignment)
+		for i in reversed(range(0,len(self.alignment))):
+			if(self.alignment[i] == '|'):
+				score += alig.MATCH
+			else:
+				if(self.align_a[i] != '-' and self.align_b[i] != '-'):
+					score += alig.MISMATCH
+				else:
+					if(i == len(self.alignment)-1 or (self.align_a[i] == '-' and self.align_a[i+1] != '-') or (self.align_b[i] == '-' and self.align_b[i+1] != '-')):
+						score += alig.GAP_OPEN
+					score+=alig.GAP_EXTEND
+		
+		if (score>max_score):
+			max_score = score
+			max_i = i
+		
+		if(max_i == len(self.a)):
+			self.a = ""
+			self.b = ""
+			self.start_a = self.end_a
+			self.start_b = self.end_b
+			self.cigar = CIGAR("")
+			return
+
+		cur_len = 0
+		for ci in range(len(self.cigar)):
+			if(self.cigar[ci][0] + cur_len > max_i):
+				assert(self.cigar[ci][1] == 'M')
+				need = max_i - cur_len
+				self.cigar[ci][0]-= need
+				for cj in range(ci):
+					self.cigar = CIGAR(str(self.cigar)[2:])
+				self.start_a+=need
+				self.start_b+=need
+			cur_len += self.cigar[ci][0]
+
+			if(self.cigar[ci][1] == 'M'):
+				self.start_a += self.cigar[ci][0]
+				self.start_b += self.cigar[ci][0]
+			elif(self.cigar[ci][1] == 'I'):
+				self.start_b += self.cigar[ci][0]
+			else:
+				self.start_a += self.cigar[ci][0]
+
+		self.a = self.a[self.start_a:self.end_a]
+		self.b = self.b[self.start_b:self.end_b]
+		self.populate_nice_alignment()
+
+	def trim_back(self: Alignment):
+		max_score = 0
+		max_i = -1
+		alig = Align()
+		score = 0
+		i = len(self.alignment)
+		for i in range(0,len(self.alignment)):
+			if(self.alignment[i] == '|'):
+				score += alig.MATCH
+			else:
+				if(self.align_a[i] != '-' and self.align_b[i] != '-'):
+					score += alig.MISMATCH
+				else:
+					if(i == 0 or (self.align_a[i] == '-' and self.align_a[i-1] != '-') or (self.align_b[i] == '-' and self.align_b[i-1] != '-')):
+						score += alig.GAP_OPEN
+					score+=alig.GAP_EXTEND
+		
+		if (score>max_score):
+			max_score = score
+			max_i = i
+		
+		if(max_i == -1):
+			self.a = ""
+			self.b = ""
+			self.start_a = self.end_a
+			self.start_b = self.end_b
+			self.cigar = CIGAR("")
+			return
+
+		cur_len = 0
+		max_i+=1
+		self.end_a = self.start_a
+		self.end_b = self.start_b
+		for ci in range(len(self.cigar)):
+			if(self.cigar[ci][0] + cur_len >= max_i):
+				assert(self.cigar[ci][1] == 'M')
+				need = max_i - cur_len
+				self.cigar[ci][0] = need
+				while(len(self.cigar)-1>ci):
+					self.cigar = CIGAR(str(self.cigar)[:-2])
+				self.end_a+=need
+				self.end_b+=need
+			cur_len += self.cigar[ci][0]
+
+			if(self.cigar[ci][1] == 'M'):
+				self.end_a += self.cigar[ci][0]
+				self.end_b += self.cigar[ci][0]
+			elif(self.cigar[ci][1] == 'I'):
+				self.end_b += self.cigar[ci][0]
+			else:
+				self.end_a += self.cigar[ci][0]
+
+		self.a = self.a[self.start_a:self.end_a]
+		self.b = self.b[self.start_b:self.end_b]
+		self.populate_nice_alignment()
+	
+	def prepend_cigar(self: Alignment,app: CIGAR):
+		self.cigar = CIGAR(str(app)+str(self.cigar))
+	
+	def append_cigar(self: Alignment, app: CIGAR):
+		self.cigar = CIGAR(str(self.cigar)+str(app))
+
+	def cigar_from_alignment(self: Alignment):
+		self.cigar = CIGAR("")
+		sz = 0
+		op = ''
+		top = ''
+		first = False
+		for i in range(len(self.alignment)):
+			if(self.align_a[i] == '-'):
+				top = 'I'
+			elif(self.align_b[i] == '-'):
+				top = 'D'
+			else:
+				top = 'M'
+
+			if(op != top):
+				if(first):
+					self.cigar.append_cigar(str(sz)+op)
+				op = top
+				sz = 0
+				first = True
+			sz+=1
+		self.cigar.append_cigar(str(sz)+op)
+	
+	def swap(self: Alignment):
+		temp = self.a
+		self.a = self.b
+		self.b = temp
+
+		temp = self.chr_a
+		self.chr_a = self.chr_b
+		self.chr_b = temp
+
+		temp1 = self.start_a
+		self.start_a = self.start_b
+		self.start_b = temp1
+
+		temp1 = self.end_a
+		self.end_a = self.end_b
+		self.end_b = temp1
+
+		cigar = str(self.cigar)
+		for i in range(len(cigar)):
+			if(cigar[i] == 'D'):
+				cigar[i] == 'I'
+			elif(cigar[i] == 'I'):
+				cigar[i] == 'D'
+
+		self.populate_nice_alignment()
+	
+	### External Functions
+	def merge(self: Alignment, cur: Alignment, qstr: str, rstr: str):
+		assert(cur.start_a< self.end_a or cur.start_b<self.start_b)
+		assert(self.end_a <= cur.end_a)
+		assert(self.end_b <= cur.end_b)
+
+		trim = self.end_a-cur.start_a
+		q=0
+		r=0
+		i=0
+		for i in reversed(range(len(self.alignment))):
+			if(q<trim):
+				if(self.align_a[i] != '-'):
+					q+=1
+				if(self.align_b[i] != '-'):
+					r+=1
+		
+		self.align_a = self.align_a[:i+1]
+		self.alignment = self.alignment[:i+1]
+		self.align_b = self.align_b[:i+1]
+		self.end_a = self.start_a + len(self.a) - q
+		self.end_b = self.start_b + len(self.b) - r
+		self.a = self.a[:len(self.a)-q]
+		self.b = self.b[:len(self.b)-r]
+
+		q = 0
+		r = 0
+		i = 0
+
+		for i in range(len(cur.alignment)):
+			if(q<trim):
+				if(cur.align_a[i] != '-'):
+					q+=1
+				if(cur.align_b[i] != '-'):
+					r+=1
+		
+		cur.align_a = cur.align_a[:i]
+		cur.alignment = cur.alignment[:i]
+		cur.align_b = cur.align_b[:i]
+		cur.start_a += q
+		cur.start_b += r
+		cur.a = cur.a[:q]
+		cur.b = cur.b[:r]
+
+
+		trim = self.end_b - cur.start_b
+		q = 0
+		r = 0
+		i = 0
+
+		for i in reversed(range(len(self.alignment))):
+			if(r<trim):
+				if(self.align_a[i] != '-'):
+					q+=1
+				if(self.align_b[i] != '-'):
+					r+=1
+
+		self.align_a = self.align_a[:i+1]
+		self.alignment = self.alignment[:i+1]
+		self.align_b = self.align_b[:i+1]
+		self.end_a = self.start_a + len(self.a) - q
+		self.end_b = self.start_b + len(self.b) - r
+		self.a = self.a[:len(self.a)-q]
+		self.b = self.b[:len(self.b)-r]
+
+		q = 0
+		r = 0
+		i = 0
+
+		for i in range(len(cur.alignment)):
+			if(r<trim):
+				if(cur.align_a[i] != '-'):
+					q+=1
+				if(cur.align_b[i] != '-'):
+					r+=1
+		
+		cur.align_a = cur.align_a[:i]
+		cur.alignment = cur.alignment[:i]
+		cur.align_b = cur.align_b[:i]
+		cur.start_a += q
+		cur.start_b += r
+		cur.a = cur.a[:q]
+		cur.b = cur.b[:r]
+
+		self.cigar_from_alignment()
+		cur.cigar_from_alignment()
+		assert(self.start_a <= cur.start_a)
+		assert(self.start_b <= cur.start_b)
+		assert(self.end_a <= cur.start_a)
+		assert(self.end_b <= cur.start_b)
+		qgap = cur.start_a - self.end_a
+		rgap = cur.start_b - self.end_b
+
+		if(qgap and rgap):
+			if(qgap <= 1000 and rgap <= 1000):
+				gap = Alignment(qstr[self.end_a:qgap],rstr[self.end_b:rgap])
+				self.append_cigar(gap.cigar)
+			else:
+				ma = max(qgap,rgap)
+				mi = min(qgap,rgap)
+				ma1 = Alignment(qstr[self.end_a:self.end_a + mi],rstr[self.end_b:self.end_b + mi])
+				if(qgap == mi):
+					ma1.append_cigar(str(ma-mi)+ 'I')
+				else:
+					ma1.append_cigar(str(ma-mi)+ 'D')
+
+				ma2 = Alignment(qstr[cur.start_a - mi: cur.start_a],rstr[cur.start_b-mi: cur.start_b])
+				if(qgap == mi):
+					ma1.prepend_cigar(str(ma-mi)+ 'I')
+				else:
+					ma1.prepend_cigar(str(ma-mi)+ 'D')
+		elif(qgap):
+			self.append_cigar(CIGAR(str(qgap) + 'D'))
+			
+		elif(rgap):
+			self.append_cigar(CIGAR(str(rgap) + 'I'))
+
+		self.a += qstr[self.end_a:self.end_a+qgap]
+		self.b += rstr[self.end_b:self.end_b+rgap]
+		assert(cur.end_a >= self.end_a)
+		assert(cur.end_b >= self.end_b)
+		self.end_a = cur.end_a
+		self.end_b = cur.end_b
+		self.append_cigar(cur.cigar)
+		self.populate_nice_alignment()
+
+
+
+	### Utilities
+	def cigar_string(self: Alignment):
+		return str(self.cigar)
+
+	def printD(width = 100, only_alignment=False):
+		print("no")
+
+	### Getters
+	def span(self: Alignment):
+		return len(self.alignment)
+	
+	def matches(self: Alignment):
+		return self.error.matches
+	
+	def mismatches(self: Alignment):
+		return self.error.mismatches
+
+	def gap_bases(self: Alignment):
+		return self.error.gap_bases
+
+	def gaps(self: Alignment):
+		return self.error.gaps
+
+	def gap_error(self: Alignment):
+		return pct(float(self.error.gap_bases), float(self.error.matches+self.error.gap_bases+self.error.mismatches))
+
+	def mismatch_error(self: Alignment):
+		return pct(float(self.error.mismatches), float(self.error.matches+self.error.gap_bases+self.error.mismatches))
+
+	def total_error(self: Alignment):
+		return self.mismatch_error() + self.gap_error()
+
+class Hit:
+    query: Sequence
+    query_start: int
+    query_end: int
+    ref: Sequence
+    ref_start: int
+    ref_end: int
+    jaccard: int
+    name: str
+    comment: str
+    aln: Alignment
+
+    def __init__(self:Hit):
+        self.name = ""
+
+    def __init__(self:Hit, query: Sequence, query_start: int, query_end: int, ref: Sequence, ref_start: int, ref_end: int, jaccard: int, name: str, comment: str):
+        self.query = query
+        self.query_start = query_start
+        self.query_end = query_end
+        self.ref = ref
+        self.ref_start = ref_start
+        self.ref_end = ref_end
+        self.jaccard = jaccard
+        self.name = name
+        self.comment = ""
+        self.aln = Alignment()
+
+    def __eq__(self: Hit, hit: Hit):
+        if(self.query.name == hit.query.name and self.ref.name == hit.ref.name):
+            return True
+        else:
+            return False
+    def from_bed(bed: str):
+        ss = bed.split()
+        assert(len(ss)>=10)
+        h = Hit(Sequence(ss[0],s"",(ss[7])[0] != '+'),0,0, Sequence(ss[3],s"",(ss[8])[0] != '+'),0,0,0,"","", Alignment())
+        h.query_start = int(ss[1])
+        h.query_end = int(ss[2])
+        h.ref_start = int(ss[4])
+        h.ref_end = int(ss[5])
+        h.name = ss[6]
+        if(len(ss)>=15):
+            h.comment = ss[14]
+        if(len(ss)>=14):
+            h.jaccard = int(ss[13])
+        if(len(ss)>=13):
+            cigar = CIGAR(ss[11])
+        
+        return h
+
+        
+
+    def from_bed2(bed: str,query: Sequence,ref: Sequence):
+        
+        ss = bed.split()
+        assert(len(ss)>=10)
+
+        h = Hit(query,0,0,ref,0,0,0,"","")
+
+        h.query_start = int(ss[1])
+        h.query_end = int(ss[2])
+
+        h.ref_start = int(ss[4])
+        h.ref_end = int(ss[5])
+
+        assert(h.query.is_rc == (ss[8][0] != '+'))
+        assert(h.ref.is_rc == (ss[9][0] != '+'))
+
+        assert(~h.query.is_rc)
+        if(h.ref.is_rc):
+            temp = h.ref_start
+            h.ref_start = h.ref_end
+            h.ref_end = temp
+            seq_len = len(h.ref.seq)
+            h.ref_start = seq_len - h.ref_start + 1
+            h.ref_end = seq_len = h.ref_end + 1
+        
+        h.name = ss[6]
+        if(len(ss)>=14):
+            h.jaccard = int(ss[13])
+        if(len(ss)>=13):
+            
+            print("")# change ending back once good bed string is given
+            #h.aln = Alignment(query.seq,ref.seq,ss[12]))
+
+        return h
+
+    def from_wgac(bed):
+        ss = bed.split()
+        assert(len(ss)>=27)
+        h = Hit(Sequence(ss[0],"",False),0,0, Sequence(ss[6],"",(ss[5])[0] != '+'),0,0,0,"","")
+        h.query_start = ss[1]
+        h.query_end = ss[2]
+        h.ref_start = ss[7]
+        h.ref_end = ss[8]
+        h.name = ss[16]
+        h.comment = "err=.1f"
+        #fmt::format("err={:.1f}", 100 - 100 * atof(ss[26].c_str()))
+        assert(h.ref.is_rc == ((ss[5])[0] != '+'))
+        assert(~h.query.is_rc)
+        
+        return h
+    
+    def to_bed(self: Hit, do_rc = True, with_cigar = True, file = ""):
+		
+
+        assert(~self.query.is_rc)
+        qn = self.query.name
+        rn = self.ref.name
+        
+        qs = 0
+		
+        if(do_rc and self.query.is_rc):
+            qs = len(self.query.seq) - self.query_end + 1
+        else:
+            qs = self.query_start
+        qe = 0
+        if(do_rc and self.query.is_rc):
+            qe = len(self.query.seq) - self.query_start + 1
+        else:
+            qe = self.query_end
+
+        rs = 0
+        if(do_rc and self.ref.is_rc):
+            rs = len(self.ref.seq) - self.ref_end + 1
+        else:
+            rs = self.ref_start
+        re = 0
+        if(do_rc and self.ref.is_rc):
+            re = len(self.ref.seq) - self.ref_start + 1
+        else:
+            re = self.ref_end
+
+        bed = qn + "\t" + str(qs) + "\t" + str(qe) + "\t" + rn + "\t" + str(rs) + "\t" + str(re) + "\t" + self.name
+        if(self.aln.span()):
+            bed = bed + "\t" + str(self.aln.total_error())
+        else:
+            bed = bed + "\t" + ""
+        
+        if(self.query.is_rc):
+            bed = bed + "\t" + "-"
+        else:
+            bed = bed + "\t" + "+"
+        
+        if(self.ref.is_rc):
+            bed = bed + "\t" + "-"
+        else:
+            bed = bed + "\t" + "+"
+        
+        bed = bed + "\t" + str(max(self.query_end-self.query_start,self.ref_end-self.ref_start))
+        bed = bed + "\t" + str(self.aln.span())
+        if(with_cigar):
+            bed = bed + "\t" + self.aln.cigar_string()
+        else:
+            bed = bed + "\t" + ""
+        
+        if(self.aln.span()):
+            bed = bed + "\t" + "m=" + str(self.aln.mismatch_error()) + ";g=" + str(self.aln.gap_error())
+        else:
+            bed = bed + "\t" + ""
+        
+        return bed
+
+    
+    def extends(self: Hit, factor: float, max_entend:int):
+        w = max(self.query_end-self.query_start,self.ref_end-self.ref_start)
+        w = min(max_entend,int(w*factor))
+        self.query_start = max(0,self.query_start-w)
+        self.query_end += w
+        self.ref_start = max(0,self.ref_start-w)
+        self.ref_end += w
+    
+    def update_from_alignment(self: Hit):
+        self.query_start = self.aln.start_a
+        self.query_end = self.aln.end_a
+        self.ref_start = self.aln.start_b
+        self.ref_end = self.aln.end_a
+
+def get_position(ar: CIGAR, ppos:int):
+    print('yes')
+
+
+
+
+
+extend Align:
+    def __init__(self: Alignment, qstr: str, rstr:str, guide: list[Hit], side:int):
+		self.chr_a = qstr
+		prev = guide[0]
+		for index in range(1,len(guide)):
+			prev = guide[index-1]
+			cur = guide[index]
+			qs = cur.query_start
+			qe = cur.query_end
+			qps = prev.query_start 
+			qpe = prev.query_end
+
+			rs = cur.ref_start
+			re = cur.ref_end
+			rps = prev.ref_start
+			rpe = prev.ref_end
+
+			assert(qpe <= qs)
+			assert(rpe <= rs)
+
+			##check this assignment of self
+			self.end_a = qe
+			self.end_b = re
+			self.a+=qstr[qpe:qe]
+			self.b+=rstr[rpe:re]
+
+			qgap = qs  - qpe
+			rgap = rs - rpe
+			if(qgap and rgap):
+				if(qgap <= 1000 and rgap <= 1000):
+					gap = Alignment(qstr[qpe:qgap],rstr[rpe:rgap])
+					self.append_cigar(gap.cigar)
+				else:
+					ma = max(qgap,rgap)
+					mi = min(qgap,rgap)
+					ma1 = Alignment(qstr[qpe:qpe+mi],rstr[rpe:rpe+mi])
+					if(qgap == mi):
+						ma1.append_cigar(str(ma-mi)+ 'I')
+					else:
+						ma1.append_cigar(str(ma-mi)+ 'D')
+
+					ma2 = Alignment(qstr[qs-mi:qs],rstr[rs-mi:rs])
+					if(qgap == mi):
+						ma1.prepend_cigar(str(ma-mi)+ 'I')
+					else:
+						ma1.prepend_cigar(str(ma-mi)+ 'D')
+
+					if(ma2.total_error()<ma1.total_error()):
+						self.append_cigar(ma2.cigar)
+					else:
+						self.append_cigar(ma1.cigar)
+
+			elif(qgap):
+				self.append_cigar(CIGAR(str(qgap) + 'D'))
+			
+			elif(rgap):
+				self.append_cigar(CIGAR(str(rgap) + 'I'))
+
+			self.append_cigar(cur.aln.cigar)
+
+		qlo = self.start_a
+		qhi = self.end_a
+		rlo= self.start_b
+		rhi = self.end_b
+
+		assert(self.a == qstr[qlo:qhi])
+		assert(self.b == rstr[rlo:rhi])
+		
+		if(side):
+			qlo_n = max(0,qlo-side)
+			rlo_n = max(0,rlo-side)
+			if(qlo-qlo_n and rlo-rlo_n):
+				gap = Alignment(qstr[qlo_n:qlo],rstr[rlo_n:rlo])
+				gap.trim_front()
+
+				qlo_n = qlo - (gap.end_a - gap.start_a)
+				rlo_n = rlo - (gap.end_b - gap.start_b)
+				self.prepend_cigar(gap.cigar)
+				self.a = qstr[qlo_n:qlo] + self.a
+				self.b = rstr[rlo_n:rlo] + self.b
+				self.start_a = qlo #qlo = qlo_n
+				self.start_b = rlo #rlo = rlo_n
+
+			qhi_n = min(qhi+side,len(qstr))
+			rhi_n = min(rhi+side,len(rstr))
+
+			if(qhi_n-qhi and rhi_n-rhi):
+				gap = Alignment(qstr[qhi:qhi_n],rstr[rhi:rhi_n])
+				gap.trim_back()
+
+				qhi_n = qhi + gap.end_a
+				rhi_n = rhi + gap.end_b
+				self.append_cigar(gap.cigar)
+				self.a += qstr[qhi:qhi_n]
+				self.b += rstr[rhi:rhi_n]
+				self.end_a = qhi_n #qhi = qhi_n; 
+				self.end_b = rhi_n #rhi = rhi_n;
+
+		assert(qlo >= 0)
+		assert(rlo >= 0)
+		assert(qhi <= len(qstr))
+		assert(rhi <= len(rstr))
+		assert(self.a == qstr[qlo:qhi])
+		assert(self.b == rstr[rlo:rhi])
+
+		self.populate_nice_alignment()
+
+
+
+
+
+
+### Friends
+def update_from_alignment(h: Hit):
+	print("no")
+
+def stats(ref_path: str, bed_path: str):
+	print("no")
+
+def split_alignment(h: Hit):
+	print("no")
+
+def gap_split(h: Hit):
+	print("no")
+
+def subhit(h: Hit, start: int, end: int, ho: Hit):
+	print("no")
+
+def process(hs: Hit, cigar: CIGAR):
+	print("no")
+
+def trimlower(h: Hit):
+	print("no")

@@ -1,0 +1,12 @@
+# hash function for sequences
+def hash_dna(c:seq) -> int:
+	return int((c.__int__()))
+
+def align_dna(c):
+ 	return int(seq(c))
+
+def rev_dna(c):
+ 	return str(~seq(c))
+
+def pct(p: float, tot: float):
+    return 100*p/tot

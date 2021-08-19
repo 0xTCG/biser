@@ -1,0 +1,6 @@
+
+MY_LIB = "test.so" 
+from MY_LIB cimport fun1(a: int) -> int
+
+
+print (fun1(100))

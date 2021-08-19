@@ -1,0 +1,154 @@
+from tree2 import *
+from globals import *
+from hash import * 
+from align_hit import *
+from search import *
+from fasta import *
+from time import timing
+from util import *
+
+
+TOTAL_ATTEMPTED=0
+JACCARD_FAILED=0
+QGRAM_NORMAL_FAILED=0
+OTHER_FAILED=0
+INTERVAL_FAILED=0
+
+def print_function(h: Hit):
+    print (f'{h.to_bed()}\t;OK')
+
+# int initial_search(shared_ptr<Index> query_hash, shared_ptr<Index> ref_hash, bool is_same_genome, 
+# 	T print_function, bool show_progress=true)
+def initial_search(query_hash: Index, ref_hash: Index, is_same_genome: bool,s:Search):# print_function:function[void, Hit] ):
+    # print "Initial search"
+    tree = IntervalTree[Interval[bool]]()
+    total = 0
+    track = 0
+    next_to_attain = 0
+    TRACK_PROGRESS = 10000
+
+    Search2 =  s
+
+    brojac1 = 0
+    brojac2=0
+
+    internal = Internal()
+    # internal.DoUppercaseSeeds = True
+    Hash = Hash()
+    
+    for qi in range(0,len(query_hash.minimizers)):
+        
+        qm = query_hash.minimizers[qi]
+        # print(f'From initial search: {qi}, {int(Search2.MIN_READ_SIZE)}, {next_to_attain}, {qm.loc}, {qm.hash.status}, {internal.DoUppercaseSeeds and qm.hash.status != 0}\n')
+        # print(f'From initial search: {qi}, {int(Search2.MIN_READ_SIZE)}, {next_to_attain}, {qm.loc}, {qm.hash.status}, {Search2.MAX_ERROR}, {int(internal.DoUppercaseSeeds)}, {int(qm.loc < next_to_attain)}, {int(internal.DoUppercaseSeeds and qm.hash.status != 0)}\n')
+        
+        if (qm.loc < next_to_attain):
+            # print(f'tu 1: {qi}, {int(Search2.MIN_READ_SIZE)}, {next_to_attain}, {qm.loc}, {qm.hash.status}, {Search2.MAX_ERROR}, {int(internal.DoUppercaseSeeds)}')
+            continue
+
+        # hash1.statuses.index("HAS_N")   ->        2
+        # hash1.statuses.index("HAS_UPPERCASE") ->  0
+        # hash1.statuses.index("ALL_LOWERCASE") ->  1
+        if (internal.DoUppercaseSeeds and qm.hash.status != 0):
+            # print(f'tu 2: {qi}, {int(Search2.MIN_READ_SIZE)}, {next_to_attain}, {qm.loc}, {qm.hash.status}, {Search2.MAX_ERROR}, {int(internal.DoUppercaseSeeds)}')
+            continue
+        
+        # break
+        # print(f'why are you here: {qi}, {int(Search2.MIN_READ_SIZE)}, {next_to_attain}, {qm.loc}, {qm.hash.status}, {Search2.MAX_ERROR}, {int(internal.DoUppercaseSeeds)}')
+        # break
+        # hits = list[Hit]()
+        hits = search(qi, query_hash, ref_hash, tree, is_same_genome,int(Search2.MIN_READ_SIZE), True, False,s) # last true is report fails
+        
+        min_len = len(query_hash.seq.seq)
+        for pp in hits:
+            min_len = min(min_len, pp.query_end - pp.query_start)
+            # print("Hit:")
+            print_function(pp)
+        total += len(hits)
+        # print total
+
+        next_to_attain = int(qm.loc + (Search2.MIN_READ_SIZE * Search2.MAX_ERROR) / 2) if (min_len >= Search2.MIN_READ_SIZE) else qm.loc
+        # print(f"next: {next_to_attain}, {min_len}")
+    # print f'brojacio: {brojac1}, {brojac2}'
+    return total
+
+
+
+
+def search_single(ref_path: str, query_chr: str,ref_chr:str,  is_ref_complement:bool,  kmer_size: int,  window_size: int,s: Search):
+    is_same_genome = (ref_chr == query_chr) and not is_ref_complement
+    # print f"Search single {is_ref_complement}, {is_same_genome}\n"
+
+    fr = FastaReference(ref_path)
+    
+    ref = fr.get_sequence(ref_chr)
+    s_ref = Sequence(ref_chr, ref, is_ref_complement)
+    # print(f'Len of fetched sequence: {len(s_ref.seq)}')
+    # with timing('finding minimizers'):
+    ref_hash = Index(s_ref, kmer_size, window_size,True)
+    # print f'built ref index'
+    query_hash = Index(ref_hash)
+
+    if (not is_same_genome):
+        query = fr.get_sequence(query_chr)
+        query_hash = Index(Sequence(query_chr, query,False), kmer_size, window_size, True)
+    # print( f'Ref: \n{ref_hash.seq.seq}')
+    # print( f'Query: \n{query_hash.seq.seq}')
+    # Minimizers and Hashs are OK! CHECKED
+    # count_0s = 0
+    # for i in query_hash.minimizers:
+    #     if i.hash.hash != 0:
+    #         print(f'Query minimizers: {i.hash}')
+    #     else:
+    #         count_0s+=1
+    # print( f"zeros: {count_0s}")
+    # print(len(query_hash.minimizers))
+    # print(len(ref_hash.minimizers))
+    # for i in ref_hash.minimizers:
+    #     print(f'Ref minimizers: {i.hash}')
+    # for i in query_hash.minimizers:
+    #     print(f'Query minimizers: {i.hash}')
+    # for i in query_hash.index:
+    #     print(f'Query index: {i}, elements:  {query_hash.index[i]}')
+    # for i in ref_hash.index:
+    #     print(f'Ref index: {i}, elements: {query_hash.index[i]}')
+    
+    # return
+
+    total = initial_search(query_hash, ref_hash, is_same_genome,s)
+
+    #help1
+    # total = 0
+    # print (f'Total:\t{total}')
+    
+
+
+def search_main(opts,args):
+    s = Search()
+    is_complement  = False
+    if (len(args)>0):
+        command = args[0]
+        for o,a in opts:
+            if o in ("-k","--kmer"):
+                s.KMER_SIZE = int(a)
+            elif o in ("-w","--window"):
+                s.WINDOW_SIZE= int(a)
+            elif o in ("-u","--uppercase"):
+                s.MIN_UPPERCASE= int(a)
+            elif o in ("-e","--error"):
+                s.MAX_ERROR= float(a)
+            elif o in ("-E","--edit-error"):
+                s.MAX_EDIT_ERROR= float(a)
+            elif o in ("-g","--gap-freq"):
+                s.GAP_FREQUENCY= float(a)
+            elif o in ("-r","reverse"):
+                is_complement = True
+        s.MIN_READ_SIZE = KB * (1 - s.MAX_ERROR)
+        # print f'{s}'
+        # print f'{args}'
+        # print f'{opts}'
+        search_single(args[0], args[1], args[2], is_complement,s.KMER_SIZE, s.WINDOW_SIZE,s)
+    else:
+        print f'Not enough arguments to search'
+
+

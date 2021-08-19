@@ -1,0 +1,321 @@
+import sys
+import bio.align
+import bio.bwt
+from time import time
+from bio import FASTA
+# from add import Segment
+from bio.fmindex import FMDIndex, _enc, smems
+from time import timing
+
+# type List = list
+
+MIN = -999999999999999  # should be better :)
+min_len = 500
+
+
+
+
+def analyze_region(s1,s2):
+	if len(s1) != len(s2):
+		print 'error lens'
+		print len(s1), len(s2)
+		assert False
+	# assert len(s1) == len(s2)
+	miss_ = 0
+	for i in range(0,len(s1)):
+		if s1[i] != s2[i]:
+			miss_ += 1
+		
+	return len(s1) - miss_, miss_
+
+
+def get_stats_for_cigar(s1,s2,cigar):
+	count1 = 0
+	count2 = 0
+	match_ = 0
+	miss = 0
+	gap_I = 0
+	gap_D = 0
+
+	for br,let in cigar:
+		if let == 'I':
+			count1 += br
+			gap_I+=br
+		elif let == 'D':
+			count2+=br
+			gap_D+=br
+		else:
+			mt,ms = analyze_region(s1[count1:count1+br],s2[count2:count2+br])
+			match_	+= mt
+			miss	+= ms
+
+			count2	+= br
+			count1	+= br
+	if match_ + miss + gap_I != len(s1) or match_ + miss + gap_D != len(s2):
+		print 'error stats'
+		print s1,s2,cigar
+		print match_ + miss + gap_I, len(s1)
+		print match_ + miss + gap_D, len(s2)
+		# raise Exception()
+		sys.exit(1)
+	assert match_ + miss + gap_I == len(s1)
+	assert match_ + miss + gap_D == len(s2)
+
+	return match_, miss, gap_I + gap_D
+
+
+
+
+class PrioritySearchTree[T]:
+	"""
+	A static binary search tree for weighted items (points).
+	At the beginning, each point is deactivated and its weight (score) is set to -INF.
+
+	The following operations can be performed efficiently with this structure:
+		- activate a point (assign it a score);
+		- deactivate a point (assign its score to -INF);
+		- find a point;
+		- find an active point with the highest score in the given interval.
+
+	Priority search tree is initialized with the (unsorted) list of points.
+	Each leaf in the tree corresponds to a point in the original list.
+	"""
+
+
+	index: list[int]
+	""" Index of the point in the original list; -1 for non-leaves """
+	x: list[T]  # coordinate for each leaf node
+	""" Coordinate of each point; -1 for non-leaves """
+	max_x: list[int]
+	""" Index of a leaf with the highest coordinate in the subtree """
+	score: list[int]  # scores for each leaf node
+	""" Score of each point; -INF for non-leaves and deactivated points """
+	max_score: list[int]
+	"""
+	Index of a leaf with the highest score in the subtree that has not
+	been recorded above this subtree
+	"""
+	active_count: int
+	""" Number of active points in the tree """
+
+	def __init__(self: PrioritySearchTree[T], anchors: list[T], init: T = T()):
+		"""
+		Take a list of points and construct a PST from them.
+		Complexity: O(n log n).
+		"""
+
+		size = len(anchors) - 1
+		for i in range(5):
+			size = size | (size >> (2 ** i))
+		size = (size + 1) * 2
+
+		self.x = [init] * size
+		self.max_x = [-1] * size
+		self.score = [MIN] * size
+		self.max_score = [-1] * size
+		self.active_count = 0
+		self._init(sorted(anchors), hi=len(anchors))
+
+	def _init(self: PrioritySearchTree[T], anchors, i = 0, lo = 0, hi = -1, ai = 0) -> tuple[int, int]:
+		""" Recursively initialize the tree rooted at node {i}. """
+		if i >= len(self.x):
+			return -1, ai
+		elif lo + 1 == hi:  # leaf
+			self.x[i] = anchors[ai]
+			self.score[i] = MIN
+			self.max_x[i] = i
+			return i, ai + 1
+		else:
+			bound = (lo + hi + 1) // 2
+			l, r = self._next(i)
+			l, ai = self._init(anchors, l, lo, bound, ai)
+			r, ai = self._init(anchors, r, bound, hi, ai)
+			self.max_x[i] = l if r == -1 else r
+			return self.max_x[i], ai
+
+
+	def rmq(self: PrioritySearchTree[T], lo: T, hi: T):
+		"""
+		Find a point with the highest score whose coordinate is between lo and hi (inclusive).
+		Returns a leaf index within the tree.
+		Complexity: O(log n).
+		"""
+		i = self._rmq(lo, hi)
+		return -1 if i == -1 else i
+
+	def _rmq(self: PrioritySearchTree[T], lo: T, hi: T, i = 0) -> int:
+		if i >= len(self.x) or self.max_score[i] == -1:
+			return -1
+		elif self.max_x[i] == i:  # leaf
+			return i if lo <= self.x[i] <= hi else -1
+		else:
+			if lo <= self.x[self.max_score[i]] <= hi:
+				return self.max_score[i]
+			l, r = self._next(i)
+			if hi <= self.x[self.max_x[l]]:  # h is inclusive
+				return self._rmq(lo, hi, l)
+			elif lo > self.x[self.max_x[l]]:
+				return self._rmq(lo, hi, r)
+			else:
+				lm, rm = self._rmq(lo, hi, l), self._rmq(lo, hi, r)
+				if lm == -1 or rm == -1:
+					return max(lm, rm)  # any non-negative or -1
+				return lm if self.score[lm] >= self.score[rm] else rm
+
+	def activate(self: PrioritySearchTree[T], x: T, score: int):
+		"""
+		Activate a point with coordinate {x} and set its score to {score}.
+		Complexity: O(log n).
+		"""
+		c = self._get(x)
+		assert c != -1
+		self.score[c] = score
+
+		i = 0
+		while i < len(self.x):
+			if self.max_score[i] == -1 or self.score[c] >= self.score[self.max_score[i]]:
+				c, self.max_score[i] = self.max_score[i], c
+			if c == -1:
+				break
+			l, r = self._next(i)
+			i = r if self.x[c] > self.x[self.max_x[l]] else l
+		self.active_count += 1
+
+	def deactivate(self: PrioritySearchTree[T], x: T):
+		"""
+		Deactivate a point with coordinate {x} and set its score to -INF.
+		Complexity: O(log n).
+		"""
+		leaf = self._get(x)
+		assert leaf != -1
+		self.score[leaf] = MIN
+
+		i = 0
+		while i < len(self.x):
+			l, r = self._next(i)
+			if self.max_score[i] == -1:
+				break
+			elif self.max_score[i] == leaf:
+				if self.max_x[i] == i:
+					self.max_score[leaf] = -1
+				elif (
+					r < len(self.x)
+					and self.max_score[r] != -1
+					and (
+						self.max_score[l] == -1
+						or self.score[self.max_score[r]] > self.score[self.max_score[l]]
+					)
+				):
+					self.max_score[i] = leaf = self.max_score[r];
+					i = r
+				else:
+					self.max_score[i] = leaf = self.max_score[l];
+					i = l
+			else:
+				i = r if x > self.x[self.max_x[l]] else l
+		self.active_count -= 1
+
+	def _next(self: PrioritySearchTree[T], i):
+		return 2 * i + 1, 2 * i + 2
+
+	def _get(self: PrioritySearchTree[T], x):
+		"""
+		Find a leaf node with coordinate {x}.
+		Complexity: O(log n).
+		"""
+		i = 0
+		while i < len(self.x):
+			if self.max_x[i] == i:
+				break
+			l, r = self._next(i)
+			i = r if x > self.x[self.max_x[l]] else l
+		return i if i < len(self.x) and x == self.x[i] else -1
+
+def chain(
+	anchors: list[tuple[int, int, int]],
+	MATCH_SCORE = 5,
+	MAX_CHAIN_GAP: int = 500
+) -> list[list[int]]:
+	"""
+	Finds all local chains with from the list of anchors.
+	Each anchor is a tuple of {(start_reference, start_query, anchor_len)}.
+	Returns a list of chains where each chain is a list of indices from the {anchors} list.
+	Complexity: O(n log n) where {n = len(anchors)}.
+	"""
+
+	# Construct a tree from y-points (query)
+	# t = time()
+	xs = list[tuple[int, int]](2 * len(anchors))
+	ys = list[tuple[int, int]](len(anchors))
+	for i, a in enumerate(anchors):
+		x, y, l = a
+		xs.append((x, i))
+		xs.append((x + l, i))
+		ys.append((y + l - 1, i))  # inclusive bound
+	max_x, max_y = max(xs)[0], max(ys)[0] + 1
+	tree = PrioritySearchTree(ys, (-1, -1))
+	# print(f'PST init took {time()-t}'); t=time()
+
+	# Iterate through the sorted x-points (reference)
+	dp = [(0, i) for i, _ in enumerate(anchors)]  # DP table
+	prev = [-1 for _ in anchors]  # pointer to the previous element in chain
+	deactivate_bound = 0
+	xs.sort()
+	for i, xx in enumerate(xs):
+		x, xi = xx
+		ax, ay, al = anchors[xi]
+
+		if x == ax:  # left interval point
+			while deactivate_bound < i:
+				d = xs[deactivate_bound][1]
+				if xs[deactivate_bound][0] == anchors[d][0] + anchors[d][2]:
+					if ax - (anchors[d][0] + anchors[d][2]) <= MAX_CHAIN_GAP:
+						break
+					tree.deactivate((anchors[d][1] + anchors[d][2] - 1, d))
+				deactivate_bound += 1
+
+			w = MATCH_SCORE * al
+			# Find the highest scoring segment that precedes the current one
+			j = tree.rmq((ay - MAX_CHAIN_GAP, 0), (ay - 1, len(anchors)))
+			if j != -1 and tree.score[j] != MIN:
+				j = tree.x[j][1]
+				gap = ax - (anchors[j][0] + anchors[j][2]) + ay - (anchors[j][1] + anchors[j][2])
+				if w + dp[j][0] - gap > 0:
+					dp[xi] = (w + dp[j][0] - gap, dp[xi][1])
+					prev[xi] = j
+					continue
+			dp[xi] = (al, dp[xi][1])
+		else:
+			gap = max_x + 1 - (ax + al) + max_y + 1 - (ay + al)
+			tree.activate((ay + al - 1, xi), dp[xi][0] - gap)
+	dp.sort(reverse=True)
+	# print(f'DP init took {time()-t}'); t=time()
+
+	# Reconstruct the chains
+	paths = list[list[int]]()
+	used = [False for _ in dp]
+	for score, i in dp:
+		if used[i]: continue
+		path = list[int]()
+		while i != -1 and not used[i]:
+			path.append(i)
+			used[i] = True
+			i = prev[i]
+		paths.append(path)
+	return paths
+
+def get_ancors(x, y):
+	anchors = list[tuple[int, int, int]]()
+	# with timing('SMEM'):
+		# if len(x) < len(y): x, y = y, x
+	fmi = FMDIndex(x)
+	min_seed_len = 10
+	for ix in range(len(y) - min_seed_len):
+		for smem in fmi.smems(y, x=ix, min_seed=min_seed_len)[1]:
+			for rid, name, pos, is_rev in fmi.biresults(smem):
+				if not is_rev:
+					if len(anchors) == 0 or (pos, smem.start, len(smem)) != anchors[-1]:
+						anchors.append((pos, smem.start, len(smem)))
+	anchors = list[tuple[int, int, int]](set[tuple[int, int, int]](anchors))
+	# print(f'found {len(anchors)} anchors')
+	return anchors

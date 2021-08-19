@@ -1,0 +1,43 @@
+from common import *
+from globals import *
+import math
+# depends on from where is call
+MY_LIB = "search/util_c.so" 
+from MY_LIB cimport fun1(a: int) -> int
+from MY_LIB cimport solve_inverse_jaccard_c(a: int, b: int, c:float, d:float) -> float
+from MY_LIB cimport relaxed_jaccard_estimate_c(a: int, b: int, c:float, d:float, e:float) -> float
+from MY_LIB cimport hash_help(h: int, c: int) -> int
+
+def rc(s: seq):
+    return ~s
+
+
+def tau( edit_error,  kmer_size,s_glob):
+    
+    ERROR_RATIO = (s_glob.MAX_ERROR - s_glob.MAX_EDIT_ERROR) / s_glob.MAX_EDIT_ERROR
+    gap_error = min(1.0, ERROR_RATIO * edit_error)
+    a = (1 - gap_error) / (1 + gap_error)
+    b = 1 / (2 * math.exp(kmer_size * edit_error) - 1)
+    return a * b
+
+def solve_inverse_jaccard( j,  kmer_size,s_glob):
+
+    return solve_inverse_jaccard_c(j,  kmer_size, s_glob.MAX_ERROR,s_glob.MAX_EDIT_ERROR)
+
+def relaxed_jaccard_estimate( s:int, kmer_size:int,  mm: dict[int,int],s_glob):
+    
+    result = -1.0
+    it = -1
+    if s in mm:
+        it = mm[s]
+    if (it):
+        result = float(it)
+    if (result != -1):
+        return result
+
+    result = relaxed_jaccard_estimate_c( s,  kmer_size,  (s_glob.MAX_EDIT_ERROR), (s_glob.MAX_ERROR), result)
+    
+    mm[s] = int(result)
+    
+    return result
+    

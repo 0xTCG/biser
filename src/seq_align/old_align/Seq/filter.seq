@@ -1,0 +1,81 @@
+from globals import *
+from common import *
+
+QGRAM_NORMAL_FAILED = 0
+OTHER_FAILED = 0
+def min_qgram( l:int,  q:int) -> int:
+    s = Search()
+    return int(l * (1 - (s.MAX_ERROR - s.MAX_EDIT_ERROR) - q * s.MAX_EDIT_ERROR)  - (s.GAP_FREQUENCY * l + 1) * (q - 1))
+
+def uppercase_filter(q, q_pos,  q_len, r,  r_pos,  r_len) -> tuple[bool,str]:
+    q_up = 0
+    s = Search()
+    for i in range(0,q_len):
+        q_up += int(str(q[q_pos + i]).isupper())
+    r_up = 0
+    for i in range(0,r_len):
+        r_up += int(str(r[r_pos + i]).isupper())
+    if (q_up < s.MIN_UPPERCASE or r_up < s.MIN_UPPERCASE):
+        # OTHER_FAILED+=1
+        return (False, f'upper ({q_up}, {r_up}) < {s.MIN_UPPERCASE}')
+
+    return (True, "")
+
+
+def qgram_filter(q,  q_pos,  q_len, r,  r_pos,  r_len) -> tuple[bool, str]:
+    maxlen = max(q_len, r_len)
+    QG = 5
+    QSZ = (1 << (2 * QG))
+    MASK = QSZ - 1
+
+    qgram_p = list[int]()
+    qgram_r = list[int]()
+    for i in range(0,QSZ):
+        qgram_p.append(0)
+        qgram_r.append(0)
+    minqg = min_qgram(maxlen, QG)
+
+    assert(minqg >= 10)
+    assert(q_pos + q_len <= len(q))
+    assert(r_pos + r_len <= len(r))
+
+    qi = q_pos
+    qgram = 0
+    while ( qi < q_pos + q_len):
+        qgram = ((qgram << 2) | hash_dna(q[qi])) & MASK
+        if (qi - q_pos >= QG - 1):
+            qgram_p[qgram] += 1
+        qi +=1
+    qi = r_pos
+    qgram = 0
+    while ( qi < r_pos + r_len):
+        qgram = ((qgram << 2) | hash_dna(r[qi])) & MASK
+        if (qi - r_pos >= QG - 1):
+            qgram_r[qgram] += 1
+        qi +=1
+    dist = 0
+    qi = 0
+    while ( qi < QSZ):
+        dist += min(qgram_p[qi], qgram_r[qi])
+        qgram_p[qi] = qgram_r[qi] = 0
+        qi+=1
+    if (dist < minqg):
+        # QGRAM_NORMAL_FAILED+=1
+        return (False, f'q-grams {dist} < {minqg}')
+
+    return (True, "")
+    
+def filter(q, q_pos, q_end, r, r_pos, r_end) -> tuple[bool, str] :
+    internal=Internal()
+    if (internal.DoUppercase):
+        f = uppercase_filter(q, q_pos, q_end - q_pos, r, r_pos, r_end - r_pos)
+        if (not f[0]):
+            return f
+    if (internal.DoQgram):
+        f = qgram_filter(q, q_pos, q_end - q_pos, r, r_pos, r_end - r_pos)
+        if (not f[0]):
+            return f
+    
+    return (True, "")
+
+    

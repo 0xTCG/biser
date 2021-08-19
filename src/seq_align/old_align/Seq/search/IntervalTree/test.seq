@@ -1,0 +1,95 @@
+# k = dict[int,str]()
+
+# for i in range(10,0,-1):
+#     k[i] = f"num {i}"
+# # print k
+
+# m=set[int]()
+# m.add(1)
+
+# m1=set[int]()
+# m1.add(2)
+# m1 = m1.union(m)
+# print m1
+
+# ? interval  test
+# from interval import *
+
+# k = Interval[str](10,15, "data0")
+# k1 = Interval[str](1,10, "data1")
+# k2 = Interval[str](15,120, "data2")
+# k3 = Interval[str](15,120, "data3")
+
+# print k
+# print k1
+# print k2
+# print k<k1
+# print k1<k2
+# print k>k1
+# print k1>k2
+
+# print k<=k1
+# print k1<=k2
+# print k>=k1
+# print k1>=k2
+# print f'---'
+# print (k2==k3)
+# print (k2<k3)
+
+# ? node  test
+# from node import *
+# k = Interval[str](10,15, "data0")
+# k1 = Interval[str](1,10, "data1")
+# k2 = Interval[str](15,120, "data2")
+# k3 = Interval[str](15,120, "data3")
+
+# s = set[Interval[str]]()
+# s.add(k)
+# s.add(k1)
+# s.add(k2)
+# s.add(k3)
+# print(s)
+# top_node = Node[str]()
+# top_node = top_node.from_intervals(s)
+# top_node.print_structure()
+
+# from intervaltree import *
+# from time import timing
+# k = Interval[str](10,15, "data0")
+# k1 = Interval[str](1,10, "data1")
+# k2 = Interval[str](15,120, "data2")
+# k3 = Interval[str](15,120, "data3")
+
+# s = set[Interval[str]]()
+# s.add(k)
+# s.add(k1)
+# s.add(k2)
+# s.add(k3)
+# intTree = IntervalTree[str](s)
+# with timing('adding'):
+#     for i in range(0,100000):
+#         temp = Interval[str](i, i+10,f"data {i}")
+#         intTree.add(temp)
+
+# print intTree
+
+def bisect_left[K](a: list[K], x: K):
+    """Return the index where to insert item x in list a, assuming a is sorted.
+    The return value i is such that all e in a[:i] have e < x, and all e in
+    a[i:] have e >= x.  So if x already appears in the list, a.insert(x) will
+    insert just before the leftmost x already there.
+    Optional args lo (default 0) and hi (default len(a)) bound the
+    slice of a to be searched.
+    """
+    lo = 0
+    if lo < 0:
+        raise ValueError('lo must be non-negative')
+    
+    hi = len(a)
+    while lo < hi:
+        mid = (lo+hi)//2
+        if a[mid] < x: lo = mid+1
+        else: hi = mid
+    return lo
+k = [1,2,3,4,5, 50]
+print(bisect_left[int](k,6))

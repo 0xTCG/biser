@@ -1,0 +1,256 @@
+from align_hit import *
+import math
+
+
+string = ""
+def toBinary(num):
+        if num >= 1:
+            toBinary(num // 2)
+            global string
+            string += str(num % 2)
+
+
+class Point[T]:
+    p: int
+    a: int
+    h: T
+    
+    def __init__(self: Point):
+        self.p = -1
+        self.a = -1
+
+    def __init__(self: Point, p: int, a: int, Tp: T):
+        self.p = p
+        self.a = a
+        self.h = Tp
+    def __init__(self: Point, p: int, a: int):
+        self.p = p
+        self.a = a
+
+
+PLOT = [(['']*50)]*2
+
+class SegmentTree[T]:
+    MINS: int
+    tree: list[Point]
+    anchors: list[T]
+    activated: int
+
+    def initialize(self: SegmentTree, i: int, s: int, e: int, tree_i: int):
+        ## Fix so that tree_i changes as it is called, maybe change return to tuple
+        if(i >= len(self.tree)):
+            return -1
+        elif(s+1 == e):
+            assert(tree_i < len(self.anchors))
+            self.tree[i] = Point[T](-1,tree_i,self.anchors[tree_i].x)
+            self.anchors[tree_i].score = 0 # SegmentTree<T>::MIN
+            tree_i+=1
+            return i
+        else:
+            bnd = (s + e + 1)/2
+            a = SegmentTree.initialize(2*i+1,s,bnd,tree_i)
+            b = SegmentTree.initialize(2*i+2,bnd,tree_i)
+
+            self.tree[i] = Point[T](-1,-1, self.tree[2*i+1+(2*i+2<len(self.tree))].h)
+            return max(a, max(i,b))
+
+    def __init__(self: SegmentTree, a: list[T]):
+        self.anchors = a
+        self.activated = 0
+        #sort(self.anchors) 
+        global string
+        toBinary(len(self.anchors)-1)
+        size = (1 << (32 - (32-len(string)))) ## leading zeros
+        
+        # shouldn't make T into int
+        self.tree = [Point()]*size
+        
+        tree_i = 0
+        m = SegmentTree.initialize(0,0,len(self.anchors)-1,tree_i)
+        m+=1
+        assert(tree_i == len(self.anchors))
+        assert(m <= len(self.tree))
+    
+    def empty(self: SegmentTree):
+        return self.activated == 0
+
+    
+    def rmq_priv(self: SegmentTree, p: T, q: T, i: int):
+        
+        if(i >= len(self.tree)):
+            return -1
+        elif(self.tree[i].a != -1):
+            if(p < self.anchors[self.tree[i].a].x and self.anchors[self.tree[i].a].x <= q):
+                # what is x?
+                return i
+            else:
+                return -1
+        else:
+            pv = self.tree[i].p
+            if(pv == -1):
+                return -1
+            assert(self.tree[pv].a != -1)
+            if(p <= self.anchors[self.tree[pv].a].x and self.anchors[self.tree[pv].a].x <=q):
+                return pv
+            else:
+                assert(2 * i + 1 < len(self.tree))
+                if(q <= self.tree[2 * i + 1].h):
+                    return SegmentTree.rmq_priv(p,q,2 * i + 1)
+                elif(p > self.tree[2 * i + 1].h):
+                    return SegmentTree.rmq_priv[p,q,2 * i + 2]
+                else:
+                    m1 = SegmentTree.rmq_priv(p,q,2 * i + 1)
+                    m2 = SegmentTree.rmq_priv(p,q,2 * i + 2)
+
+                    if(m1 == -1):
+                        return m2
+                    
+                    if(m2 == -1):
+                        return m1
+
+                    assert(self.tree[m1].a != -1)
+                    assert(self.tree[m2].a != -1)
+                    if(self.anchors[self.tree[m1].a].score >= self.anchors[self.tree[m2].score]):
+                        return m1
+                    else: 
+                        return m2
+
+    def rmq(self: SegmentTree, p: T, q: T):
+        i = SegmentTree.rmq_priv(p,q,0)
+        if(i == -1):
+            return -1
+        else:
+            return self.tree[i].a
+                    
+    def deactivate(self: SegmentTree, q: T):
+        leaf = 0
+        while(leaf< len(self.tree) and (self.tree[leaf].a == -1 or q != self.anchors[self.tree[leaf].a].x)):
+            leaf = 2*leaf+1+(q>self.tree[2*leaf+1].h)
+            leaf+=1
+        assert(leaf<len(self.tree))
+        assert(q == self.tree[leaf].h)
+        assert(self.tree[leaf].a != -1) #leaf
+        self.anchors[self.tree[leaf].a].score = 0 ## SegmentTree<T>::MIN
+
+        for i in range(len(self.tree)):
+            if(self.tree[i].p == -1):
+                break
+
+            elif(self.tree[i].p == leaf):
+                if(self.tree[i].a != -1):
+                    self.tree[i].p = -1
+            
+                else:
+                    assert(2*i+1<len(self.tree))
+                    if(2*i+1 < len(self.tree) and self.tree[2*i+2].p == -1 and (self.tree[2*i+1].p == -1 or self.anchors[self.tree[self.tree[2*i+2].p].a].score > self.anchors[self.tree[self.tree[2*i+1].p].a].score)):
+                        self.tree[i].p = leaf #=tree[2*i+2].p
+                        i = 2*i+2
+                    else:
+                        self.tree[i].p = leaf #=tree[2*i+1].p
+                        i = 2*i+1
+            
+            else:
+                i = 2*i+1 +(q> self.tree[2*i+1].h)
+        
+
+        self.activated-=1
+        assert(self.activated>=0)
+            
+
+
+
+
+    def activate(self: SegmentTree, q, score: int):
+        leaf = 0
+        while(leaf< len(self.tree) and (self.tree[leaf].a == -1 or q != self.anchors[self.tree[leaf].a].x)):
+            leaf = 2*leaf+1+(q>self.tree[2*leaf+1].h)
+            leaf+=1
+        assert(leaf<len(self.tree))
+        assert(q == self.tree[leaf].h)
+        assert(self.tree[leaf].a != -1) #leaf
+        self.anchors[self.tree[leaf].a].score = 0 ## SegmentTree<T>::MIN
+
+        for i in range(len(self.tree)):
+            assert(self.tree[leaf].a != -1)
+            if(self.tree[i].p == -1 or self.anchors[self.tree[leaf].a].score >= self.anchors[self.tree[self.tree.p].a].score):
+                temp = self.tree[i].p
+                self.tree[i].p = leaf
+                leaf = temp
+            
+            assert(self.tree[i].p != -1)
+            if(leaf == -1):
+                break
+            
+            assert(self.tree[leaf].a != -1)
+            assert(2*i+1<len(self.tree))
+            i=2*i+1+(self.anchors[self.tree[leaf].a].x >self.tree[2*i+1].h)
+
+            
+        self.activated+=1
+        assert(self.activated<=len(self.anchors))
+
+
+    def plot(self: SegmentTree):
+        global PLOT
+        PLOT = [(['']*50)]*2
+        
+        w = 6 *math.pow(2.0,math.ceil(math.log(float(len(self.tree))) / math.log(2.0))-1)
+        SegmentTree.plot_priv(w,0,0,0,len(self.anchors),PLOT)
+
+        cw = w/4
+        ll = 1
+        o = ""
+        si = 0
+        while(si<len(PLOT[0]) and PLOT[0][si] != ""):
+            o+= PLOT[0][si] + "\n" + PLOT[1][si] + "\n"
+            if(PLOT[0][si+1] != ""):
+                for i in range(ll):
+                    h = ""
+                    for c in range(cw):
+                        h+="-"
+                    # how string works might be wrong
+                    o+= " "*cw-1 + "┌" + h + "┴" + h + "┐" + " "*cw-1
+
+                o+="\n"
+                ll*=2
+                cw/=2
+            si+=1
+        
+        return o
+
+
+
+
+    def plot_priv(self: SegmentTree, w:int, l:int, i:int, s:int, e:int, PLOT2:list[list[str]]):
+        global PLOT
+        PLOT2 = PLOT
+        if(i >= len(self.tree)):
+            return
+        
+        bnd = (s+e+1)/2
+        if(self.tree[i].a == -1):
+            SegmentTree.plot_priv(w/2,l+1,2*i+1,s,bnd,PLOT)
+        
+        # fix this, first format is confusing
+        PLOT[0][l] += ":^" + str(w) + str(self.tree[i].h[0])+ "/" + str(self.tree[i].h[1])
+        if(self.tree[i].a == -1):
+            PLOT[0][l] += ""
+        else:
+            PLOT[0][l] += "*"
+        
+        PLOT[1][l] += ":^" + str(w)
+        if(self.tree[i].p != -1):
+            PLOT[1][l] += str(self.anchors[self.tree[self.tree[i].p].a].x[0]) + "/" + str(self.anchors[self.tree[self.tree[i].p].a].x[1])
+        else:
+            if(self.tree[i].a != -1):
+                if(self.anchors[self.tree[i].a].score == self.MINS):
+                    PLOT[i][l] += str("-1")
+                else:
+                    PLOT[i][l] += str(self.anchors[self.tree[i].a].score)
+            else:
+                PLOT[1][l] += ""
+
+        if(self.tree[i].a == -1):
+            SegmentTree.plot_priv(w/2,l+1,2*i+2,bnd,e,PLOT)
+    
+    

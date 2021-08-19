@@ -1,0 +1,363 @@
+from align_hit import *
+from tree2 import *
+from hash import *
+from slidingO import *
+from globals import*
+from common import *
+from extendedFunctions import *
+from filter import *
+
+# check if pf_pos overlaps any intervals in query, and if yes, then does pfp_pos overlaps any of their corresponding reference intervals
+def is_overlap(tree:IntervalTree[Interval[bool]],pf_pos,pf_end, pfp_pos,pfp_end, s:Search) -> bool:
+	assert(pf_pos <= pf_end)
+	assert(pfp_pos <= pfp_end)
+	RIGHT_ALLOWANCE = s.MIN_READ_SIZE
+	final = list[Interval[Interval[bool]]]()
+	pf = tree.at(pf_pos)
+	
+	if len(pf) == 0:
+		return False
+
+	
+	for queryInt in pf:
+		if queryInt.data.contains_point(pfp_pos):
+			final.append(queryInt)
+	if len(final) == 0:
+		return False
+
+	for it in final:
+		sA = it.begin
+		eA = it.end
+		sB = it.data.begin
+		eB = it.data.end
+
+		if (pf_pos >= sA and pf_end <= eA and pfp_pos >= sB and pfp_end <= eB):
+			return True
+		if (min(eA - sA, eB - sB) < s.MIN_READ_SIZE * 1.5):
+			continue
+		if (eA - pf_pos >= RIGHT_ALLOWANCE and eB - pfp_pos >= RIGHT_ALLOWANCE):
+			return True
+
+
+	return False
+
+def parse_hits(hits):
+
+	hits_real = list[Hit]()
+	for h in hits:
+		add = True
+		for ph in hits:
+			if(not h  is ph ):
+				if (h.ref_start >= ph.ref_start and h.ref_end <= ph.ref_end and h.query_start >= ph.query_start and h.query_end <= ph.query_end):
+					add = False
+					break
+		if (add):
+			hits_real.append(h)
+	return hits_real
+
+def extend1(winnow: SlidingMap, query_hash: Index, query_start,  query_end,  query_winnow_start,  query_winnow_end,ref_hash: Index,  ref_start,  ref_end,  ref_winnow_start,  ref_winnow_end, same_genome,s) -> Hit:
+	assert(query_start < len(query_hash.seq.seq))
+	
+	assert(ref_start < len(ref_hash.seq.seq))
+	assert(query_end <= len(query_hash.seq.seq))
+	assert(ref_end <= len(ref_hash.seq.seq))
+
+	extensions = list[tuple[function[bool,SlidingMap, Index,Index, bool, list[int]],function[bool,SlidingMap, Index, Index, bool, list[int]] ] ]()
+	extensions.append((do_extend_both_both, undo_extend_both_both))
+	extensions.append((do_extend_both_right, undo_extend_both_right))
+	extensions.append((do_extend_both_left, undo_extend_both_left))
+
+	# first extend to the boundaries:
+	query_start =  query_hash.minimizers[query_winnow_start - 1].loc + 1 if query_winnow_start else 0
+	query_end = query_hash.minimizers[query_winnow_end].loc if query_winnow_end < len(query_hash.minimizers) else len(query_hash.seq.seq)
+	ref_start = ref_hash.minimizers[ref_winnow_start - 1].loc + 1 if ref_winnow_start else 0
+	ref_end = ref_hash.minimizers[ref_winnow_end].loc  if ref_winnow_end < len(ref_hash.minimizers) else len(ref_hash.seq.seq)
+
+	MAX_GAP_ERROR = s.MAX_ERROR - s.MAX_EDIT_ERROR
+
+	while( True ):
+		max_match = min(s.MAX_SD_SIZE, int((1.0 / MAX_GAP_ERROR + .5) * abs(query_start - ref_start)) if same_genome else s.MAX_SD_SIZE)
+		aln_len = max(query_end - query_start, ref_end - ref_start)
+		seq_len = min(query_end - query_start, ref_end - ref_start)
+		if (aln_len > max_match or pct(float(seq_len), float(aln_len)) < 100 * (1 - 2 * MAX_GAP_ERROR)):
+			break
+		if (same_genome):
+			overlap = query_end - ref_start
+			if (overlap > 0 and pct(float(overlap), float(ref_end - ref_start)) > 100 * s.MAX_ERROR):
+				break
+		extended = False
+		list_of_parameters = list[int]()
+		list_of_parameters = [query_start,query_end,query_winnow_start,query_winnow_end,ref_start,ref_end,ref_winnow_start,ref_winnow_end]
+
+		for fn in extensions:
+			if (not fn[0](winnow, query_hash,ref_hash, same_genome,list_of_parameters)):
+				# we had to use this ugly parsing because there is no way to send int type in fuction by refference
+				query_start = list_of_parameters[0]
+				query_end = list_of_parameters[1]
+				query_winnow_start = list_of_parameters[2]
+				query_winnow_end = list_of_parameters[3]
+				ref_start = list_of_parameters[4]
+				ref_end = list_of_parameters[5]
+				ref_winnow_start = list_of_parameters[6]
+				ref_winnow_end= list_of_parameters[7]
+				continue
+			
+			if (winnow.jaccard() >= 0):
+				extended = True
+				break
+			else:
+				fn[1](winnow, query_hash,ref_hash, same_genome,list_of_parameters)
+
+		query_start = list_of_parameters[0]
+		query_end = list_of_parameters[1]
+		query_winnow_start = list_of_parameters[2]
+		query_winnow_end = list_of_parameters[3]
+		ref_start = list_of_parameters[4]
+		ref_end = list_of_parameters[5]
+		ref_winnow_start = list_of_parameters[6]
+		ref_winnow_end= list_of_parameters[7]
+		
+		if (not extended):
+			break
+	
+	return Hit(query_hash.seq, query_start, query_end, ref_hash.seq, ref_start, ref_end, winnow.jaccard(), "", "OK")
+
+
+
+def search_in_reference_interval( query_start: int, query_winnow_start:int,  query_winnow_end:int, query_hash: Index,  ref_hash: Index,tree: IntervalTree[Interval[bool]], same_genome: bool,  init_len: int,  allow_extend: bool,  report_fails:bool, winnow: SlidingMap,  t_start: int,  t_end: int, s:Search) ->list[Hit]:
+	assert(t_start <= t_end)
+	assert(t_start >= 0)
+	assert(winnow.query_size > 0)
+
+	TOTAL_ATTEMPTED = 0
+	JACCARD_FAILED = 0
+	INTERVAL_FAILED=0
+	TOTAL_ATTEMPTED+=1
+
+	ref_start = t_start
+	ref_end = min(t_start + init_len, len(ref_hash.seq.seq)) # winnow is W(query) ; extend it to W(query) | W(ref)
+	ref_winnow_start = ref_hash.find_minimizers(ref_start)
+	
+
+	assert(ref_winnow_start < len(ref_hash.minimizers))
+
+	ref_winnow_end = ref_winnow_start
+	while (ref_winnow_end < len(ref_hash.minimizers) and ref_hash.minimizers[ref_winnow_end].loc < ref_end):
+		
+		winnow.add_to_reference(ref_hash.minimizers[ref_winnow_end].hash)
+		ref_winnow_end+=1
+	# this part (next while loop) can be optimized
+	# Roll until we find best inital match
+	# check winnow refference first
+	
+	best_winnow = SlidingMap(winnow)
+	best_ref_start = ref_start
+	best_ref_end = ref_end
+
+	best_ref_winnow_start = ref_winnow_start
+	best_ref_winnow_end = ref_winnow_end
+	
+	while (ref_start < t_end and ref_end < len(ref_hash.seq.seq)):
+		
+		if (ref_winnow_start < len(ref_hash.minimizers) and ref_hash.minimizers[ref_winnow_start].loc < ref_start + 1) :
+			
+			winnow.remove_from_reference(ref_hash.minimizers[ref_winnow_start].hash)
+			ref_winnow_start += 1
+
+		if (ref_winnow_end < len(ref_hash.minimizers) and ref_hash.minimizers[ref_winnow_end].loc == ref_end):
+			
+			winnow.add_to_reference(ref_hash.minimizers[ref_winnow_end].hash)
+			ref_winnow_end += 1
+
+		if (winnow.jaccard() > best_winnow.jaccard()):
+			best_ref_start = ref_start
+			best_ref_end = ref_end
+			best_ref_winnow_start = ref_winnow_start
+			best_ref_winnow_end = ref_winnow_end
+			
+			# this is going to give us deep copy of winnow
+			best_winnow = SlidingMap(winnow)
+
+		ref_start += 1
+		ref_end += 1
+		
+		if (ref_end == len(ref_hash.seq.seq)):
+			break
+
+	# List for storing final hits that we are returning
+	hits = list[Hit]()
+
+	if (best_winnow.jaccard() < 0):
+		JACCARD_FAILED+=1
+		if (report_fails):
+			hits.append(Hit(query_hash.seq, query_start, query_start + init_len, ref_hash.seq, best_ref_start, best_ref_end, best_winnow.jaccard(),"", "")) #printing funtion used: fmt::format("jaccard: {} < {}"
+		
+	elif (allow_extend):
+		
+		if (not is_overlap(tree, query_start, query_start + init_len, best_ref_start, best_ref_end,s)):
+			
+			# filter sequences (q-gram and uppercase filter)
+			f = filter(query_hash.seq.seq, query_start, query_start + init_len, ref_hash.seq.seq, ref_start, ref_end)
+			
+			if (not f[0]):
+				if (report_fails):
+					hits.append(Hit(query_hash.seq, query_start, query_start + init_len, ref_hash.seq, ref_start, ref_end, 0, "", "" ))
+			else:
+				h = extend1(best_winnow,query_hash, query_start, query_start + init_len, query_winnow_start, query_winnow_end,ref_hash, best_ref_start, best_ref_end, best_ref_winnow_start, best_ref_winnow_end, same_genome,s)
+				f = filter(query_hash.seq.seq, h.query_start, h.query_end, ref_hash.seq.seq, h.ref_start, h.ref_end)
+				if (not f[0]):
+					if (report_fails):
+						h.comment = f[1]
+						hits.append(h)
+				else:
+					hits.append(h)
+					# a is interval in query that have corresponding Interval in reference as data field
+					a = Interval[Interval[bool]](h.query_start, h.query_end, Interval[bool](h.ref_start, h.ref_end, True))
+					tree.add(a)
+		else:
+			INTERVAL_FAILED+=1
+	else:
+		f = filter(query_hash.seq.seq, query_start, query_start + init_len, ref_hash.seq.seq, best_ref_start, best_ref_end)
+		if (f[0] or report_fails):
+			hits.append(Hit(query_hash.seq, query_start, query_start + init_len,ref_hash.seq, best_ref_start, best_ref_end, best_winnow.jaccard(), "", "OK_INIT" if f[1] == "" else f[1]))
+
+	return hits
+
+
+def getSlidingMap(i:int) -> SlidingMap:
+	return SlidingMap(i)
+
+# small class for simulating mutable tuple
+class pair:
+	first: int
+	second: int
+
+	def __init__(self: pair, i: int,j:int):
+		self.first = i
+		self.second = j
+	def __getitem__(self: pair, num: int) -> int:
+		assert(num<3)
+		if num == 0:
+			return self.first
+		else:
+			return self.second
+	def __setitem__(self: pair, num: int, value: int):
+		assert(num<3)
+		if num == 0:
+			self.first = value
+		else:
+			self.second = value
+
+def findPairsWithinTheRefference(loc: int, s_int: set[Interval[Interval[bool]]]):
+	ret = list[Interval[bool]]()
+	for i in s_int:
+		if i.data.contains_point(loc):
+			ret.append(i.data)
+	return ret
+def existPairWithinTheRefference(loc: int, s_int: set[Interval[Interval[bool]]]):
+
+	for i in s_int:
+		if i.data.contains_point(loc):
+			return True
+	return False
+
+def search(query_winnow_start: int, query_hash: Index, ref_hash: Index, tree: IntervalTree[Interval[bool]], same_genome: bool,init_len: int, allow_extend:bool, report_fails:bool,s:Search) -> list[Hit]:
+	
+	internal = Internal()
+	hashG = HashGlobal()
+	
+	l = list[Hit]()
+	
+	
+	if (query_winnow_start >= len(query_hash.minimizers)):
+		return l
+	
+	query_start = query_hash.minimizers[query_winnow_start].loc
+	
+	if (query_start + init_len > len(query_hash.seq.seq)):
+		return l
+	assert(query_hash.kmer_size == ref_hash.kmer_size)
+
+	init_winnow=SlidingMap(query_hash.kmer_size,s)#query_hash.kmer_size,s
+	
+	candidates_prel = set[int]()
+	query_winnow_end2 = query_winnow_start
+	# print f'Mimizer q list length: {len(query_hash.minimizers)}\n'
+	# print ref_hash.index
+	for query_winnow_end in range (query_winnow_start, len(query_hash.minimizers)):
+		
+		if not (query_hash.minimizers[query_winnow_end].loc - query_start <= init_len):
+			break
+		query_winnow_end2+=1
+		# print(f'Search fun loop: {}')
+		
+		h = query_hash.minimizers[query_winnow_end].hash
+		# print "here probl"
+		init_winnow.add_to_query(h)
+		# Hash statuses:
+		# HAS_N   ->        2
+        # HAS_UPPERCASE ->  0
+        # ALL_LOWERCASE ->  1
+		if (internal.DoUppercaseSeeds and h.status != 0):
+			continue
+		
+		
+		pf = tree.at(query_hash.minimizers[query_winnow_end].loc)
+		
+		ptr = list[int]()
+		temp_h = h
+		if temp_h in ref_hash.index:
+			ptr = ref_hash.index[temp_h]
+		
+		if (len(ptr) == 0 or len(ptr) >= ref_hash.threshold):
+			continue
+		else:
+			for pos in ptr:
+				if (not same_genome or pos >= query_start + init_len):
+
+					if (len(pf) == 0 or existPairWithinTheRefference(pos,pf)):
+						candidates_prel.add(pos)
+
+	
+
+	if ( not init_winnow.query_size):
+		return  list[Hit]()
+	T = list[pair]()
+	candidates = list[int]()
+	# this might be optimized, maybe use set for candidates_prel or even AVL tree?
+	for i in sorted(candidates_prel):
+		candidates.append(i)
+	
+	i = 0
+
+	while i <= int(len(candidates)) - init_winnow.limit:
+		j = int(i + (init_winnow.limit - 1))
+		
+		if (candidates[j] - candidates[i] <= init_len):
+			
+			x = max(0, candidates[j] - init_len + 1)
+			y = candidates[i] + 1
+			if (len(T) and x < T[-1][1]):
+				T[-1][1] = max(T[-1][1], y)
+			else:
+				T.append(pair(x, y))
+		i+=1
+	
+	hits = list[Hit]()
+
+	for t in T:
+		
+		if (same_genome):
+			t[0] = max(t[0], query_start + init_len)
+		if (t[0] > t[1]):
+			continue
+
+		h = search_in_reference_interval(query_start, query_winnow_start, query_winnow_end2,query_hash, ref_hash, tree, same_genome, init_len,allow_extend, report_fails, SlidingMap(init_winnow), t[0], t[1],s)
+
+		for hh in h:
+			hits.append(hh)
+
+	tree.chop(0, int(query_start - s.MIN_READ_SIZE))
+	
+	return parse_hits(hits)
+	
