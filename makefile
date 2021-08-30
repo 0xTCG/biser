@@ -4,7 +4,7 @@ sedef:
 	cd src/align/sedef && make -j release
 
 unionfind:
-	g++ -O3 -w -o exec/uf src/decomposition/uf.cpp
+	g++ -O3 -w -o exec/union_find src/decomposition/union_find.cpp
 	
 
 SEQ := $(shell command -v seqc)

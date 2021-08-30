@@ -249,7 +249,7 @@ echo "Memory used for align: ${sc_mem_k} MB"
 
 cat ${output2}/* >${output}/final.bed
 echo "Doing decomposition..."
-uf ${output}/final.bed >${output}/elementaries.txt 2>${output}/log/decomposition.log 
+union_find ${output}/final.bed >${output}/elementaries.txt 2>${output}/log/decomposition.log 
 #Finished
 finished=`grep Finished ${logs}/*.log | awk '{s+=1}END{print s}'`
 count_all=`ls $files | wc -l`

@@ -174,6 +174,6 @@ ${TIME} -f'Second align took: %E' ./align_ms2.sh ${output}/different/ ${input}
 # at the end just concatinate everything into one file
 python3 chop_regions.py final ${output}/same/ ${output}/different/ ${output}/final.bed
 
-${TIME} -f'Decomposition took: %E' uf ${output}/final.bed >${output}/elementaries.txt 2>${output}/elementaries_log.txt
+${TIME} -f'Decomposition took: %E' union_find ${output}/final.bed >${output}/elementaries.txt 2>${output}/elementaries_log.txt
 
 tail -1 ${output}/elementaries_log.txt
