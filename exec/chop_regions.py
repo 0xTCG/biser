@@ -2,7 +2,7 @@ from intervaltree import *
 import os
 import sys
 
-def build_dict(path, d = dict()):
+def build_dict(path, d = dict(), elem=False):
     count_sds = 0
     threshold1 = 5000000
     threshold2 = 10000000
@@ -49,20 +49,34 @@ def build_dict(path, d = dict()):
     else:
         for j in open(path, 'r'):
             line = j.split('\t')
-            chr1 = line[0]
+            
+            count_sds += 1
+            if len(line) == 1:
+                continue
+            if elem:
+                if line[0] == '0':
+                    chr1 = line[1][:-1]
+
+                    chr2 = line[1][:-1]
+                    s1 = int(line[2])
+                    e1 = int(line[3])
+                    s2 = int(line[2])
+                    e2 = int(line[3])
+            else:
+                chr1 = line[0]
+                chr1 = line[3]
+
+                s1 = int(line[1])
+                e1 = int(line[2])
+
+                s2 = int(line[1])
+                e2 = int(line[2])
+
             if chr1 == '#chr1':
                 continue
-            chr2 = line[3]
 
             if chr1 == 'chrM' or chr2 == 'chrM':
                 continue
-            count_sds += 1
-            s1 = int(line[1])
-            e1 = int(line[2])
-
-            s2 = int(line[4])
-            e2 = int(line[5])
-
             # if e1 - s1 > 5000000:
             #     print (j)
             if e1 - s1 > threshold1:
@@ -102,7 +116,7 @@ def build_dict(path, d = dict()):
 # d__, i__, j__ =  build_dict('/home/hiseric1/new_sedef/sedef/hg_3/final.bed', dict())
 # print(i__, j__)
 
-def build_dict_2(path, d = dict()):
+def build_dict_2(path, d = dict(),elem = False):
     count_sds = 0
     threshold1 = 5000000
     threshold2 = 10000000
@@ -152,19 +166,37 @@ def build_dict_2(path, d = dict()):
     else:
         for j in open(path, 'r'):
             line = j.split('\t')
-            chr1 = line[0]
-            if chr1 == '#chr1':
-                continue
-            chr2 = line[3]
-
-            if chr1 == 'chrM' or chr2 == 'chrM':
-                continue
+        
+            
             count_sds += 1
-            s1 = int(line[1])
-            e1 = int(line[2])
+            if elem:
+                if line[0] == '0':
+                    chr1 = line[1]
 
-            s2 = int(line[4])
-            e2 = int(line[5])
+                    chr2 = line[1]
+                    s1 = int(line[2])
+                    e1 = int(line[3])
+                    s2 = int(line[2])
+                    e2 = int(line[3])
+                else:
+                    continue
+            else:
+                chr1 = line[0]
+                chr2 = line[3]
+                if chr1 == '#chr1':
+                    continue
+
+                if chr1 == 'chrM' or chr2 == 'chrM':
+                    continue
+
+                s1 = int(line[1])
+                e1 = int(line[2])
+
+                s2 = int(line[1])
+                e2 = int(line[2])
+
+                chr1 += line[8]
+                chr2 += line[9] if line[9] == '+' else '_'
 
             # if e1 - s1 > 5000000:
             #     print (j)
@@ -175,9 +207,6 @@ def build_dict_2(path, d = dict()):
             if e1 - s1 > threshold3:
                 counters[2] += 1
             
-            chr1 += line[8]
-            chr2 += line[9] if line[9] == '+' else '_'
-
             if chr1 in d:
                 d[chr1].add(Interval(s1,e1))
             else:
@@ -501,7 +530,7 @@ def extract_sequences(path, out_folder, input_beds):
 # extract_sequences()
 from Bio.Seq import Seq
 # ok first read whole genome and save ti to dictionary
-def extract_sequences_2(path, out_folder, input_beds):
+def extract_sequences_2(path, out_folder, input_beds, elem=False):
     # path = 'data/genomes/'
     # out_folder = 'sdregions8'
     # input_beds = 'same8'
@@ -531,16 +560,32 @@ def extract_sequences_2(path, out_folder, input_beds):
     count_array = []
     num_ov_neg = 0
     
-    for i in  os.listdir(input_beds):
-        # print (i)
-        # this is for fixing sequences
-        # modify_sequences(main_fa_dict, f'{input_beds}/{i}')
-        # sys.exit(1)
-        new_fa = open(f'{out_folder}/{i}.fa', 'w')
+    if os.path.isdir(input_beds):
+        for i in  os.listdir(input_beds):
+            # print (i)
+            # this is for fixing sequences
+            # modify_sequences(main_fa_dict, f'{input_beds}/{i}')
+            # sys.exit(1)
+            new_fa = open(f'{out_folder}/{i}.fa', 'w')
+            d__ = dict()
+            d__, i__, j__ = build_dict_2(f'{input_beds}/{i}', dict(), elem)
+            count_array.append((i__, j__))
+            # print (f'Dictionary built {i__}, {j__}')
+            for chr_ in d__:
+                for interval in d__[chr_]:
+                    if chr_[-1] == '+':
+                        new_fa.write(f'>{chr_}-{interval.begin}-{interval.end}\n{main_fa_dict[chr_[:-1]][interval.begin : interval.end]}\n')
+                    else:
+                        num_ov_neg += 1
+                        new_fa.write(f'>{chr_}-{interval.begin}-{interval.end}\n{Seq(main_fa_dict[chr_[:-1]][interval.begin : interval.end]).reverse_complement()}\n')
+
+
+            new_fa.close()
+    else:
+        new_fa = open(f'{out_folder}.fa', 'w')
         d__ = dict()
-        d__, i__, j__ = build_dict_2(f'{input_beds}/{i}', dict())
+        d__, i__, j__ = build_dict_2(f'{input_beds}', dict(), elem)
         count_array.append((i__, j__))
-        # print (f'Dictionary built {i__}, {j__}')
         for chr_ in d__:
             for interval in d__[chr_]:
                 if chr_[-1] == '+':
@@ -551,6 +596,7 @@ def extract_sequences_2(path, out_folder, input_beds):
 
 
         new_fa.close()
+
     count_array.sort(reverse = True)
     print (f'Num of rev comp: {num_ov_neg}')
     print ('10 biggest clusters: (#of sequences, coverage)')
@@ -737,8 +783,11 @@ def main():
         elif sys.argv[1] == 'create':
             d, i, s = build_dict(sys.argv[2])
             print (i, s)
-        elif sys.argv[1] == 'extract_colors':
-            # path to genome(s), out_folder, input_beds
-            extract_sequences_2( sys.argv[2], sys.argv[3], sys.argv[4])
+        elif sys.argv[1] == 'create_elem':
+            d, i, s = build_dict(sys.argv[2], dict(), True)
+            print (i, s)
+        elif sys.argv[1] == 'extract_colors_elem':
+            # path to genome, out_file, input_bed
+            extract_sequences_2( sys.argv[2], sys.argv[3], sys.argv[4], True)
 
 main()

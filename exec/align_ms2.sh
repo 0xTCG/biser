@@ -30,7 +30,7 @@ for i in ${input}/* ; do
                 
                 # mkdir ${i}/merged
 
-                sedef/sedef merge ${i}/ ${i}/merged/
+                ./sedef merge ${i}/ ${i}/merged/
                 # rm -rf ${i}/merged
                 # rm -rf ${i}/merged.bed
                 # rm  ${i}/merged.bed
@@ -79,7 +79,7 @@ for i in ${input}/* ; do
 
 
                 # cat ${i}/merged/seeds.bed >${i}/merged.bed
-                echo "${TIME} -f'TIMING %e %M' sedef/sedef align generate --k 10 ${fa1} ${i}/merged/seeds.bed_merged ${fa2} >${i}/final.bed 2>${input}/log/aligned/${filename1}_${filename2}.log"
+                echo "${TIME} -f'TIMING %e %M' ./sedef align generate --k 10 ${fa1} ${i}/merged/seeds.bed_merged ${fa2} >${i}/final.bed 2>${input}/log/aligned/${filename1}_${filename2}.log"
                 
             
             fi
