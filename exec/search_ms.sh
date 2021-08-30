@@ -154,6 +154,15 @@ if [ -e "${output}" ]; then
     	# exit 1
     fi
 fi
+SEQ=`command -v seqc`
+
+SEQ_PATH=`dirname ${SEQ}`
+
+export LD_LIBRARY_PATH=`cd $SEQ_PATH && cd .. && cd lib/seq && pwd`
+export SEQ_LIBRARY_PATH=LD_LIBRARY_PATH
+
+
+
 mkdir -p "${output}"
 
 validchrs=${input}*50.fa
@@ -189,7 +198,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ] ; then # || tru
 				samtools faidx $j
 
 				# final one:
-				echo "${TIME} -f'TIMING %e %M' seqc run -release biser_search.seq -r ${r} -q ${q} -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
+				echo "${TIME} -f'TIMING %e %M' ./biser_search -r ${r} -q ${q} -p ${p} -d ${d} -g ${g} -f ${l} -k 14 -w 16 -o ${output}/${filename1}_${filename2}/seeds $i $j >${output}/log/seeds/${filename1}_${filename2}.log 2>${output}/log/seeds/${filename1}_${filename2}_2.log"
 				
 				# echo "/home/hiseric1/new_sedef/sedef/sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/"
 
@@ -227,7 +236,7 @@ if [ ! -f "${output}/seeds.joblog.ok" ] || [ "${force}" == "y" ] ; then # || tru
             	filename1="${filename1%_*_*}"
                 filename2=$(basename -- "$j")
                 filename2="${filename2%_*_*}"
-				echo "sedef merge ${curent_dic}/${output}/${filename1}_${filename2}/seeds/ ${curent_dic}/${output}/${filename1}_${filename2}/merged/ >${output}/log/merged/${filename1}_${filename2}.log"
+				echo "./sedef merge ${output}/${filename1}_${filename2}/seeds/ ${output}/${filename1}_${filename2}/merged/ >${output}/log/merged/${filename1}_${filename2}.log"
 			fi
 	    done
 	done | ${TIME} -f'Merging time: %E' parallel --will-cite -j ${jobs} --bar --joblog "${output}/merged.joblog"

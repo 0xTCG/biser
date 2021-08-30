@@ -57,7 +57,7 @@ d="0"
 g="0"
 l="1"
 p="5000"
-r="700"
+r="500"
 q="100"
 
 while true; do
@@ -146,9 +146,8 @@ fi
 
 # first we find all potential regins within same species and merge them
 # ./new_sedef_ms.sh data/genomes/ -o same -l 1 -j 10 
-output ${output}
 mkdir ${output}/
-${TIME} -f'First search took: %E' ./new_sedef_ms.sh ${input} -o "${output}/same/" -l ${l} -r ${r} -p ${p} -q ${q} -d ${d} -g ${g} -j ${jobs}
+${TIME} -f'First search took: %E' ./search_ms.sh ${input} -o "${output}/same/" -l ${l} -r ${r} -p ${p} -q ${q} -d ${d} -g ${g} -j ${jobs}
 
 # now we do align of those putative SDs to find alignment and exact locations of those SDs
 # ./align_ms.sh data/genomes/ same
@@ -175,6 +174,6 @@ ${TIME} -f'Second align took: %E' ./align_ms2.sh ${output}/different/ ${input}
 # at the end just concatinate everything into one file
 python3 chop_regions.py final ${output}/same/ ${output}/different/ ${output}/final.bed
 
-${TIME} -f'Decomposition took: %E' uf ${output}/final.bed >${output}/elementaries.txt 2>${output}/elementaries_log.txt
+${TIME} -f'Decomposition took: %E' union_find ${output}/final.bed >${output}/elementaries.txt 2>${output}/elementaries_log.txt
 
 tail -1 ${output}/elementaries_log.txt

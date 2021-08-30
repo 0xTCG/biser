@@ -4,7 +4,7 @@ Biser is a fast tool for detecting and decomposing SDs in a one or multiple geno
 
 Needed installations:
 * SEDEF
-* Seq programming language
+* Seq compiler
 
 
 ## Instalation
@@ -17,7 +17,7 @@ For installign BISER, run the following:
 make
 ```
 
-BISER requires Boost libraries in order to compile. In case you installed Boost in a non-standard directory, you can still compile as follows:
+BISER requires Boost (https://www.boost.org/) libraries in order to compile. In case you installed Boost in a non-standard directory, you can still compile as follows:
 ```bash
 CPATH={path_to_boost} make
 ```

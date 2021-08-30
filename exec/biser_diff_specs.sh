@@ -145,8 +145,9 @@ SEQ=`command -v seqc`
 
 SEQ_PATH=`dirname ${SEQ}`
 
-LD_LIBRARY_PATH=`cd $SEQ_PATH && cd .. && cd lib/seq && pwd`
-SEQ_LIBRARY_PATH=LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=`cd $SEQ_PATH && cd .. && cd lib/seq && pwd`
+export SEQ_LIBRARY_PATH=LD_LIBRARY_PATH
+
 
 echo "BISER: FASTA=${input}; output=${output}; jobs=${jobs}; force=${force}"
 
