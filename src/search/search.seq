@@ -1,0 +1,375 @@
+import sys
+import math
+import getopt
+import collections
+import bio
+
+
+KMER_SIZE = 14
+WINNOW_SIZE = 16
+TAU = 0.0
+QUERY_THRESHOLD = 300
+REF_THRESHOLD = 1_000
+MAX_EXTEND = 5_000
+MAX_DISTANCE = 250
+INDEX_CUTOFF = 0.001
+MAX_SD_LEN = 2_000_000_000
+MAX_ERROR = 0.3
+MAX_EDIT_ERROR = 0.15
+
+
+@dataclass(eq=True)
+class Chromosome:
+    id: int
+    species: str
+    name: str
+    complement: bool = False
+    len: int = 0
+
+    def __str__(self):
+        return f'{self.species}_{self.name}'
+
+@tuple
+class Locus:
+    chr: int  # Chromosome ID
+    loc: int
+
+class ListNode:
+    """Main class that holds information about nodes in linked list"""
+
+    first: int
+    last: int
+    ref: int
+    ref_last: int
+    chr: int
+    age: int = 0
+    count: int = 0
+    next: Optional[ListNode] = None
+    potentional: bool = False
+
+    def insert_after(self, first, ref, chr, age = 1, count = 1):
+        self.next = ListNode(first, first, ref, ref, chr, age, count, self.next)
+
+    def __iter__(self):
+        walker: Optional[ListNode] = self
+        while walker:
+            yield walker
+            walker = walker.next
+
+    def __str__(self):
+        return ''.join(
+            f"({i.first}:{i.last}; ref: {i.ref}, {i.chr}; {i.age}/{i.count}; "
+            f"{i.potentional})->"
+            for i in self
+        )
+
+    def __len__(self):
+        return sum(1 for _ in self)
+
+
+def tau():
+    ratio = (MAX_ERROR - MAX_EDIT_ERROR) / MAX_EDIT_ERROR
+    gap_error = min(1.0, ratio * MAX_EDIT_ERROR)
+    a = (1 - gap_error) / (1 + gap_error)
+    b = 1 / (2 * math.exp(KMER_SIZE * MAX_EDIT_ERROR) - 1)
+    return a * b
+
+
+def pad_sd(chromosomes, c1, b1, e1, c2, b2, e2):
+    b1 = max(0, b1 - MAX_EXTEND)
+    e1 = min(chromosomes[c1].len - 1, e1 + MAX_EXTEND)
+    if not c1 == c2: e1 = min(e1, b2)
+    b2 = max(0, b2 - MAX_EXTEND) if not c1 == c2 else max(0, b2 - MAX_EXTEND, e1)
+    e2 = min(chromosomes[c2].len - 1, e2 + MAX_EXTEND)
+    return (b1, e1, b2, e2)
+
+
+def save_sd(L, current, chromosomes, result):
+    if L.chr < len(chromosomes) and current.chr < len(chromosomes):
+        chr1, chr2 = chromosomes[L.chr], chromosomes[current.chr]
+        coord = (0, 0, 0, 0)
+        complement = chr1.complement or chr2.complement
+        if complement:
+            if chr1 == chr2:
+                coord = pad_sd(chromosomes, L.chr, L.first, L.last, current.chr, chr2.len - current.loc, chr2.len - L.ref)
+            else:
+                coord = pad_sd(chromosomes, L.chr, chr1.len - L.last, chr1.len - L.first, current.chr, L.ref, L.ref_last)
+        else:
+            coord = pad_sd(chromosomes, L.chr,  L.first, L.last, current.chr, L.ref, current.loc)
+        strand = 'y' if complement else 'n'
+        name = f"{chr1}_{chr2}_{strand}.bed"
+        result.setdefault(name, []).append(
+            f"{chr1.species}#{chr1.name}\t{coord[0]}\t{coord[1]}\t"
+            f"{chr2.species}#{chr2.name}\t{coord[2]}\t{coord[3]}\t\t\t+\t{strand}\n"
+        )
+    else:
+        raise ValueError("reverse complemented intervals should not be here")
+
+
+def update_list(L: Optional[ListNode], loci, current, chromosomes, result):
+    loci_idx = 0
+
+    # if certain values in the beginning of the loci are lower that first node, add them all beforehand
+    walker, previous, holder = L, L, L
+    while (
+        L and loci_idx < len(loci)
+        and (
+            (loci[loci_idx].chr == L.chr and loci[loci_idx].loc < L.first)
+            or (loci[loci_idx].chr < L.chr)
+        )
+    ):
+        if not (
+            loci_idx < len(loci)
+            and chromosomes[current.chr].complement
+            and loci[loci_idx].chr != current.chr - 1
+        ):
+            walker = ListNode(loci[loci_idx].loc, loci[loci_idx].loc, current.loc, current.loc, loci[loci_idx].chr, 1, 1, L)
+            if previous is not L:
+                previous.next = walker
+            if loci_idx == 0:
+                holder = walker
+            previous = walker
+        loci_idx += 1
+
+    walker, previous, L = L, L, holder
+    while walker:
+        if (
+            loci_idx < len(loci)
+            and chromosomes[current.chr].complement
+            and loci[loci_idx].chr != current.chr - 1
+        ):
+            loci_idx += 1
+            continue
+
+        delete = False
+        if (
+            loci_idx < len(loci)
+            and walker.ref != current.loc
+            and walker.last < loci[loci_idx].loc
+            and walker.last + MAX_DISTANCE >= loci[loci_idx][1]
+            and walker.chr == loci[loci_idx].chr
+        ):
+            walker.last = loci[loci_idx].loc
+            walker.ref_last = current.loc
+            walker.count += 1
+            loci_idx += 1
+        elif loci_idx < len(loci) and (
+            not walker.next
+            or (
+                loci[loci_idx][0] < walker.next.chr
+                or (
+                    walker.next.first >= loci[loci_idx].loc
+                    and walker.next.chr == loci[loci_idx].chr
+                )
+            )
+        ):
+            # We set age to 0, we will increase it to one when we are on this node
+            walker.insert_after(loci[loci_idx].loc, current.loc, loci[loci_idx].chr, 0, 1)
+            if loci[loci_idx].chr == walker.chr and walker.first < loci[loci_idx].loc < walker.last:
+                walker.age += 1
+            loci_idx += 1
+            continue
+
+        walker.age += 1
+        condition = walker.count >= math.ceil(walker.age * TAU)
+        if condition and (walker.last - walker.first) < MAX_SD_LEN:
+            walker.potentional = True
+        elif not condition or walker.last - walker.first >= MAX_SD_LEN:
+            if walker.potentional:
+                # for last was previously used walker.first + current - walker.ref
+                # (< walker.ref -> for checking how close they are?)
+                if current.loc - walker.ref >= REF_THRESHOLD and walker.last - walker.first > QUERY_THRESHOLD:
+                    save_sd(walker, Locus(current.chr, walker.ref_last), chromosomes, result)
+            if walker is L:
+                L = L.next
+            else:
+                if walker.next is None:
+                    previous.next = None
+                else:
+                    delete = True  # delete node
+                    previous.next = walker.next
+        if not delete:
+            previous = walker
+        walker = walker.next
+
+    while loci_idx < len(loci):
+        if current.chr >= len(chromosomes):
+            print (len(chromosomes), chromosomes, current.chr)
+        if not (
+            loci_idx < len(loci)
+            and chromosomes[current.chr].complement
+            and loci[loci_idx].chr != current.chr - 1
+        ):
+            if not L:
+                previous = L = ListNode(loci[0].loc, loci[0].loc, current.loc, current.loc, loci[0].chr, 1, 1)
+            else:
+                previous.insert_after(loci[loci_idx].loc, current.loc, loci[loci_idx].chr)
+                previous = previous.next
+        loci_idx += 1
+    return L
+
+
+def build_index(
+    s: bio.seq,
+    chr: int,
+    index: Dict[int, List[Locus]], # kmer -> [(chr, loc)]
+    chromosomes,
+    result,
+    find_sds = False,
+    build_index = False,
+    max_frequency = (1 << 32) - 1,
+):
+    MASK = (1 << (2 * KMER_SIZE)) - 1
+
+    L = None # ListNode
+    processed_kmer_count = 0
+
+    winnow = collections.deque()
+    h, last_hash = 0, -1  # Hash(-1,0)
+    for i, si in enumerate(s): # TODO: use seq k-mers
+        h = ((h << 2) | (int(si) & 3)) & MASK
+        if i < KMER_SIZE - 1:
+            continue
+        # here we ensure that correct elements are in winnow
+        # SEQ_TODO
+        while winnow and not (winnow._arr[winnow._tail][0] < h):
+            winnow.pop()
+        while winnow and winnow._arr[-1][1] < (i - KMER_SIZE + 1) - WINNOW_SIZE:
+            winnow.popleft()
+        winnow.append((h, i - KMER_SIZE + 1))
+        if i - KMER_SIZE + 1 < WINNOW_SIZE:
+            continue
+        if len(index) == 0 or winnow._arr[0][0] != last_hash:
+            processed_kmer_count += 1
+            hash = winnow._arr[0][0]  # Hash(winnow[0][1].hash,winnow[0][1].status)
+            if hash in index:
+                if find_sds:
+                    if len(index[hash]) < max_frequency:
+                        L = update_list(L, index[hash], Locus(chr, winnow._arr[0][1]), chromosomes, result)
+                if build_index:
+                    index[hash].append(Locus(chr, winnow._arr[0][1]))
+            elif build_index:
+                index[hash] = [Locus(chr, winnow._arr[0][1])]
+            last_hash = hash
+
+    if find_sds:
+        if L:
+            for i in L:
+                if i.potentional and (i.last - i.first > QUERY_THRESHOLD or i.count >= 4):
+                    save_sd(i, Locus(chr, i.ref_last), chromosomes, result)
+
+    return processed_kmer_count
+
+
+def biser_search(ref_path, query_path, ref_chr):
+    """
+    this is main function for parallel call if one chr is specified,
+    it finds all SDs within that chr and between that chr and all other chromosomes
+    that are lexicographically bigger than it
+    """
+
+    species = ref_path.split("/")[-1][0:-3].split("_")[0]
+
+    index = {} # Dict[ int, List[Tuple[int, int]] ]
+    result: Dict[str, List[str]] = {} # 
+    # here we first build dictionary and find potential regions in reference chromosome
+
+    chromosomes = []
+    if not ref_chr:
+        with open(f"{ref_path}.fai") as f:
+            for i in f.readlines():
+                line = i.split("\t")
+                if not "_" in line[0] and line[0] != "chrM":
+                    if query_path != ref_path or line[0] > ref_chr:
+                        chromosomes.append(Chromosome(len(chromosomes), species, line[0]))
+    else:
+        chromosomes.append(Chromosome(len(chromosomes), species, ref_chr))
+        chromosomes.append(Chromosome(len(chromosomes), species, ref_chr, True))
+    frequency = 0
+    with bio.FASTA(ref_path) as fr:
+        for chr_index, chr in enumerate(chromosomes):
+            ref = ~fr[chr.name] if chr.complement else fr[chr.name]
+            chr.len = len(ref)
+            frequency = build_index(
+                ref,
+                chr_index,
+                index,
+                chromosomes,
+                result,
+                build_index=True,
+                find_sds=ref_path == query_path,
+            )
+
+    # Now we find matching subsequences in all other chromosomes that are bigger than out ref_chr if both specie are same, if not, take all chromosomes from another specie
+    species = query_path.split("/")[-1][0:-3].split("_")[0]
+    hist, max_len = {}, 0
+    for i in index:
+        hist[len(index[i])] = hist.get(len(index[i]), 0) + 1
+        max_len = max(max_len, len(index[i]))
+
+    sum, occurence, threshold = 0, 0, 1 << 31
+    for i in sorted(hist.keys(), reverse=True):
+        sum += hist[i]
+        if sum <= int(frequency * INDEX_CUTOFF):
+            threshold = i
+            occurence += hist[i]
+        else:
+            break
+    print(f"filtered {occurence} k-mers")
+
+    # here we read all other chromosomes:
+    begin = len(chromosomes)
+    with open(f"{query_path}.fai") as f:
+        for i in f.readlines():
+            line = i.split("\t")
+            if not "_" in line[0] and line[0] != "chrM":
+                if query_path != ref_path or line[0] > ref_chr:
+                    chromosomes.append(Chromosome(len(chromosomes), species, line[0]))
+    with bio.FASTA(query_path) as fr:
+        for chr_index, chr in enumerate(chromosomes):
+            if chr_index < begin:
+                continue
+            ref = ~fr[chr.name] if chr.complement else fr[chr.name]
+            chr.len = len(ref)
+            build_index(
+                ref,
+                chr_index,
+                index,
+                chromosomes,
+                result,
+                build_index=False,
+                find_sds=True,
+                max_frequency=threshold,
+            )
+    return result
+
+
+name = "__main__"  # SEQ_TODO
+if name == "__main__":
+    out = "test/"
+    opts, args = getopt.getopt(sys.argv[1:], "n:k:r:w:o:d:s:g:f:p:m:q:")
+    for o, a in opts:
+        if o in ("-k", "--kmer"):
+            KMER_SIZE = int(a)
+        elif o in ("-w", "--winnow"):
+            WINNOW_SIZE = int(a)
+        elif o in ("-o", "--output"):
+            out = a
+            if a[-1] != "/": out += "/"
+        elif o in ("-p", "--padding"):
+            MAX_EXTEND = int(a)
+        elif o in ("-r", "--ref"):
+            REF_THRESHOLD = int(a)
+        elif o in ("-q", "--query"):
+            QUERY_THRESHOLD = int(a)
+    if len(args) < 2:
+        print("Wrong formatting")
+    fa1, fa2, chr1, chr2 = args + ["", ""]
+    print(f"Input: {fa1}\t{fa2}\t{chr1}\t{chr2}, {KMER_SIZE}, {WINNOW_SIZE}")
+
+    TAU = tau()
+    results = biser_search(fa1, fa2, chr1)
+    for i, di in results.items():
+        with open(f'{out}{i}', "w") as f:
+            for j in di:
+                print(j, file=f)
