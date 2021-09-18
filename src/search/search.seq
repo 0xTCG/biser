@@ -3,6 +3,8 @@ import math
 import getopt
 import collections
 import bio
+import os
+import time
 
 
 KMER_SIZE = 14
@@ -29,10 +31,12 @@ class Chromosome:
     def __str__(self):
         return f'{self.species}_{self.name}'
 
+
 @tuple
 class Locus:
     chr: int  # Chromosome ID
     loc: int
+
 
 class ListNode:
     """Main class that holds information about nodes in linked list"""
@@ -75,32 +79,31 @@ def tau():
     return a * b
 
 
-def pad_sd(chromosomes, c1, b1, e1, c2, b2, e2):
-    b1 = max(0, b1 - MAX_EXTEND)
-    e1 = min(chromosomes[c1].len - 1, e1 + MAX_EXTEND)
-    if not c1 == c2: e1 = min(e1, b2)
-    b2 = max(0, b2 - MAX_EXTEND) if not c1 == c2 else max(0, b2 - MAX_EXTEND, e1)
-    e2 = min(chromosomes[c2].len - 1, e2 + MAX_EXTEND)
-    return (b1, e1, b2, e2)
-
-
 def save_sd(L, current, chromosomes, result):
+    def pad_sd(chromosomes, c1, b1, e1, c2, b2, e2):
+        b1 = max(0, b1 - MAX_EXTEND)
+        e1 = min(chromosomes[c1].len - 1, e1 + MAX_EXTEND)
+        if c1 == c2: e1 = min(e1, b2)
+        b2 = max(0, b2 - MAX_EXTEND)
+        if c1 == c2: b2 = max(b2, e1)
+        e2 = min(chromosomes[c2].len - 1, e2 + MAX_EXTEND)
+        return (b1, e1, b2, e2)
+    
     if L.chr < len(chromosomes) and current.chr < len(chromosomes):
         chr1, chr2 = chromosomes[L.chr], chromosomes[current.chr]
         coord = (0, 0, 0, 0)
-        complement = chr1.complement or chr2.complement
-        if complement:
-            if chr1 == chr2:
-                coord = pad_sd(chromosomes, L.chr, L.first, L.last, current.chr, chr2.len - current.loc, chr2.len - L.ref)
-            else:
-                coord = pad_sd(chromosomes, L.chr, chr1.len - L.last, chr1.len - L.first, current.chr, L.ref, L.ref_last)
+        complement = int(chr1.complement or chr2.complement)
+        if complement and str(chr1) == str(chr2):
+            coord = pad_sd(chromosomes, L.chr, L.first, L.last, current.chr, chr2.len - current.loc, chr2.len - L.ref)
+        elif complement:
+            coord = pad_sd(chromosomes, L.chr, chr1.len - L.last, chr1.len - L.first, current.chr, L.ref, current.loc)
         else:
             coord = pad_sd(chromosomes, L.chr,  L.first, L.last, current.chr, L.ref, current.loc)
-        strand = 'y' if complement else 'n'
-        name = f"{chr1}_{chr2}_{strand}.bed"
+        name = f"{chr1}_{chr2}_{'ny'[complement]}.bed"
         result.setdefault(name, []).append(
             f"{chr1.species}#{chr1.name}\t{coord[0]}\t{coord[1]}\t"
-            f"{chr2.species}#{chr2.name}\t{coord[2]}\t{coord[3]}\t\t\t+\t{strand}\n"
+            f"{chr2.species}#{chr2.name}\t{coord[2]}\t{coord[3]}\t"
+            f"\t\t+\t{'+-'[complement]}"
         )
     else:
         raise ValueError("reverse complemented intervals should not be here")
@@ -222,7 +225,7 @@ def build_index(
     L = None # ListNode
     processed_kmer_count = 0
 
-    winnow = collections.deque()
+    winnow = [] # collections.deque()
     h, last_hash = 0, -1  # Hash(-1,0)
     for i, si in enumerate(s): # TODO: use seq k-mers
         h = ((h << 2) | (int(si) & 3)) & MASK
@@ -233,7 +236,7 @@ def build_index(
         while winnow and not (winnow[-1][0] < h):
             winnow.pop()
         while winnow and winnow[-1][1] < (i - KMER_SIZE + 1) - WINNOW_SIZE:
-            winnow.popleft()
+            winnow.pop(0)  #popleft()
         winnow.append((h, i - KMER_SIZE + 1))
         if i - KMER_SIZE + 1 < WINNOW_SIZE:
             continue
@@ -297,13 +300,13 @@ def biser_search(ref_path, query_path, ref_chr):
                 find_sds=ref_path == query_path,
             )
 
-    # Now we find matching subsequences in all other chromosomes that are bigger than out ref_chr if both specie are same, if not, take all chromosomes from another specie
+    # Now we find matching subsequences in all other chromosomes that are bigger than 
+    # out ref_chr if both specie are same, if not, take all chromosomes from another specie
     species = query_path.split("/")[-1][0:-3].split("_")[0]
     hist, max_len = {}, 0
-    for i in index:
-        hist[len(index[i])] = hist.get(len(index[i]), 0) + 1
-        max_len = max(max_len, len(index[i]))
-
+    for loci in index.values():
+        hist[len(loci)] = hist.get(len(loci), 0) + 1
+        max_len = max(max_len, len(loci))
     sum, occurence, threshold = 0, 0, 1 << 31
     for i in sorted(hist.keys(), reverse=True):
         sum += hist[i]
@@ -323,7 +326,8 @@ def biser_search(ref_path, query_path, ref_chr):
                 if query_path != ref_path or line[0] > ref_chr:
                     chromosomes.append(Chromosome(len(chromosomes), species, line[0]))
     with bio.FASTA(query_path) as fr:
-        for chr_index, chr in enumerate(chromosomes, begin):
+        for chr_index in range(begin, len(chromosomes)):
+            chr = chromosomes[chr_index]
             ref = ~fr[chr.name] if chr.complement else fr[chr.name]
             chr.len = len(ref)
             build_index(
@@ -338,9 +342,7 @@ def biser_search(ref_path, query_path, ref_chr):
             )
     return result
 
-
-name = "__main__"  # SEQ_TODO
-if name == "__main__":
+if __name__ == "__main__":
     out = "test/"
     opts, args = getopt.getopt(sys.argv[1:], "n:k:r:w:o:d:s:g:f:p:m:q:")
     for o, a in opts:
@@ -362,9 +364,12 @@ if name == "__main__":
     fa1, fa2, chr1, chr2 = args + ["", ""]
     print(f"Input: {fa1}\t{fa2}\t{chr1}\t{chr2}, {KMER_SIZE}, {WINNOW_SIZE}")
 
-    TAU = tau()
-    results = biser_search(fa1, fa2, chr1)
-    for i, di in results.items():
-        with open(f'{out}{i}', "w") as f:
-            for j in di:
-                print(j, file=f)
+    with time.timing("Search"):
+        TAU = tau()
+        try: os.mkdir(out)
+        except: pass
+        results = biser_search(fa1, fa2, chr1)
+        for i, di in results.items():
+            with open(f'{out}{i}', "w") as f:
+                for j in di:
+                    print(j, file=f)

@@ -1,0 +1,165 @@
+MIN_SCORE = -((1 << 32) - 1)
+
+class PrioritySearchTree[T]:
+  """
+  A static binary search tree for weighted items (points).
+  At the beginning, each point is deactivated and its weight (score) is set to -INF.
+
+  The following operations can be performed efficiently with this structure:
+    - activate a point (assign it a score);
+    - deactivate a point (assign its score to -INF);
+    - find a point;
+    - find an active point with the highest score in the given interval.
+
+  Priority search tree is initialized with the (unsorted) list of points.
+  Each leaf in the tree corresponds to a point in the original list.
+  """
+
+
+  index: List[int]
+  """ Index of the point in the original list; -1 for non-leaves """
+  x: List[T]  # coordinate for each leaf node
+  """ Coordinate of each point; -1 for non-leaves """
+  max_x: List[int]
+  """ Index of a leaf with the highest coordinate in the subtree """
+  score: List[int]  # scores for each leaf node
+  """ Score of each point; -INF for non-leaves and deactivated points """
+  max_score: List[int]
+  """
+  Index of a leaf with the highest score in the subtree that has not
+  been recorded above this subtree
+  """
+  active_count: int
+  """ Number of active points in the tree """
+
+  def __init__(self, anchors: List[T], init: T):
+    """
+    Take a list of points and construct a PST from them.
+    Complexity: O(n log n).
+    """
+
+    size = len(anchors) - 1
+    for i in range(5):
+      size = size | (size >> (2 ** i))
+    size = (size + 1) * 2
+
+    self.x = [init] * size
+    self.max_x = [-1] * size
+    self.score = [MIN_SCORE] * size
+    self.max_score = [-1] * size
+    self.active_count = 0
+    self._build(sorted(anchors), hi=len(anchors))
+
+  def _build(self, anchors, i = 0, lo = 0, hi = -1, ai = 0):
+    """ Recursively initialize the tree rooted at node {i}. """
+    if i >= len(self.x):
+      return -1, ai
+    elif lo + 1 == hi:  # leaf
+      self.x[i] = anchors[ai]
+      self.score[i] = MIN_SCORE
+      self.max_x[i] = i
+      return i, ai + 1
+    else:
+      bound = (lo + hi + 1) // 2
+      l, r = self._next(i)
+      l, ai = self._build(anchors, l, lo, bound, ai)
+      r, ai = self._build(anchors, r, bound, hi, ai)
+      self.max_x[i] = l if r == -1 else r
+      return self.max_x[i], ai
+
+  def rmq(self, lo, hi):
+    """
+    Find a point with the highest score whose coordinate is between lo and hi (inclusive).
+    Returns a leaf index within the tree.
+    Complexity: O(log n).
+    """
+    i = self._rmq(lo, hi)
+    return -1 if i == -1 else i
+
+  def _rmq(self, lo, hi, i = 0):
+    if i >= len(self.x) or self.max_score[i] == -1:
+      return -1
+    elif self.max_x[i] == i:  # leaf
+      return i if lo <= self.x[i] <= hi else -1
+    else:
+      if lo <= self.x[self.max_score[i]] <= hi:
+        return self.max_score[i]
+      l, r = self._next(i)
+      if hi <= self.x[self.max_x[l]]:  # h is inclusive
+        return self._rmq(lo, hi, l)
+      elif lo > self.x[self.max_x[l]]:
+        return self._rmq(lo, hi, r)
+      else:
+        lm, rm = self._rmq(lo, hi, l), self._rmq(lo, hi, r)
+        if lm == -1 or rm == -1:
+          return max(lm, rm)  # any non-negative or -1
+        return lm if self.score[lm] >= self.score[rm] else rm
+
+  def activate(self, x, score):
+    """
+    Activate a point with coordinate {x} and set its score to {score}.
+    Complexity: O(log n).
+    """
+    c = self._get(x)
+    assert c != -1
+    self.score[c] = score
+
+    i = 0
+    while i < len(self.x):
+      if self.max_score[i] == -1 or self.score[c] >= self.score[self.max_score[i]]:
+        c, self.max_score[i] = self.max_score[i], c
+      if c == -1:
+        break
+      l, r = self._next(i)
+      i = r if self.x[c] > self.x[self.max_x[l]] else l
+    self.active_count += 1
+
+  def deactivate(self, x):
+    """
+    Deactivate a point with coordinate {x} and set its score to -INF.
+    Complexity: O(log n).
+    """
+    leaf = self._get(x)
+    assert leaf != -1
+    self.score[leaf] = MIN_SCORE
+
+    i = 0
+    while i < len(self.x):
+      l, r = self._next(i)
+      if self.max_score[i] == -1:
+        break
+      elif self.max_score[i] == leaf:
+        if self.max_x[i] == i:
+          self.max_score[leaf] = -1
+        elif (
+          r < len(self.x)
+          and self.max_score[r] != -1
+          and (
+            self.max_score[l] == -1
+            or self.score[self.max_score[r]] > self.score[self.max_score[l]]
+          )
+        ):
+          self.max_score[i] = leaf = self.max_score[r];
+          i = r
+        else:
+          self.max_score[i] = leaf = self.max_score[l];
+          i = l
+      else:
+        i = r if x > self.x[self.max_x[l]] else l
+    self.active_count -= 1
+
+  def _next(self, i):
+    return 2 * i + 1, 2 * i + 2
+
+  def _get(self, x):
+    """
+    Find a leaf node with coordinate {x}.
+    Complexity: O(log n).
+    """
+    i = 0
+    while i < len(self.x):
+      if self.max_x[i] == i:
+        break
+      l, r = self._next(i)
+      i = r if x > self.x[self.max_x[l]] else l
+    return i if i < len(self.x) and x == self.x[i] else -1
