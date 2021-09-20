@@ -7,6 +7,9 @@ import sys
 # bed_file = 'mm8_mm8/final.bed'
 # write_path = 'mm8_mm8/colors/'
 
+bed_file   = ''
+write_path = ''
+
 if len(sys.argv) > 1:
     bed_file = sys.argv[1]
     write_path = sys.argv[2]
