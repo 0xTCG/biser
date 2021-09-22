@@ -1,26 +1,24 @@
 import sys
 from time import time
-from bio import FASTA, Kmer
+from bio import FASTA, Kmer, CIGAR
 from time import timing
-import priority
+from chain import chain
+from merge import Hit
 
 
-KMER_SIZE = 10
-
-
-def generate_anchors(x, y, same_chr, xstart, ystart):
+def generate_anchors(x, y, same_chr, xstart, ystart, KMER_SIZE: Static[int] = 10):
   ref_hashes = {}
-  for pos, kmer in y.kmers_canonical_with_pos[Kmer[10]]():
+  for pos, kmer in y.kmers_with_pos(1, KMER_SIZE):
     ref_hashes.setdefault(int(kmer), []).append(pos)
-  
+
   slide = [-1] * (len(x) + len(y))
-  for xi, kmer in x.kmers_canonical_with_pos[Kmer[10]]():
+  for xi, kmer in x.kmers_with_pos(1, KMER_SIZE):
     matches = ref_hashes.get(int(kmer), [])
     if not 0 < len(matches) < 1000:
       continue
     for yi in matches:
       d = len(x) + yi - xi
-      if (same_chr and abs(xstart + yi - ystart - xi) <= KMER_SIZE) or xi < slide[d]:
+      if (same_chr and abs(ystart + yi - xstart - xi) <= KMER_SIZE) or xi < slide[d]:
         continue
       ext = KMER_SIZE
       while (
@@ -32,156 +30,134 @@ def generate_anchors(x, y, same_chr, xstart, ystart):
       slide[d] = xi + ext
 
 
-def chain(anchors, MATCH_SCORE = 5, MAX_CHAIN_GAP: int = 500):
-  """
-  Finds all local chains with from the list of anchors.
-  Each anchor is a tuple of {(start_reference, start_query, anchor_len)}.
-  Returns a list of chains where each chain is a list of indices from the {anchors} list.
-  Complexity: O(n log n) where {n = len(anchors)}.
-  """
-  # Construct a tree from y-points (query)
-  xs = [(x, i) for i, (x, _, _) in enumerate(anchors)] 
-  xs += [(x + l, i) for i, (x, _, l) in enumerate(anchors)]
-  ys = [(y + l - 1, i) for i, (_, y, l) in enumerate(anchors)] # inclusive bound
-  max_x, max_y = max(xs)[0], max(ys)[0] + 1
-  tree = priority.PrioritySearchTree(ys, (-1, -1))
-  
-  # Iterate through the sorted x-points (reference)
-  dp = [(0, i) for i in range(len(anchors))]  # DP table
-  prev = [-1] * len(anchors)  # pointer to the previous element in chain
-  deactivate_bound = 0
-  for i, (x, xi) in enumerate(sorted(xs)):
-    ax, ay, al = anchors[xi]
-
-    if x == ax:  # left interval point
-      while deactivate_bound < i:
-        d = xs[deactivate_bound][1]
-        if xs[deactivate_bound][0] == anchors[d][0] + anchors[d][2]:
-          if ax - (anchors[d][0] + anchors[d][2]) <= MAX_CHAIN_GAP:
-            break
-          tree.deactivate((anchors[d][1] + anchors[d][2] - 1, d))
-        deactivate_bound += 1
-
-      w = MATCH_SCORE * al
-      # Find the highest scoring segment that precedes the current one
-      j = tree.rmq((ay - MAX_CHAIN_GAP, 0), (ay - 1, len(anchors)))
-      if j != -1 and tree.score[j] != priority.MIN_SCORE:
-        j = tree.x[j][1]
-        gap = ax - (anchors[j][0] + anchors[j][2]) + ay - (anchors[j][1] + anchors[j][2])
-        if w + dp[j][0] - gap > 0:
-          dp[xi] = (w + dp[j][0] - gap, dp[xi][1])
-          prev[xi] = j
-          continue
-      dp[xi] = (al, dp[xi][1])
-    else:
-      gap = max_x + 1 - (ax + al) + max_y + 1 - (ay + al)
-      tree.activate((ay + al - 1, xi), dp[xi][0] - gap)
-  dp.sort(reverse=True)
-
-  # Reconstruct the chains
-  paths, used = [], [False] * len(dp)
-  for score, i in dp:
-    if not used[i]:
-      path = []
-      while i != -1 and not used[i]:
-        path.append(i)
-        used[i] = True
-        i = prev[i]
-      path = path[::-1]
-      
-      qlo, qhi = anchors[path[0]][0], anchors[path[-1]][0] + anchors[path[-1]][2]
-      rlo, rhi = anchors[path[0]][1], anchors[path[-1]][1] + anchors[path[-1]][2]
-      if max(rhi - rlo, qhi - qlo) < max(MIN_UPPERCASE_MATCH, MIN_READ_SIZE * (1 - MAX_ERROR)):
-        continue
-      yield path
 
 
-def fill_alignments(x, y, anchors, hit):
+
+def fill_alignments(
+  x, y, anchors, hit,
+  MATCH =  6 + -5,
+  MISMATCH =  6 + 4,
+  GAP_OPEN =  6 + 40,
+  GAP_EXTEND = 6 + 1
+):  
   cigar = []
-  for ai in hit[:-1]:
-    a, an = anchors[ai], anchors[ai + 1]
+  for hi in range(len(hit) - 1):
+    a, an = anchors[hit[hi]], anchors[hit[hi + 1]]
     cigar.append(f'{a[2]}M')
-    xg, yg = an[0] - a[0] - a[2], an[p][1] - a[1] - a[2]
+    xg, yg = an[0] - a[0] - a[2], an[1] - a[1] - a[2]
     if xg == 0:
       cigar.append(f'{yg}I')
     elif yg == 0:
       cigar.append(f'{xg}D')
     elif max(xg, yg) <= 1000:
-      cigar.append((x[a[0] + a[2]:an[0]] @ y[a[1] + a[2]:an[1]]).cigar)
+      cigar.append(str(x[a[0] + a[2]:an[0]].align(y[a[1] + a[2]:an[1]], MATCH, MISMATCH, gapo=GAP_OPEN, gape=GAP_EXTEND).cigar))
     else:
       mi, ma = min(xg, yg), max(xg, yg)
-      a1 = x[a[0] + a[2]:a[0] + a[2] + mi] @ y[a[1] + a[2]:a[1] + a[2] + mi]
-      a2 = x[an[0] - mi:an[0]] @ y[an[1] - mi:an[1]]
-      if a1.score < a2.score:
-        cigar += [a1.cigar, str(ma - mi) + ('I' if xg == mi else 'D')]
+      al = x[a[0] + a[2]:a[0] + a[2] + mi].align(y[a[1] + a[2]:a[1] + a[2] + mi], MATCH, MISMATCH, gapo=GAP_OPEN, gape=GAP_EXTEND)
+      ar = x[an[0] - mi:an[0]].align(y[an[1] - mi:an[1]], MATCH, MISMATCH, gapo=GAP_OPEN, gape=GAP_EXTEND)
+      gc = f"{ma - mi}{'DI'[int(xg == mi)]}"
+      if al.score < ar.score:
+        cigar += [str(al.cigar), gc]
       else:
-        cigar += [str(ma - mi) + ('I' if xg == mi else 'D'), a2.cigar]
-  cigar.append(f'{anchors[hit[-1][2]}M')
-  return bio.CIGAR(''.join(cigar))
+        cigar += [gc, str(ar.cigar)]
+  cigar.append(f'{anchors[hit[-1]][2]}M')
+  return ''.join(cigar)
 
 
-def refine(alignments):
-  same_chr = XX
-
-  score = [
-    R_MATCH * a.matches() - R_MISMATCH * a.mismatches() - R_GAP * a.gaps()
-    for a in alignments
-  ]
-  dp = [0] * len(alignments)
-  prev = [-1] * len(alignments)
-  for ai, _ in enumerate(alignments):
-    if same_chr:
-      qo = max(0, min(i_xe, i_ye) - max(i_xs, i_ys))
-      if max(i_ye - i_ys, i_xe - i_xs) - qo < R_SIDE_ALIGN: # no gap between
-        continue
-    dp[ai] = score[ai]
-    for aj in range(ai - 1, -1, -1):
-      i_xs, i_xe, i_ys, i_ye, i_aln = anchors[ai]
-      j_xs, j_xe, j_ys, j_ye, j_aln = anchors[aj]
-    
-      if i_xs < j_xe: i_xs = j_xe # fix overlaps
-      if i_ys < j_ye: i_ys = j_ye
-      if j_xe >= i_xe or j_ye >= i_ye or j_ys >= i_ys: continue
-
-      mi, ma = min(i_xs - j_xe, i_ys - j_ye), max(i_xs - j_xe, i_ys - j_ye)
-      if ma >= R_MAX_GAP:
-        continue
-      if same_chr and max(0, min(i_xs, i_ys) - max(j_xe, j_ye)) >= 1:  # no gap between
-        continue
-      score = dp[aj] + score[ai] - R_MISMATCH * mi - R_GAPOPEN - R_GAP * (ma - mi)
-      if score >= dp[ai]:
-        dp[ai], prev[ai] = score, aj
-    maxes.append((dp[ai], ai))
-      
-    if (cqs < p.query_end) {
-      cqs = p.query_end;
-    }
-    int crs = c.ref_start;
-    if (crs < p.ref_end) {
-      crs = p.ref_end;
-    }
-
-
-def fast_align(genome, bed):
+if __name__ == '__main__':
   chromosomes = {}
-  with FASTA(genome) as fa:
+  with FASTA(sys.argv[1]) as fa:
     for r in fa:
       chromosomes[r.name] = r.seq
-  
-  with open(bed) as f:
+
+  with timing("align"), open(sys.argv[2]) as f:
+    # hits = []
     for li, lp in enumerate(f):
-      l = lp.split('\t')
-      loc = l[0].split('#')[1], int(l[1]), int(l[2])
-      s1 = chromosomes[loc[0]][loc[1]:loc[2]]
-      loc = l[3].split('#')[1], int(l[4]), int(l[5])
-      s2 = chromosomes[loc[0]][loc[1]:loc[2]]
+      h = Hit(lp)
+      x = chromosomes[h.x.chr.split('#')[1]][h.x.start:h.x.end]
+      y = chromosomes[h.y.chr.split('#')[1]][h.y.start:h.y.end] if not h.rc else ~chromosomes[h.y.chr.split('#')[1]][h.y.start:h.y.end]
+      anchors = list(generate_anchors(x, y, h.x.chr == h.y.chr and not h.rc, h.x.start, h.y.start))
+      for ch in chain(anchors):
+        c = fill_alignments(x, y, anchors, ch)
+        print(li, h.x.start + anchors[ch[0]][0], h.y.start + anchors[ch[0]][1], c)
 
-      anchors = list(generate_anchors(s1, s2, l[0] == l[3], int(l[1]), int(l[4])))
-      chains = chain(anchors)
-      print(chains)
-      if li%100==0:
-        print(f'\r{li}', file=sys.stderr)
-    print(f'\ndone!', file=sys.stderr)
+    #   if li%100==0:
+    #     print(f'\r{li}', file=sys.stderr)
+    # print(f'\ndone!', file=sys.stderr)
 
-fast_align(sys.argv[1], sys.argv[2])
+
+def refine(x, y, hits, h):
+  MATCH = 10
+  MISMATCH = 1
+  GAP = 0.5
+  GAPOPEN = 100 # try to approximate WGAC
+  MIN_READ = 900 # minimal refined read size
+  SIDE_ALIGN = 500 
+  MAX_GAP = 10 * 1024 # max gap during refining process
+  
+  hits.sort()
+  same_chr = h.x.name == h.y.name and not h.rc
+
+  score = [MATCH * h.match() - MISMATCH * h.mismatch() - GAP * h.gap() for h in hits]
+  dp, prev = [0] * len(hits), [-1] * len(hits)
+  maxes = set()
+  for ai, a in enumerate(hits):
+    if same_chr:
+      qo = min(h.x.start + a.x.end, h.y.start + a.y.end) - max(h.x.start + a.x.start, a.y.start + a.y.start)
+      if max(a.y.end - a.y.start, a.x.end - a.x.start) - max(qo, 0) < SIDE_ALIGN:
+        continue # no gap inbetween
+    dp[ai] = score[ai]
+    for aj in range(ai - 1, -1, -1):
+      c, p = hits[ai], hits[aj]
+      cqs = p.x.end if c.x.start < p.x.end else c.x.start
+      crs = p.y.end if c.y.start < p.y.end else c.y.start
+      if p.x.end >= c.x.end or p.y.end >= c.y.end or p.y.start >= c.y.start: 
+        continue
+
+      mi, ma = min(cqs - p.x.end, crs - p.y.end), max(cqs - p.x.end, crs - p.y.end)
+      if ma >= MAX_GAP:
+        continue
+      if same_chr and max(0, min(h.x.start + cqs, h.y.start + crs) - max(h.x.start + p.x.end, h.y.start + p.y.end)) >= 1:
+        continue # no gap between
+      score = dp[aj] + score[ai] - MISMATCH * mi - GAPOPEN - GAP * (ma - mi)
+      if score >= dp[ai]:
+        dp[ai], prev[ai] = score, aj
+    maxes.insert((dp[ai], ai))
+
+    # stage 2
+
+    used = [False] * len(hits)
+    paths = []
+    results = []
+    for d, maxi in maxes:
+      if d == 0: break
+      if used[maxi]: continue
+
+      path = []
+      while maxi != -1 and not used[maxi]:
+        paths.append(maxi)
+        used[maxi] = True
+        maxi = prev[maxi]
+      path = path[::-1]
+
+      est_size = hits[path[0]].aln.span()
+      for i in range(1, len(path)):
+        est_size += hits[path[i]].aln.span()
+        est_size += max(
+          hits[path[i]].x.start - hits[path[i - 1]].x.end,
+          hits[path[i]].y.start - hits[path[i - 1]].y.end
+        )
+      if est_size < MIN_READ - SIDE_ALIGN:
+        continue
+
+      xs, xe = hits[path[0]].x.start, hits[path[-1]].x.end
+      ys, ye = hits[path[0]].y.start, hits[path[-1]].y.end
+      if any(
+        xe - xs - max(0, min(xe, r.x.end) - max(xs, r.x.start)) < SIDE_ALIGN and
+        ye - ys - max(0, min(ye, r.y.end) - max(ys, r.y.start)) < SIDE_ALIGN
+        for r in results
+      ):
+        continue
+      
+      # h = 
 

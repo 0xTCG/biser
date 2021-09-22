@@ -1,0 +1,91 @@
+import sys
+import bisect
+import time
+import bio
+
+MERGE_DIST = 500
+
+@dataclass(eq=True, order=True)
+class Hit:
+    @dataclass(eq=True, order=True)
+    class Interval:
+        chr: str
+        start: int
+        end: int
+    
+    x: Interval
+    y: Interval
+    rc: bool
+
+    def __init__(self, h: Hit):
+        self.x = Interval(h.x.chr, h.x.start, h.x.end)
+        self.y = Interval(h.y.chr, h.y.start, h.y.end)
+        self.rc = h.rc
+    def __init__(self, s: str):
+        l = s.split('\t')
+        self.x = Interval(l[0], int(l[1]), int(l[2]))
+        self.y = Interval(l[3], int(l[4]), int(l[5]))
+        self.rc = l[9] == '-'
+        if self.x > self.y: 
+            self.y, self.x = self.x, self.y
+    
+    def __str__(self):
+        return (
+            f"{self.x.chr}\t{self.x.start}\t{self.x.end}\t"
+            f"{self.y.chr}\t{self.y.start}\t{self.y.end}\t"
+            f"\t\t+\t{'+-'[int(self.rc)]}"
+        )
+
+
+def merge(hits):
+    hits.sort(key=lambda h: (h.rc, h.x.chr, h.y.chr, h.x.start, h.y.start))
+    y_sorted, y_hits = [], []
+    ph = Hit()
+    for hi, h in enumerate(hits):
+        if h.x == h.y and not h.rc:
+            continue
+        if hi == 0:
+            y_sorted, y_hits = [h.y.end], [Hit(h)]
+            ph = Hit(h)
+            continue
+        elif (
+            ph.x.end + MERGE_DIST < h.x.start or 
+            ph.x.chr != h.x.chr or ph.y.chr != h.y.chr or ph.rc != h.rc
+        ):
+            yield from y_hits
+            y_sorted, y_hits = [h.y.end], [Hit(h)]
+            ph = Hit(h)
+        else:
+            while True:
+                update = False
+                s = bisect.bisect_left(y_sorted, h.y.start - MERGE_DIST)
+                while s < len(y_sorted):
+                    if (
+                        y_hits[s].x.end + MERGE_DIST >= h.x.start and
+                        y_hits[s].y.end + MERGE_DIST >= h.y.start and
+                        h.y.end + MERGE_DIST >= y_hits[s].y.start
+                    ):
+                        h.x.end = max(h.x.end, y_hits[s].x.end)
+                        h.y.end = max(h.y.end, y_hits[s].y.end)
+                        h.x.start = min(h.x.start, y_hits[s].x.start)
+                        h.y.start = min(h.y.start, y_hits[s].y.start)
+                        del y_sorted[s], y_hits[s]
+                        update = True
+                    else:
+                        s += 1
+                if not update:
+                    break
+            i = bisect.bisect_left(y_sorted, h.y.end)
+            y_sorted.insert(i, h.y.end)
+            y_hits.insert(i, Hit(h))
+            h.x.end = max(h.x.end, ph.x.end)
+            ph = Hit(h)
+    yield from y_hits
+
+if __name__ == "__main__":
+    with time.timing('Merge'), open(sys.argv[1], 'w') as f:
+        for path in sys.argv[2:]:
+            print(f'processing {path}...')
+            hits = [Hit(l) for l in open(path)]
+            for h in merge(hits):
+                print(h, file=f)
