@@ -1,4 +1,4 @@
-/// 786 
+/// 786
 
 /// This file is subject to the terms and conditions defined in
 /// file 'LICENSE', which is part of this source code package.
@@ -110,15 +110,15 @@ void merge_all(char* s1 = "", char* s2 = "")
 	// char * path = "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/seeds";
 	char * path2 = s2; // "/home/hiseric1/new_sedef/seq/search/test1/noram_with_filtering/merged/";// "/home/hiseric1/new_sedef/seq/search/final/merged/";// "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/sedef_out/merged/";//"/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/new_sedef/merged/";
 	// char * path2= "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/merged/";
-	
+
 	DIR *dir;
-	
+
 	struct dirent *ent;
 
 	if ((dir = opendir (path)) != NULL) {
 		/* print all the files and directories within directory */
 		while ((ent = readdir (dir)) != NULL) {
-			
+
 			// printf ("%s\n", ent->d_name);
 			// if (ent->d_name != "." && ent->d_name != "..")
 			// {
@@ -128,6 +128,7 @@ void merge_all(char* s1 = "", char* s2 = "")
 				// 	help += c + ent->d_name;
 				if (help.substr(help.size() - 4) == ".bed")
 				{
+					eprn("{}", help);
 					std::ifstream input( help);
 					for( std::string line; getline( input, line ); )
 					{
@@ -146,29 +147,29 @@ void merge_all(char* s1 = "", char* s2 = "")
 							// cout << elem.to_bed(false, false);
 							// break;
 						// }
-						
+
 						myfile << elem.to_bed(false, false) << '\n';
 					}
-					
+
 					myfile.close();
 					// break;
 				}
 
-				
-				
+
+
 				// break;
 			// }
-			
+
 		}
 		closedir (dir);
 	} else {
 	/* could not open directory */
 		perror ("No such file");
-	
+
 	}
 	cout << "Done merging file" << s1 << '\n';
 
-	
+
 }
 
 void merge_all_2()
@@ -180,9 +181,9 @@ void merge_all_2()
 	// char * path = "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/seeds";
 	char * path2= "/home/hiseric1/new_sedef/seq/search/sedef_out/mm10_mm10/merged/";// "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/sedef_out/merged/";//"/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/new_sedef/merged/";
 	// char * path2= "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/merged/";
-	
+
 	DIR *dir;
-	
+
 	struct dirent *ent;
 
 	if ((dir = opendir (path)) != NULL) {
@@ -213,7 +214,7 @@ void merge_all_2()
 					// for (auto c:path)
 					// 	help += c + ent->d_name;
 
-					
+
 					if (help.substr(help.size() - 4) == ".bed")
 					{
 						std::ifstream input( help);
@@ -234,16 +235,16 @@ void merge_all_2()
 								// cout << elem.to_bed(false, false);
 								// break;
 							// }
-							
+
 							myfile << elem.to_bed(false, false) << '\n';
 						}
-						
+
 						myfile.close();
 						// break;
 					}
 
-					
-					
+
+
 					// break;
 				}
 			closedir (dir2);
@@ -253,9 +254,9 @@ void merge_all_2()
 	} else {
 	/* could not open directory */
 		perror ("No such file");
-	
+
 	}
-	
+
 }
 
 /******************************************************************************/
@@ -288,15 +289,15 @@ int main(int argc, char **argv)
 		eprn("Arguments missing: please run sedef help for more information.");
 		exit(1);
 	}
-	
+
 	try {
 		if (command == "help") {
 			print_help();
 			exit(0);
-		} 
+		}
 		else if(command == "merge"){
 			// merge_all_2();
-			
+
 			merge_all(argv[2], argv[3]);
 
 		}
@@ -318,7 +319,7 @@ int main(int argc, char **argv)
 	} catch (exception &e) {
 		eprn("Error: {}", e.what());
 		exit(1);
-	} 
-	
+	}
+
 	return 0;
 }

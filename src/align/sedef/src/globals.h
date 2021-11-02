@@ -51,7 +51,7 @@ struct Align { // Full SD alignment (via KSW)
   static int GAP_EXTEND;
 
   // align.cc
-  static const int MAX_KSW_SEQ_LEN = 60 * KB;
+  static const int MAX_KSW_SEQ_LEN = 20 * KB;
 };
 
 struct Extend { // Extension of initial SDs

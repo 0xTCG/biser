@@ -25,6 +25,14 @@ void refine_chains(vector<Hit> &anchors, const string &qseq, const string &rseq,
   dprn(":: taking {} anchors for refinement", anchors.size());
 
   sort(anchors.begin(), anchors.end());
+  // prn("{}", anchors.size());
+  // fmt::print("({}, {}, {}, {}, {});", orig.query_start, orig.query_end,
+  // orig.ref_start, orig.ref_end, int(orig.query->is_rc == orig.ref->is_rc));
+  // for (auto &a : anchors)
+  //   prn("  > {}\t{}\t{}\t{}\t{}", orig.query_start + a.query_start,
+  //       orig.query_start + a.query_end, orig.ref_start + a.ref_start,
+  //       orig.ref_start + a.ref_end, a.aln.cigar_string());
+  // fmt::print("\n");
 
   bool same_chr = orig.query->name == orig.ref->name &&
                   orig.query->is_rc == orig.ref->is_rc;
@@ -98,6 +106,13 @@ void refine_chains(vector<Hit> &anchors, const string &qseq, const string &rseq,
     }
     maxes.insert({dp[ai], ai});
   }
+
+  // for (int i = 0; i < dp.size(); i++) {
+  //   prn("  - {} {} {} {}", anchors[i].aln.cigar_string(), score[i], dp[i],
+  //       prev[i]);
+  //   // prn("{}\n{}\n{}\n-", anchors[i].aln.align_a, anchors[i].aln.alignment,
+  //   // anchors[i].aln.align_b);
+  // }
 
   vector<bool> used(anchors.size(), 0);
   vector<deque<int>> paths;
@@ -189,5 +204,9 @@ void refine_chains(vector<Hit> &anchors, const string &qseq, const string &rseq,
     }
   }
 
+  // for (auto &a: hits)
+  // prn("  (({}, {}), ({}, {}), {}, {})", a.query_start, a.query_end,
+  // a.ref_start, a.ref_end, int(a.query->is_rc == a.ref->is_rc),
+  // a.aln.cigar_string());
   anchors = hits;
 }

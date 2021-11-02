@@ -236,6 +236,7 @@ auto bucket_alignments(const string &bed_path, int nbins, string output_dir,
   }
 
   eprn("Read total {} alignments", hits.size());
+  return vector<vector<Hit>>{hits};
   if (extend) {
     hits = merge(hits, Globals::Extend::MERGE_DIST);
     eprn("After merging remaining {} alignments", hits.size());
@@ -288,13 +289,11 @@ void generate_alignments(const string &ref_path, const string &bed_path,
   // int a___ = 3;
 
   auto schedule = bucket_alignments(bed_path, 1, "", false);
-  if (ref_path2 == "")
-  {
+  if (ref_path2 == "") {
     ref_path2 = ref_path;
   }
   FastaReference fr(ref_path);
   FastaReference fr2(ref_path2);
-
 
   int lines = 0, total = 0;
   for (auto &s : schedule)
@@ -307,22 +306,29 @@ void generate_alignments(const string &ref_path, const string &bed_path,
     for (auto &h : schedule[i]) {
       lines++;
       // auto name1 = h.query->name
-      
+
       string delimiter = "#";
-      string name1 = h.query->name.substr(h.query->name.find_last_of(delimiter) + 1, h.query->name.size());  //   h.query->name.substr(0, h.query->name.find(delimiter));
-      string name2 = h.ref->name.substr(h.ref->name.find_last_of(delimiter) + 1, h.ref->name.size());
+      string name1 = h.query->name.substr(
+          h.query->name.find_last_of(delimiter) + 1,
+          h.query->name.size()); //   h.query->name.substr(0,
+                                 //   h.query->name.find(delimiter));
+      string name2 = h.ref->name.substr(h.ref->name.find_last_of(delimiter) + 1,
+                                        h.ref->name.size());
 
       string fa = fr.get_sequence(name1, h.query_start, &h.query_end);
       string fb = fr2.get_sequence(name2, h.ref_start, &h.ref_end);
       if (h.ref->is_rc)
         fb = rc(fb);
 
-      eprnn("\r Processing {} out of {} ({:.1f}%, len {:10n} to {:10n})", lines,
-            total, pct(lines, total), fa.size(), fb.size());
+      // eprnn("\r Processing {} out of {} ({:.1f}%, len {:10n} to {:10n})",
+      // lines, total, pct(lines, total), fa.size(), fb.size());
 
       // eprn("{}", h.to_bed(0));
 
+      // fmt::print("{} {} {}; {} {} {}; ",
+      // h.query->name,h.query_start,h.query_end,h.ref->name,h.ref_start,h.ref_end);
       auto alns = fast_align(fa, fb, h, kmer_size);
+      // continue;
       for (auto &hh : alns) {
         hh.query_start += h.query_start;
         hh.query_end += h.query_start;
@@ -344,7 +350,6 @@ void generate_alignments(const string &ref_path, const string &bed_path,
       // break;
     }
     // break;
-
   }
 
   eprn("\nFinished BED {} in {}s ({} lines, generated {} hits)", bed_path,
@@ -388,7 +393,6 @@ void align_main(int argc, char **argv) {
     if (cmdl(3)) {
       query_str = cmdl[3];
       // eprn("HERE {}, {}", query_str, ref_str);
-
     }
     generate_alignments(ref_str, cmdl[2], kmer_size, query_str);
   } else {

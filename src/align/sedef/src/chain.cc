@@ -43,7 +43,7 @@ vector<Anchor> generate_anchors(const string &query, const string &ref,
 
   vector<int> slide(query.size() + ref.size(), -1);
   vector<Anchor> anchors;
-  dprn("got {} hashes", ref_hashes.size());
+  // fmt::print("{}; ", ref_hashes.size());
 
   bool same_chr = orig.query->name == orig.ref->name &&
                   orig.query->is_rc == orig.ref->is_rc;
@@ -132,6 +132,12 @@ auto chain_anchors(vector<Anchor> &anchors) {
   sort(xs.begin(), xs.end());
   SegmentTree<Coor> tree(ys);
 
+  // fmt::print("\np: ["); for (auto &i: tree.tree) fmt::print("{}, ", i.p);
+  // fmt::print("\n"); fmt::print("a: ["); for (auto &i: tree.tree)
+  // fmt::print("{}, ", i.a); fmt::print("\n"); fmt::print("h: ["); for (auto
+  // &i: tree.tree) fmt::print("({}, {}), ", i.h.first, i.h.second);
+  // fmt::print("\n");
+
   vector<int> prev(anchors.size(), -1);
   vector<pair<int, int>> dp(anchors.size());
   for (int i = 0; i < dp.size(); i++) {
@@ -159,6 +165,7 @@ auto chain_anchors(vector<Anchor> &anchors) {
               (Globals::Chain::MATCH_CHAIN_SCORE / 2) * (a.l - a.has_u);
       int j = tree.rmq({a.r - Globals::Chain::MAX_CHAIN_GAP, 0},
                        {a.r - 1, anchors.size()});
+      // fmt::print("{}\n", j);
       if (j != -1 && ys[j].score != SegmentTree<Coor>::MIN) {
         j = ys[j].pos;
         auto &p = anchors[j];
@@ -178,8 +185,18 @@ auto chain_anchors(vector<Anchor> &anchors) {
       int gap = (max_q + 1 - (a.q + a.l) + max_r + 1 - (a.r + a.l));
       tree.activate({a.r + a.l - 1, i}, dp[i].first - gap);
     }
+
+    // fmt::print("=== {} {} {}\n", x.x.first, i, deactivate_bound);
+    // fmt::print("p: ["); for (auto &i: tree.tree) fmt::print("{}, ", i.p);
+    // fmt::print("\n"); fmt::print("a: ["); for (auto &i: tree.tree)
+    // fmt::print("{}, ", i.a); fmt::print("\n"); fmt::print("h: ["); for (auto
+    // &i: tree.tree) fmt::print("({}, {}), ", i.h.first, i.h.second);
+    // fmt::print("\n"); fmt::print("dp: ["); for (auto &i: dp) fmt::print("({},
+    // {}), ", i.first, i.second); fmt::print("\n");
   }
   sort(dp.begin(), dp.end(), greater<pair<int, int>>());
+  // fmt::print("dp: ["); for (auto &i: dp) fmt::print("({}, {}), ", i.first,
+  // i.second); fmt::print("\n");
 
   vector<int> path;
   path.reserve(anchors.size());
@@ -197,6 +214,7 @@ auto chain_anchors(vector<Anchor> &anchors) {
       maxi = prev[maxi];
     }
     boundaries.push_back({path.size(), has_u});
+    // eprn("-- {} {}", path.size(), has_u);
   }
   return make_pair(path, boundaries);
 }
@@ -214,8 +232,17 @@ vector<Hit> fast_align(const string &query, const string &ref, const Hit &orig,
   auto anchors = generate_anchors(query, ref, orig, kmer_size);
   dprn("-- got {} anchors in {} s", anchors.size(), elapsed(T));
   // Added this here:
-  eprn("-- got {} anchors in {} s", anchors.size(), elapsed(T));
+  // eprn("-- got {} anchors in {} s", anchors.size(), elapsed(T));
   T = cur_time();
+
+  string s;
+  // for (int i=0;i<anchors.size();i++) {
+  //     s += (i?",":"") + fmt::format("({}, {}, {})",
+  //       anchors[i].q,anchors[i].r,anchors[i].l
+  //     );
+  // }
+  // fmt::print("{}\n", s);
+  // return vector<Hit>{};
 
   /// 2. Run DP on the anchors and collect all different anchors
   vector<Hit> hits;
@@ -227,6 +254,7 @@ vector<Hit> fast_align(const string &query, const string &ref, const Hit &orig,
     bool has_u = bounds[bi].second;
     int be = bounds[bi].first;
     int bs = bounds[bi - 1].first;
+    // eprn(">> {} {}", bs, be);
     int up = bounds[bi].second;
 
     int qlo = anchors[chain[be - 1]].q,
@@ -255,8 +283,35 @@ vector<Hit> fast_align(const string &query, const string &ref, const Hit &orig,
   dprn(":: elapsed/dp = {}s", elapsed(T));
   T = cur_time();
 
+  // fmt::print(stderr,
+  //   ">> {} {} {} {} {} \n",
+  //   Globals::Chain::MIN_UPPERCASE_MATCH ,
+  //           Globals::Search::MIN_READ_SIZE,
+  //           Globals::Search::MAX_ERROR,
+  //           Globals::Chain::MATCH_CHAIN_SCORE,
+  //           Globals::Chain::MAX_CHAIN_GAP
+  // );
+
+  // vector<int> x;
+  // for (int i=0;i<hits.size(); i++) x.push_back(i);
+  // sort(x.begin(), x.end(), [&](int a, int b) {
+  //   return hits[a].query_start<hits[b].query_start;
+  // });
+  // s="";
+  // for (int hi=0;hi<x.size();hi++) {
+  //   s+=(hi?"\n[":"[");
+  //   for (int i=0;i<guides[x[hi]].size();i++)
+  //     s += "\n  " + fmt::format("({}, {}, {})",
+  //       anchors[guides[x[hi]][i]].q,anchors[guides[x[hi]][i]].r,anchors[guides[x[hi]][i]].l
+  //     );
+  //   s+="\n]";
+  // }
+  // fmt::print("{}\n", s);
+  // return hits;
+
   /// 3. Perform the full alignment
   vector<Hit> new_hits;
+  // prn("{}", orig.to_bed());
   for (auto &h : hits) {
     h.aln = Alignment(query, ref, anchors, guides[&h - &hits[0]]);
     update_from_alignment(h);
@@ -266,6 +321,10 @@ vector<Hit> fast_align(const string &query, const string &ref, const Hit &orig,
 
   /// 3. Refine these chains
   refine_chains(hits, query, ref, orig);
+  // for (auto &h : hits)
+  //   prn("  {}\t{}\t{}\t{}\t{}", orig.query_start + h.query_start,
+  //       orig.query_start + h.query_end, orig.ref_start + h.ref_start,
+  //       orig.ref_start + h.ref_end, h.aln.cigar_string());
   dprn(":: elapsed/refinement = {}s", elapsed(T));
   T = cur_time();
 

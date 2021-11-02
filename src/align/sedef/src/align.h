@@ -30,6 +30,7 @@ struct Anchor {
 /******************************************************************************/
 
 class Alignment {
+public:
   std::string chr_a;
   int start_a, end_a;
   std::string chr_b;
