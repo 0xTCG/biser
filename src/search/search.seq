@@ -225,24 +225,23 @@ def build_index(
     L = None # ListNode
     processed_kmer_count = 0
 
-    winnow = [] # collections.deque()
+    winnow = []
     h, last_hash = 0, -1  # Hash(-1,0)
     for i, si in enumerate(s): # TODO: use seq k-mers
         h = ((h << 2) | (int(si) & 3)) & MASK
         if i < KMER_SIZE - 1:
             continue
         # here we ensure that correct elements are in winnow
-        # SEQ_TODO
         while winnow and not (winnow[-1][0] < h):
             winnow.pop()
         while winnow and winnow[-1][1] < (i - KMER_SIZE + 1) - WINNOW_SIZE:
-            winnow.pop(0)  #popleft()
+            winnow.pop(0)
         winnow.append((h, i - KMER_SIZE + 1))
         if i - KMER_SIZE + 1 < WINNOW_SIZE:
             continue
         if len(index) == 0 or winnow[0][0] != last_hash:
             processed_kmer_count += 1
-            hash = winnow[0][0]  # Hash(winnow[0][1].hash,winnow[0][1].status)
+            hash = winnow[0][0]
             if hash in index:
                 if find_sds:
                     if len(index[hash]) < max_frequency:
@@ -261,6 +260,9 @@ def build_index(
     return processed_kmer_count
 
 
+def valid_chr(chr):
+    return "_" not in chr and chr != "chrM"
+
 def biser_search(ref_path, query_path, ref_chr):
     """
     this is main function for parallel call if one chr is specified,
@@ -268,20 +270,18 @@ def biser_search(ref_path, query_path, ref_chr):
     that are lexicographically bigger than it
     """
 
-    species = ref_path.split("/")[-1][0:-3].split("_")[0]
-
+    species = ref_path.split("/")[-1].split('.')[0].split("_")[0]
     index = {} # Dict[ int, List[Tuple[int, int]] ]
     result: Dict[str, List[str]] = {} # 
     # here we first build dictionary and find potential regions in reference chromosome
-
     chromosomes = []
     if not ref_chr:
-        with open(f"{ref_path}.fai") as f:
-            for i in f.readlines():
-                line = i.split("\t")
-                if not "_" in line[0] and line[0] != "chrM":
-                    if query_path != ref_path or line[0] > ref_chr:
-                        chromosomes.append(Chromosome(len(chromosomes), species, line[0]))
+        assert query_path != ref_path
+        with bio.FASTA(ref_path) as fr:
+            for i in fr:
+                if valid_chr(i.name):
+                    chromosomes.append(Chromosome(len(chromosomes), species, i.name))
+                    chromosomes.append(Chromosome(len(chromosomes), species, i.name, True))
     else:
         chromosomes.append(Chromosome(len(chromosomes), species, ref_chr))
         chromosomes.append(Chromosome(len(chromosomes), species, ref_chr, True))
@@ -302,7 +302,6 @@ def biser_search(ref_path, query_path, ref_chr):
 
     # Now we find matching subsequences in all other chromosomes that are bigger than 
     # out ref_chr if both specie are same, if not, take all chromosomes from another specie
-    species = query_path.split("/")[-1][0:-3].split("_")[0]
     hist, max_len = {}, 0
     for loci in index.values():
         hist[len(loci)] = hist.get(len(loci), 0) + 1
@@ -319,12 +318,13 @@ def biser_search(ref_path, query_path, ref_chr):
 
     # here we read all other chromosomes:
     begin = len(chromosomes)
-    with open(f"{query_path}.fai") as f:
-        for i in f.readlines():
-            line = i.split("\t")
-            if not "_" in line[0] and line[0] != "chrM":
-                if query_path != ref_path or line[0] > ref_chr:
-                    chromosomes.append(Chromosome(len(chromosomes), species, line[0]))
+    species = query_path.split("/")[-1].split('.')[0].split("_")[0]
+    with bio.FASTA(query_path) as fr:
+        for i in fr:
+            if valid_chr(i.name):
+                if query_path != ref_path or i.name > ref_chr:
+                    chromosomes.append(Chromosome(len(chromosomes), species, i.name))
+                    chromosomes.append(Chromosome(len(chromosomes), species, i.name, True))
     with bio.FASTA(query_path) as fr:
         for chr_index in range(begin, len(chromosomes)):
             chr = chromosomes[chr_index]
@@ -343,8 +343,8 @@ def biser_search(ref_path, query_path, ref_chr):
     return result
 
 if __name__ == "__main__":
-    out = "test/"
-    opts, args = getopt.getopt(sys.argv[1:], "n:k:r:w:o:d:s:g:f:p:m:q:")
+    out, threads = 'biser_search.bed', 1
+    opts, args = getopt.getopt(sys.argv[1:], "k:w:o:p:r:q:t:")
     for o, a in opts:
         if o in ("-k", "--kmer"):
             KMER_SIZE = int(a)
@@ -359,17 +359,21 @@ if __name__ == "__main__":
             REF_THRESHOLD = int(a)
         elif o in ("-q", "--query"):
             QUERY_THRESHOLD = int(a)
+        elif o in ("-t", "--threads"):
+            THREADS = int(a)
     if len(args) < 2:
         print("Wrong formatting")
-    fa1, fa2, chr1, chr2 = args + ["", ""]
-    print(f"Input: {fa1}\t{fa2}\t{chr1}\t{chr2}, {KMER_SIZE}, {WINNOW_SIZE}")
+    fa1, fa2, chr1 = args + ["", ""]
+    print(f"Input: {fa1}\t{fa2}\t{chr1}, {KMER_SIZE}, {WINNOW_SIZE}")
+    TAU = tau()
 
-    with time.timing("Search"):
-        TAU = tau()
-        try: os.mkdir(out)
-        except: pass
-        results = biser_search(fa1, fa2, chr1)
-        for i, di in results.items():
-            with open(f'{out}{i}', "w") as f:
-                for j in di:
-                    print(j, file=f)
+    with time.timing("Search"):    
+        chromosomes = [i.name for i in bio.FASTA(fa1) if valid_chr(i.name)]
+        results = {c: {} for c in chromosomes}
+        # @par(num_threads=threads)
+        for c in chromosomes:
+            results[c] = biser_search(fa1, fa2, c)
+        with open(out, "w") as f:
+            for _, r in results.items():
+                for i in r:
+                    print(i, file=f)
