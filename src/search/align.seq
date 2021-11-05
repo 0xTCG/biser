@@ -110,45 +110,42 @@ def refine(orig_h, hits):
 
 if __name__ == '__main__':
   chromosomes = {}
-  with timing('load'), FASTA(sys.argv[1]) as fa:
+  nt=8
+  lo = [[] for i in range(nt)]
+  res = [[] for i in range(nt)]
+  
+  with timing('Loading'), FASTA(sys.argv[1]) as fa:
     for r in fa:
-      chromosomes['small#' + r.name, False] = Chromosome('small', 'small#'+r.name, False, r.seq)
-      chromosomes['small#' + r.name, True] = Chromosome('small', 'small#'+r.name, True, r.seq)
+      chromosomes[r.name, False] = Chromosome('hg19', r.name, False, r.seq)
+      chromosomes[r.name, True] = Chromosome('hg19', r.name, True, r.seq)
 
-  with timing("align"), open(sys.argv[2]) as f:
-    # res = [[] for i in range(8)]
-    # fx = [lp for lp in f]
+    with open(sys.argv[2]) as f:
+      rx = []
+      for lp in f:
+        h = Hit(lp, chromosomes)
+        rx.append(h)
+      rx.sort(key=lambda x: max(x.x.end-x.x.start,x.y.end-x.y.start))    
+      for j,h in enumerate(rx):
+        lo[j%nt].append(h)
+      for i in lo:
+        print('>',len(i), file=sys.stderr)
 
-    # rx = []
-    # for lp in f:
-    #   h = Hit(lp, chromosomes)
-    #   rx.append(h)
-    # rx.sort(key=lambda x: max(x.x.end-x.x.start,x.y.end-x.y.start))
+  with timing("Alignment"):
+    @par(num_threads=nt)
+    for ri in range(nt):
+      ll = res[ri]
+      with timing(f'Threaad {ri}'):
+        for h in lo[ri]:
+          # h = Hit(lp, chromosomes)
+          anchors = list(generate_anchors(h))
+          new_hits = []
+          for ch in chain(anchors):
+            nh = Hit(h, [Hit(h, anchors[i]) for i in ch])
+            new_hits.append(nh)
+          for nh in refine(h, new_hits):
+            # print(f'  {nh.x.start}\t{nh.x.end}\t{nh.y.start}\t{nh.y.end}\t{nh.simple_cigar()}')
+            ll.append(nh)
     
-    # nt=4
-    # lo = [[] for i in range(nt)]
-    # res = [[] for i in range(nt)]
-    # for j,h in enumerate(rx):
-    #   lo[j%nt].append(h)
-    # for i in lo:
-    #   print('>',len(i), file=sys.stderr)
-
-    # @par(num_threads=nt) #, schedule='dynamic', chunk_size=20)
-    for li, lp in enumerate(f):
-      h = Hit(lp, chromosomes)
-      anchors = list(generate_anchors(h))
-      new_hits = []
-      for ch in chain(anchors):
-        nh = Hit(h, [Hit(h, anchors[i]) for i in ch])
-        new_hits.append(nh)
-      for nh in refine(h, new_hits):
-        print(f'  {nh.x.start}\t{nh.x.end}\t{nh.y.start}\t{nh.y.end}\t{nh.simple_cigar()}')
-        # res[li].append(nh)
-    
-    # for r in res:
-    #   for h in r:
-    #     print(h)    
-    #   if li%100==0:
-    #     print(f'\r{li}', file=sys.stderr)
-    # print(f'\ndone!', file=sys.stderr)
-
+    for r in res:
+      for h in r:
+        print(h)    

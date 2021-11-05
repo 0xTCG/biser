@@ -12,7 +12,7 @@ GAPO = -40
 GAPE = -1
 
 def align(x, y):
-  MAX_ALIGN = 20 * 1000
+  MAX_ALIGN = 30 * 1000
   s, c = 0, []
   for oi in range(0, max(len(x), len(y)), MAX_ALIGN):
     a = bio.seq.align(
@@ -76,6 +76,12 @@ class Hit:
     self.x = Interval(h.x.chr, h.x.start, h.x.end)
     self.y = Interval(h.y.chr, h.y.start, h.y.end)
     self.cigar = copy(h.cigar)
+  def __init__(self, sp1, c1, s1, e1, st1, sp2, c2, s2, e2, st2):
+    self.x = Interval(Chromosome(sp1, c1, st1, bio.seq()), s1, e1)
+    self.y = Interval(Chromosome(sp2, c2, st2, bio.seq()), s2, e2)
+    if self.y < self.x: 
+      self.y, self.x = self.x, self.y
+    self.cigar = []
   def __init__(self, s: str, chromosomes: Optional[Dict[Tuple[str, bool], Chromosome]] = None):
     l = s.strip().split('\t')
     if chromosomes:
