@@ -102,161 +102,20 @@ void print_help()
 /*********************************************/
 #include <dirent.h>
 
-void merge_all(char* s1 = "", char* s2 = "")
+void merge_all(string s1 = "", string s2 = "")
 {
-    // char * path = "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/new_sedef/seeds";
-    char * path = s1; // == "" ? "/home/hiseric1/new_sedef/seq/search/test1/noram_with_filtering/seeds/"; // "/home/hiseric1/new_sedef/seq/search/final/seeds/";//# "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/sedef_out/different_naming_seeds/";
-
-	// char * path = "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/seeds";
-	char * path2 = s2; // "/home/hiseric1/new_sedef/seq/search/test1/noram_with_filtering/merged/";// "/home/hiseric1/new_sedef/seq/search/final/merged/";// "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/sedef_out/merged/";//"/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/new_sedef/merged/";
-	// char * path2= "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/merged/";
-
-	DIR *dir;
-
-	struct dirent *ent;
-
-	if ((dir = opendir (path)) != NULL) {
-		/* print all the files and directories within directory */
-		while ((ent = readdir (dir)) != NULL) {
-
-			// printf ("%s\n", ent->d_name);
-			// if (ent->d_name != "." && ent->d_name != "..")
-			// {
-				vector<Hit> hits = vector<Hit>();
-				string help = string(path)+ "/" + string(ent->d_name);
-				// for (auto c:path)
-				// 	help += c + ent->d_name;
-				if (help.substr(help.size() - 4) == ".bed")
-				{
-					eprn("{}", help);
-					std::ifstream input( help);
-					for( std::string line; getline( input, line ); )
-					{
-						hits.push_back(Hit::from_bed(line, nullptr));
-					}
-					input.close();
-					auto result = merge(hits, 500);
-					// cout << hits.size() << "\t"<<result.size() << '\n';
-					ofstream myfile;
-					string help = string(path2) + string(ent->d_name) + "_merged";
-					myfile.open (help, std::ofstream::trunc);
-					for (auto elem: result)
-					{
-						// if (elem.ref_start < 0)
-						// {
-							// cout << elem.to_bed(false, false);
-							// break;
-						// }
-
-						myfile << elem.to_bed(false, false) << '\n';
-					}
-
-					myfile.close();
-					// break;
-				}
-
-
-
-				// break;
-			// }
-
-		}
-		closedir (dir);
-	} else {
-	/* could not open directory */
-		perror ("No such file");
-
-	}
+	vector<Hit> hits = vector<Hit>();
+	std::ifstream input(s1);
+	for( std::string line; getline( input, line ); )
+		hits.push_back(Hit::from_bed(line, nullptr));
+	input.close();
+	auto result = merge(hits, 500);
+	ofstream myfile;
+	myfile.open (s2, std::ofstream::trunc);
+	for (auto elem: result)
+		myfile << elem.to_bed(false, false) << '\n';
+	myfile.close();
 	cout << "Done merging file" << s1 << '\n';
-
-
-}
-
-void merge_all_2()
-{
-    // char * path = "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/new_sedef/seeds";
-    // char * path = "/home/hiseric1/new_sedef/seq/search/sedef_out/mm10_mm10/seeds/";//# "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/sedef_out/different_naming_seeds/";
-    char * path = "/home/hiseric1/new_sedef/seq/search/sedef_out/";//# "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/sedef_out/different_naming_seeds/";
-
-	// char * path = "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/seeds";
-	char * path2= "/home/hiseric1/new_sedef/seq/search/sedef_out/mm10_mm10/merged/";// "/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/sedef_out/merged/";//"/home/hiseric1/Desktop/SEDEF_SEQ/multisedef/seq/search/new_sedef/merged/";
-	// char * path2= "/home/hiseric1/Desktop/SEDEF_SEQ/orginal/sedef/out/merged/";
-
-	DIR *dir;
-
-	struct dirent *ent;
-
-	if ((dir = opendir (path)) != NULL) {
-		/* print all the files and directories within directory */
-		while ((ent = readdir (dir)) != NULL) {
-			// struct dirent *ent2;
-			printf ("Name 1: %s\n", ent->d_name);
-			DIR* dir2;
-			string path_h = string(path) + string(ent->d_name) + string("/seeds/");
-			string path_h_2 = string(path) + string(ent->d_name) + string("/merged/");
-
-			cout << "HEREEEE:  " << path_h << endl;
-			cout << "HEREEEE 2:  " << path_h_2 << endl;
-
-			// char * path_h_c = path_h;
-			// printf ("%s\n", path_h_c);
-
-			if ((dir2 = opendir (path_h.c_str())) != NULL) {
-				struct dirent *ent2;
-
-				while ((ent2 = readdir (dir2)) != NULL) {
-				// if (ent->d_name != "." && ent->d_name != "..")
-				// {
-					vector<Hit> hits = vector<Hit>();
-					string help = string(path_h) + string(ent2->d_name) ;
-					cout << "HELP: " << help << endl;
-					// path_h2 += "/" + string(ent->d_name);
-					// for (auto c:path)
-					// 	help += c + ent->d_name;
-
-
-					if (help.substr(help.size() - 4) == ".bed")
-					{
-						std::ifstream input( help);
-						for( std::string line; getline( input, line ); )
-						{
-							hits.push_back(Hit::from_bed(line, nullptr));
-						}
-						input.close();
-						auto result = merge(hits, 500);
-						cout << hits.size() << "\t"<<result.size() << '\n';
-						ofstream myfile;
-						string help = path_h_2 + string(ent2->d_name) + "_merged";
-						myfile.open (help, std::ofstream::trunc);
-						for (auto elem: result)
-						{
-							// if (elem.ref_start < 0)
-							// {
-								// cout << elem.to_bed(false, false);
-								// break;
-							// }
-
-							myfile << elem.to_bed(false, false) << '\n';
-						}
-
-						myfile.close();
-						// break;
-					}
-
-
-
-					// break;
-				}
-			closedir (dir2);
-			}
-		}
-		closedir (dir);
-	} else {
-	/* could not open directory */
-		perror ("No such file");
-
-	}
-
 }
 
 /******************************************************************************/

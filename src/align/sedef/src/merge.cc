@@ -52,6 +52,9 @@ vector<Hit> merge(vector<Hit> &hits, const int merge_dist) {
                                   b.query_start, b.ref_start);
   });
 
+  for (auto &h: hits)
+    prn("{}", h.to_bed(0, 0));
+
   Hit rec, prev;
   int wcount = 0;
   size_t len = 0;

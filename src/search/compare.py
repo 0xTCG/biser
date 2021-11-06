@@ -1,9 +1,10 @@
 #%%
+import sys
 import pyranges as pr
 import pandas as pd
 
 chrs, start, end = [], [], []
-with open("_x") as f:
+with open(sys.argv[1]) as f:
     for l in f:
         l = l.split()
         chrs.append(l[0] + l[7])
@@ -15,7 +16,7 @@ with open("_x") as f:
 rx = pr.PyRanges(chromosomes=chrs, starts=start, ends=end)
 
 chrs, start, end = [], [], []
-with open("_y") as f:
+with open(sys.argv[2]) as f:
     for l in f:
         l = l.split()
         chrs.append(l[0] + l[7])
@@ -25,9 +26,13 @@ with open("_y") as f:
         start.append(int(l[4]))
         end.append(int(l[5]))
 ry = pr.PyRanges(chromosomes=chrs, starts=start, ends=end)
+print('done')
+
+d = pr.count_overlaps({"x": rx, "y": ry})
+print('done2')
 
 xuniq, yuniq, shared = 0, 0, 0
-for _, r in pr.count_overlaps({"x": rx, "y": ry}).df.iterrows():
+for _, r in d.df.iterrows():
     span = r["End"] - r["Start"]
     if r["x"] == 0 and r["y"] == 0:
         continue
@@ -37,7 +42,7 @@ for _, r in pr.count_overlaps({"x": rx, "y": ry}).df.iterrows():
         xuniq += span
     else:
         shared += span
-print(f"x={xuniq / 1e6:,.2f}, y={yuniq / 1e6:,.2f}, xy={shared / 1e6:,.2f}")
+print(f"x={xuniq :,}, y={yuniq :,}, xy={shared :,}")
 
 #%%
 # pd.set_option("display.max_rows", None)

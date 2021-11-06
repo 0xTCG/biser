@@ -177,7 +177,7 @@ string Hit::to_bed(bool do_rc, bool with_cigar,
                      "{}\t{}\t"     // MAXLEN 10 ALNLEN 11
                      "{}{}",        // CIGAR 12 COMMENT 13
                      qn, qs, qe, rn, rs, re, name,
-                     aln.span() ? fmt::format("{:.1f}", aln.total_error()) : "",
+                     aln.span() ? fmt::format("{:.1f}", aln.total_error()) : "nan",
                      query->is_rc ? "-" : "+", ref->is_rc ? "-" : "+",
                      // Optional fields
                      // - Max. span

@@ -226,7 +226,7 @@ def print_sd(
 
         name = f"{chr1}.{specie1}_{chr2}.{specie2}_{strand}.bed"  # if chr1 < chr2 else f'{chr2}_{chr1}_{strand}.bed'
 
-        s1 = f"{specie1}#{chr1}\t{b1}\t{e1}\t{specie2}#{chr2}\t{b2}\t{e2}\t\t\t+\t{strand_}\n"  # \t{specie1}\t{specie2}\n'
+        s1 = f"{chr1}\t{b1}\t{e1}\t{chr2}\t{b2}\t{e2}\t\tnan\t+\t{strand_}\n"  # \t{specie1}\t{specie2}\n'
 
         if name in dict_final_sds:
             dict_final_sds[name].append(s1)
@@ -573,6 +573,8 @@ def get_minimizers_winnowed(
     dict_final_sds=dict[str, list[str]](),
     frequency=0,
 ):
+    # print '[BI]', croms[chr_]
+    # print '[BI]', len(new_minimizers), just_find, just_build_index, frequency, sum(len(r) for r in dict_final_sds.values())
 
     minimizers_dict = new_minimizers
     threads = Optional[Linked_list_node]()  # Linked_list_node(-1,-1,-1)
@@ -637,6 +639,7 @@ def get_minimizers_winnowed(
                     if frequency and len(minimizers_dict[newHash]) >= frequency:
                         filtered += 1
                         continue
+                    # print '[BI]', 'update', newHash, chr_, window[0][1], sum(len(r) for r in dict_final_sds.values())
                     threads = add_to_tree_3(
                         threads,
                         minimizers_dict[newHash],
@@ -649,13 +652,15 @@ def get_minimizers_winnowed(
                         dict_final_sds,
                     )
                 if just_build_index:
+                    # print '[BI]', 'append', newHash, chr_, window[0][1]
                     minimizers_dict[newHash].append((chr_, window[0][1]))
             elif just_build_index:
+                # print '[BI]', 'init', newHash, chr_, window[0][1]
                 minimizers_dict[newHash] = [(chr_, window[0][1])]
 
             last_hash = newHash
     walker = threads
-
+    # print '[BI]', sum(len(r) for r in dict_final_sds.values())
     while walker and just_find:
         if walker.potentional and (
             walker.last - walker.first > query_threshold or walker.count >= 4
@@ -675,7 +680,7 @@ def get_minimizers_winnowed(
                         walker, current, current_chr, croms, lens_dict, dict_final_sds
                     )
         walker = walker.next
-
+    # print '[BI]', sum(len(r) for r in dict_final_sds.values())
     return index_set, main_count, filtered
 
 
@@ -1164,13 +1169,12 @@ def get_fas():
 def print_dict(dict_final_sds):
     print(f"writing in {out}")
 
-    for i in dict_final_sds:
-        file_ = open(out + i, "w")
-        print('out', out+i)
+    file_ = open(out, "w")
+    print('out', out)
+    for i in sorted(dict_final_sds):
         for i in dict_final_sds[i]:
-            # print(i)
             file_.write(i)
-        file_.close()
+    file_.close()
 
 
 with timing("whole code"):
@@ -1185,8 +1189,8 @@ with timing("whole code"):
     strand_r = False
 
     second_fa = main_fa
-    print(opts)
-    print(args)
+    # print(opts)
+    # print(args)
     if len(opts) > 0:
         # here we read initial input params
         for o, a in opts:
@@ -1196,8 +1200,6 @@ with timing("whole code"):
                 winnow_size = int(a)
             elif o in ("-o", "--output"):
                 out = a
-                if a[-1] != "/":
-                    out += "/"
             elif o in ("-d", "--dynamic"):
                 if a == "1":
                     do_dynamic_distance = True
