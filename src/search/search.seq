@@ -96,6 +96,7 @@ def save_sd(L, cur, chrs, result):
     chr1, chr2 = chrs[L.chr], chrs[cur.chr]
     coord = (0, 0, 0, 0)
     complement = chr1.complement or chr2.complement
+    # TODO: just use normal coordinates
     if complement and str(chr1) == str(chr2):
       coord = pad_sd(
         chrs, L.chr, L.first, L.last, cur.chr, chr2.len - cur.loc, chr2.len - L.ref

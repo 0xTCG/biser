@@ -3,7 +3,7 @@ from time import time
 from bio import FASTA, Kmer, CIGAR
 from time import timing
 from chain import chain
-from merge import Hit, Chromosome
+from hit import Hit, Chromosome
 import threading as thr
 
 
@@ -47,6 +47,12 @@ def refine(orig_h, hits):
   dp, prev = [0.0] * len(hits), [-1] * len(hits)
   maxes = []
   for ai, a in enumerate(hits):
+    # print a.x.start, a.x.end, a.y.start, a.y.end, score[ai]
+    # print a.simple_cigar()
+    # xa, _, xb = a.nice()
+    # print xa
+    # print xb
+
     if orig_h.same_chr():
       qo = min(a.x.end, a.y.end) - max(a.x.start, a.y.start)
       if max(a.y.end - a.y.start, a.x.end - a.x.start) - max(qo, 0) < SIDE_ALIGN:
@@ -69,6 +75,7 @@ def refine(orig_h, hits):
         dp[ai], prev[ai] = sc, aj
     maxes.append((dp[ai], ai))
   maxes.sort(reverse=True)
+  # for d, maxi in maxes: print 'max', d, maxi
 
   used = [False] * len(hits)
   results = []
@@ -110,41 +117,46 @@ def refine(orig_h, hits):
 
 if __name__ == '__main__':
   chromosomes = {}
-  nt=8
+  nt=1
   lo = [[] for i in range(nt)]
-  res = [[] for i in range(nt)]
+  res = [List[Hit]() for i in range(nt)]
   
   with timing('Loading'), FASTA(sys.argv[1]) as fa:
     for r in fa:
       chromosomes[r.name, False] = Chromosome('hg19', r.name, False, r.seq)
-      chromosomes[r.name, True] = Chromosome('hg19', r.name, True, r.seq)
+      chromosomes[r.name, True] = Chromosome('hg19', r.name, True, ~r.seq)
 
     with open(sys.argv[2]) as f:
-      rx = []
+      # rx = []
       for lp in f:
-        h = Hit(lp, chromosomes)
-        rx.append(h)
-      rx.sort(key=lambda x: max(x.x.end-x.x.start,x.y.end-x.y.start))    
-      for j,h in enumerate(rx):
-        lo[j%nt].append(h)
-      for i in lo:
-        print('>',len(i), file=sys.stderr)
+        lo[0].append(Hit(lp, chromosomes))
+      # for lp in f:
+      #   h = Hit(lp, chromosomes)
+      #   rx.append(h)
+      # rx.sort(key=lambda x: max(x.x.end-x.x.start,x.y.end-x.y.start))    
+      # for j,h in enumerate(rx):
+      #   lo[j%nt].append(h)
+      # for i in lo:
+      #   print('>',len(i), file=sys.stderr)
 
   with timing("Alignment"):
-    @par(num_threads=nt)
+    # @par(num_threads=nt)
     for ri in range(nt):
       ll = res[ri]
-      with timing(f'Threaad {ri}'):
+      with timing(f'Thread {ri}'):
         for h in lo[ri]:
           # h = Hit(lp, chromosomes)
           anchors = list(generate_anchors(h))
           new_hits = []
+          # print(h)
           for ch in chain(anchors):
             nh = Hit(h, [Hit(h, anchors[i]) for i in ch])
             new_hits.append(nh)
           for nh in refine(h, new_hits):
+            print(nh)
+            # print('>', f'{nh.x.start}\t{nh.x.end}\t{nh.y.start}\t{nh.y.end}\t{nh.simple_cigar()}')
             # print(f'  {nh.x.start}\t{nh.x.end}\t{nh.y.start}\t{nh.y.end}\t{nh.simple_cigar()}')
-            ll.append(nh)
+            # ll.append(nh)
     
     for r in res:
       for h in r:

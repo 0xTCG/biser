@@ -311,7 +311,7 @@ vector<Hit> fast_align(const string &query, const string &ref, const Hit &orig,
 
   /// 3. Perform the full alignment
   vector<Hit> new_hits;
-  // prn("{}", orig.to_bed());
+  // prn("{}", orig.to_bed(0));
   for (auto &h : hits) {
     h.aln = Alignment(query, ref, anchors, guides[&h - &hits[0]]);
     update_from_alignment(h);
@@ -319,9 +319,12 @@ vector<Hit> fast_align(const string &query, const string &ref, const Hit &orig,
   dprn(":: elapsed/alignment = {}s", elapsed(T));
   T = cur_time();
 
-  /// 3. Refine these chains
+  // / 3. Refine these chains
   refine_chains(hits, query, ref, orig);
   // for (auto &h : hits)
+  //   prn("> {}\t{}\t{}\t{}\t{}", orig.query_start + h.query_start,
+  //       orig.query_start + h.query_end, orig.ref_start + h.ref_start,
+  //       orig.ref_start + h.ref_end, h.aln.cigar_string());
   //   prn("  {}\t{}\t{}\t{}\t{}", orig.query_start + h.query_start,
   //       orig.query_start + h.query_end, orig.ref_start + h.ref_start,
   //       orig.ref_start + h.ref_end, h.aln.cigar_string());

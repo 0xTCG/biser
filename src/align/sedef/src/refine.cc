@@ -47,6 +47,11 @@ void refine_chains(vector<Hit> &anchors, const string &qseq, const string &rseq,
   vector<int> prev(anchors.size(), -1);
   set<pair<int, int>, greater<pair<int, int>>> maxes;
   for (int ai = 0; ai < anchors.size(); ai++) {
+    // prn("{} {} {} {} {}", orig.query_start+anchors[ai].query_start, orig.query_start+anchors[ai].query_end,
+      // orig.ref_start+anchors[ai].ref_start, orig.ref_start+anchors[ai].ref_end, score[ai]);
+    // prn("{}", anchors[ai].aln.cigar_string());
+    // prn("{}", anchors[ai].aln.align_a);
+    // prn("{}", anchors[ai].aln.align_b);
     if (same_chr) {
       auto &c = anchors[ai];
       int qlo = c.query_start, qhi = c.query_end;
@@ -106,6 +111,9 @@ void refine_chains(vector<Hit> &anchors, const string &qseq, const string &rseq,
     }
     maxes.insert({dp[ai], ai});
   }
+
+  // for (auto &m : maxes) 
+    // prn("max {} {}", m.first, m.second);
 
   // for (int i = 0; i < dp.size(); i++) {
   //   prn("  - {} {} {} {}", anchors[i].aln.cigar_string(), score[i], dp[i],
@@ -193,7 +201,7 @@ void refine_chains(vector<Hit> &anchors, const string &qseq, const string &rseq,
     }
     guide.push_back(*prev);
 
-    hit.aln = Alignment(hit.query->seq, hit.ref->seq, guide,
+    hit.aln = Alignment(hit.query->seq, hit.ref->seq, guide, 
                         Globals::Chain::Refine::SIDE_ALIGN);
     update_from_alignment(hit);
     if (hit.aln.span() >= Globals::Chain::Refine::MIN_READ) {

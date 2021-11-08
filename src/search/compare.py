@@ -2,6 +2,7 @@
 import sys
 import pyranges as pr
 import pandas as pd
+import ncls
 
 chrs, start, end = [], [], []
 with open(sys.argv[1]) as f:
