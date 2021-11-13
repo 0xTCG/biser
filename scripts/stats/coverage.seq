@@ -1,0 +1,377 @@
+from ..decomposition.sd import *
+import sys
+
+def analyze_region(s1,s2):
+    if len(s1) != len(s2):
+        print 'error lens'
+        print len(s1), len(s2)
+        assert False
+    # assert len(s1) == len(s2)
+    miss_ = 0
+    for i in range(0,len(s1)):
+        if s1[i] != s2[i]:
+            miss_ += 1
+        
+    return len(s1) - miss_, miss_
+
+
+def get_stats_for_cigar(cigar, l1, l2, s1 = '',s2=''):
+    count1 = 0
+    count2 = 0
+    match_ = 0
+    miss = 0
+    gap_I = 0
+    gap_D = 0
+
+    for br,let in cigar:
+        if let == 'I':
+            count1 += br
+            gap_I+=br
+        elif let == 'D':
+            count2+=br
+            gap_D+=br
+        else:
+            # mt,ms = analyze_region(s1[count1:count1+br],s2[count2:count2+br])
+            match_	+= br # mt
+            miss	+= 0 # ms
+
+            count2	+= br
+            count1	+= br
+    if match_ + miss + gap_I != l1 or match_ + miss + gap_D != l2:
+        print 'error'
+        print match_ + miss + gap_I, l1
+        print match_ + miss + gap_D,l2
+        return 0,0,0
+        # sys.exit(1)
+    assert match_ + miss + gap_I == l1
+    assert match_ + miss + gap_D == l2
+
+    return match_, miss, gap_I + gap_D
+
+# in this script we calculate basepairs coverage of each methods that is finding SDs
+class who_coveres:
+    wgac: bool
+    sdquest: bool
+    biser: bool
+    sedef: bool
+    def __init__(self: who_coveres, w:bool, s:bool, b:bool, sed: bool):
+        self.wgac = w
+        self.sdquest = s
+        self.biser = b
+        self.sedef = sed
+
+def get_dots(path, tag, dots_dict, chrs):
+    f = open(path,'r').readlines()
+    how_many = 0
+    if tag == 'wgac':
+        for l_ in f:
+            l = l_.strip().split('\t')
+            # 
+            # print l_
+            if  abs(int(l[1]) - int(l[2]) ) <2 or abs(int(l[8]) - int(l[7]) ) < 2:
+                continue
+            how_many+=1
+            # print how_many
+            chr1 = l[0]
+            chr2 = l[6] 
+            if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2:
+                continue
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[7]), int(l[8])),
+                l[5] == '-',
+                CIGAR(l[-1])
+            )
+            # l1,l2 = sd.get_all_dots()
+            l1,l2 = sd.get_pairs_3() # sd.get_pairs_3() # sd.get_all_dots()
+
+            for i in l1:
+                if i in dots_dict:
+                    dots_dict[i].wgac = True
+                else:
+                    dots_dict[i] = who_coveres(True, False, False, False)
+            
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].wgac = True
+                else:
+                    dots_dict[i] = who_coveres(True, False, False, False)
+    elif tag == 'sdquest':
+        for l_ in f:
+            l = l_.strip().split('  ')
+            
+            if  abs(int(l[3]) - int(l[2]) ) <2:
+                continue
+            how_many+=1
+            # print how_many
+            chr1 = l[1]
+            chr2 = l[5] 
+            if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2: # or (chr1 == 'chrY' and chr2 == 'chrY') :
+                continue
+            assert l[4] == '+'
+            if len (l[-1].split('\t')) <= 1:
+                continue
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[2]), int(l[3])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[6]), int(l[7])),
+                l[8] == '-',
+                CIGAR(l[-1].split('\t')[-1])
+            )
+            # l1,l2 = sd.get_all_dots()
+            l1,l2 = sd.get_all_dots() # sd.get_pairs_3() # sd.get_all_dots()
+
+            for i in l1:
+                if i in dots_dict:
+                    dots_dict[i].sdquest = True
+                else:
+                    dots_dict[i] = who_coveres(False, True, False, False)
+            
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].sdquest = True
+                else:
+                    dots_dict[i] = who_coveres(False, True, False, False)
+    elif tag == 'biser':
+        
+        for l_ in f:
+            l = l_.split('\t')
+            
+            if  abs(int(l[1]) - int(l[2]) ) <2:
+                continue
+            # print l
+            how_many+=1
+            # print how_many
+            chr1 = l[0].split('#')[1]
+            chr2 = l[3].split('#')[1]
+            # print len(l)
+            # if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2: # or (chr1 == 'chrY' and chr2 == 'chrY') or len(l) <28 or len(l) > 39 :
+            #     continue
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[4]), int(l[5])),
+                l[9] == '-',
+                CIGAR(l[-1]) if len(l) > 28 else  CIGAR(l[12]) , # CIGAR(l[12])
+                True if len(l) > 28 else False
+            )
+            l1,l2 = sd.get_all_dots() # sd.get_all_dots() # sd.get_pairs_3() # sd.get_pairs_3() # sd.get_all_dots()
+            for i in l1:
+                if i in dots_dict:
+                    dots_dict[i].biser = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, True, False)
+            
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].biser = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, True, False)
+    elif tag == 'sedef':
+        
+        for l_ in f:
+            l = l_.split('\t')
+            
+            if l[1] == 'start1' or abs(int(l[1]) - int(l[2]) ) <2 :
+                continue
+            how_many+=1
+            # print l, len(l)
+            # print how_many
+            
+            chr1 = l[0]
+            chr2 = l[3]
+
+            # if chr1 == 'chrM' or chr2 == 'chrM' or '_' in chr1 or '_' in chr2: #  or (chr1 == 'chrY' and chr2 == 'chrY'):
+            #     continue
+            # print len(l)
+            sd = SD(
+                # len(sds),
+                Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                Pos(chrs.setdefault(chr2, len(chrs)), int(l[4]), int(l[5])),
+                l[9] == '-',
+                CIGAR(''),
+                True
+                # CIGAR(l[-1]) if len(l) > 35 else CIGAR(l[32]),
+                # True if len(l) > 35 else  False
+
+            )
+            l1,l2 = sd.get_all_dots() # sd.get_pairs_3() # sd.get_pairs_3() # sd.get_all_dots()
+            has_biser = False
+            biser_c1 = 0
+            for i in l1:
+                
+                if i in dots_dict:
+                    dots_dict[i].sedef = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, False, True)
+                if dots_dict[i].biser:
+                    has_biser = True
+                    biser_c1 += 1
+            
+            has_biser2 = False
+            biser_c2 = 0
+            for i in l2:
+                if i in dots_dict:
+                    dots_dict[i].sedef = True
+                else:
+                    dots_dict[i] = who_coveres(False, False, False, True)
+                if dots_dict[i].biser:
+                    has_biser2 = True
+                    biser_c2 += 1
+            if biser_c1 < len(l1) / 3:
+                has_biser = False
+            if biser_c2 < len(l2) / 3:
+                has_biser2 = False
+            
+            # if not has_biser and not has_biser2 :
+            #     s = f'{l_.strip()}\t{not has_biser}\t{not has_biser2}'
+            #     print s
+
+                
+    elif tag == 'elementaries':
+        for l_ in f:
+            l = l_.split('\t')
+            if len(l) == 1 or abs(int(l[3]) - int(l[2]) ) <2 or l[0] != '0':
+                continue
+            
+            how_many+=1
+            # print how_many
+
+            if len(l) < 2:
+                continue
+
+            if len(l) == 5:
+                chr1 = l[1].split('#')[1][:-1]
+
+                sd = SD(
+                    # len(sds),
+                    Pos(chrs.setdefault(chr1, len(chrs)), int(l[2]), int(l[3])),
+                    Pos(chrs.setdefault(chr1, len(chrs)), int(l[2]), int(l[3])),
+                    False,
+                    CIGAR('')
+                )
+                l1,l2 = sd.get_all_dots()
+                one_in = False
+                for i in l1:
+                    # if not one_in and not i in dots_dict:
+                        # print (l_)
+                        # one_in = True
+                        # sys.exit(1)
+                    if i in dots_dict:
+                        dots_dict[i].sedef = True
+                    else:
+                        dots_dict[i] = who_coveres(False, False, False, True)
+
+            else:
+                # last carracter is strand indicator
+                chr1 = l[0].split('#')[1] #[:-1]
+                # if chr1 == 'chrM': #or chr2 == 'chrM' or '_' in chr1 or '_' in chr2: # or (chr1 == 'chrY' and chr2 == 'chrY') or len(l) <28 or len(l) > 39 :
+                #     continue
+
+
+                sd = SD(
+                    # len(sds),
+                    Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                    Pos(chrs.setdefault(chr1, len(chrs)), int(l[1]), int(l[2])),
+                    False,
+                    CIGAR('')
+                )
+                l1,l2 = sd.get_all_dots()
+                one_in = False
+                for i in l1:
+                    # if not one_in and not i in dots_dict:
+                        # print (l_)
+                        # one_in = True
+                        # sys.exit(1)
+                    if i in dots_dict:
+                        dots_dict[i].sedef = True
+                    else:
+                        dots_dict[i] = who_coveres(False, False, False, True)
+            
+
+
+def main_f(thr = ''):
+    dots_dict = dict[Dot, who_coveres]()
+    chrs = dict[str,int]()
+    path_wgac  = '_data/new/hg19.wgac.bed' 
+    path_sdqst = '_data/new/hg19.sdquest.bed'
+    path_sedef = '_data/new/hg19.sedef-hard.bed' 
+    path_biser = '_data/new/hg19.biser.bed' 
+    
+    # path_elementaries = '/home/hiseric1/new_sedef/biser/src/results/hg19_1_750_200/elementaries.txt'
+    # /home/hiseric1/new_sedef/biser/src/align/results/mm8_elems/elementaries.bed
+    # get_dots(path_elementaries, 'elementaries', dots_dict, chrs)
+    # print 'Done elems'
+
+    get_dots(path_biser, 'biser', dots_dict, chrs)
+    print 'Done biser'   
+    get_dots(path_sedef, 'sedef', dots_dict, chrs)
+    print 'Done sedef'
+    get_dots(path_wgac, 'wgac', dots_dict, chrs)
+    print 'Done wgac'
+    get_dots(path_sdqst, 'sdquest', dots_dict, chrs)
+    print 'Done sdquest'
+
+    
+
+    d = dict[str, int]()
+    help_l = []
+    for j in dots_dict:
+        s = ''
+        i = dots_dict[j]
+        if i.wgac:
+            s += 'wgac_'
+        if i.sdquest:
+            s += 'sdquest_'
+        if i.sedef:
+            s += 'sedef_'
+            # print j
+        if i.biser:
+            s += 'biser'
+        
+        if i.sedef and not i.biser:
+            help_l.append(j)
+        if s in d:
+            d[s] += 1
+        else:
+            d[s] = 1
+
+
+    for i in sorted(d):
+        print f'{i} {d[i]}'
+    
+    # print (chrs)
+    # for i in sorted(help_l):
+    #     print (i.chr, i.pos)
+
+
+main_f()
+# 
+# main_f(sys.argv[1])
+
+def check_cigars():
+    path = '/home/hiseric1/new_sedef/seq/search/biser_ms/final_all.bed'
+    f = open(path, 'r').readlines()
+    for i in f:
+        line = i.split('\t')
+        cigar = line[12]
+        l1 = int(line[2]) - int(line[1])
+        l2 = int(line[5]) - int(line[4])
+        if '#' in cigar:
+            print line
+            cigar = cigar.split('mm10')[0]
+            # continue
+
+        m, mm, g = get_stats_for_cigar(CIGAR(cigar), l2, l1, s1 = '',s2='')
+        if m == 0:
+            print m, mm, g 
+            print (i)
+            sys.exit(2)
+
+
+
+# check_cigars()
+
+
+    

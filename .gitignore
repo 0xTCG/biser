@@ -1,3 +1,7 @@
 _*
 *.d
-
+*.o
+*.dSYM
+*__pycache__*
+*/biser
+*.pyc

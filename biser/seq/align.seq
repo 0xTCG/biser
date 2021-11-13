@@ -1,0 +1,107 @@
+import sys
+from time import time
+from bio import FASTA, Kmer, CIGAR
+from time import timing
+from chain import chain
+from hit import Hit, Chromosome
+
+
+def generate_anchors(h, KMER_SIZE: Static[int] = 10):
+  x, y = h.x.chr[h.x.start:h.x.end], h.y.chr[h.y.start:h.y.end]
+  
+  ref_hashes = {}
+  for pos, kmer in y.kmers_with_pos(1, KMER_SIZE):
+    ref_hashes.setdefault(int(kmer), []).append(pos)
+
+  slide = [-1] * (len(x) + len(y))
+  for xi, kmer in x.kmers_with_pos(1, KMER_SIZE):
+    matches = ref_hashes.get(int(kmer), [])
+    if not 0 < len(matches) < 1000:
+      continue
+    for yi in matches:
+      d = len(x) + yi - xi
+      if (h.same_chr() and abs(h.y.start + yi - h.x.start - xi) <= KMER_SIZE) or xi < slide[d]:
+        continue
+      ext = KMER_SIZE
+      while (
+        xi + ext < len(x) and yi + ext < len(y) and
+        x[xi + ext] != s'N' and y[yi + ext] != s'N' and x[xi + ext] == y[yi + ext]
+      ):
+        ext += 1
+      yield (h.x.start + xi, h.y.start + yi, ext)
+      slide[d] = xi + ext
+
+
+def refine(orig_h, hits):
+  MATCH = 10
+  MISMATCH = 1
+  GAP = 0.5
+  GAPOPEN = 100 # try to approximate WGAC
+  MIN_READ = 900 # minimal refined read size
+  SIDE_ALIGN = 500 
+  MAX_GAP = 10 * 1024 # max gap during refining process
+  
+  hits.sort()
+  score = [h.score(MATCH, -MISMATCH, -GAP) for h in hits]
+  dp, prev = [0.0] * len(hits), [-1] * len(hits)
+  maxes = []
+  for ai, a in enumerate(hits):
+    if orig_h.same_chr():
+      qo = min(a.x.end, a.y.end) - max(a.x.start, a.y.start)
+      if max(a.y.end - a.y.start, a.x.end - a.x.start) - max(qo, 0) < SIDE_ALIGN:
+        continue # no gap between
+    dp[ai] = score[ai]
+    for aj in range(ai - 1, -1, -1):
+      c, p = hits[ai], hits[aj]
+      c_xs = p.x.end if c.x.start < p.x.end else c.x.start
+      c_ys = p.y.end if c.y.start < p.y.end else c.y.start
+      if p.x.end >= c.x.end or p.y.end >= c.y.end or p.y.start >= c.y.start: 
+        continue
+
+      mi, ma = min(c_xs - p.x.end, c_ys - p.y.end), max(c_xs - p.x.end, c_ys - p.y.end)
+      if ma >= MAX_GAP:
+        continue
+      if orig_h.same_chr() and max(0, min(c_xs, c_ys) - max(p.x.end, p.y.end)) >= 1:
+        continue # no gap between
+      sc = dp[aj] + score[ai] - MISMATCH * mi - GAPOPEN - GAP * (ma - mi)
+      if sc >= dp[ai]:
+        dp[ai], prev[ai] = sc, aj
+    maxes.append((dp[ai], ai))
+  maxes.sort(reverse=True)
+
+  used = [False] * len(hits)
+  results = []
+  for d, maxi in maxes:
+    if d == 0: break
+    if used[maxi]: continue
+
+    path = []
+    while maxi != -1 and not used[maxi]:
+      path.append(maxi)
+      used[maxi] = True
+      maxi = prev[maxi]
+    path = path[::-1]
+
+    est_size = hits[path[0]].span()
+    for i in range(1, len(path)):
+      est_size += hits[path[i]].span()
+      est_size += max(
+        hits[path[i]].x.start - hits[path[i - 1]].x.end,
+        hits[path[i]].y.start - hits[path[i - 1]].y.end
+      )
+    if est_size < MIN_READ - SIDE_ALIGN:
+      continue
+
+    xs, xe = hits[path[0]].x.start, hits[path[-1]].x.end
+    ys, ye = hits[path[0]].y.start, hits[path[-1]].y.end
+    if any(
+      xe - xs - max(0, min(xe, r.x.end) - max(xs, r.x.start)) < SIDE_ALIGN and
+      ye - ys - max(0, min(ye, r.y.end) - max(ys, r.y.start)) < SIDE_ALIGN
+      for r in results
+    ):
+      continue
+    
+    h = Hit(orig_h, [hits[pi] for pi in path], SIDE_ALIGN)
+    if h.span() >= MIN_READ:
+      yield h
+      results.append(h)
