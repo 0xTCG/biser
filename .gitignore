@@ -3,5 +3,5 @@ _*
 *.o
 *.dSYM
 *__pycache__*
-*/biser
+biser/seq/biser
 *.pyc
