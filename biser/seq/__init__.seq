@@ -1,0 +1,97 @@
+import getopt 
+import bio
+import time
+import sys
+
+
+def run_search(genomes, chr, output):
+  import search
+  import hit
+
+  species = [f.split("/")[-1].split('.')[0].split("_")[0] for f in genomes]
+  chromosomes = [i.name for i in bio.FASTA(genomes[0]) if search.valid_chr(i.name)]    
+  result = {
+    (species[0], c, species[0], d, r): List[hit.Hit]()
+    for c in chromosomes for d in chromosomes for r in [True, False]
+    if c <= d
+  }
+  with time.timing("Search"):  
+    search.search(genomes, chr, result)
+  with open(output, "w") as f:
+    for r in result.values():
+      for h in search.merge(r, search.MERGE_DIST):
+        print(h, file=f)
+
+
+def run_align(genome, bed, output):
+  import align
+  import hit
+  import chain
+
+  chromosomes = {}
+  with bio.FASTA(genome) as fa:
+    for r in fa:
+      chromosomes[r.name, False] = hit.Chromosome(
+        len(chromosomes), '', r.name, False, len(r.seq), r.seq
+      )
+      chromosomes[r.name, True] = hit.Chromosome(
+        len(chromosomes), '', r.name, True, len(r.seq), ~r.seq
+      )
+  with time.timing("Alignment"), open(bed) as f, open(output, 'w') as fo:
+    for lp in f:
+      h = hit.Hit(lp, chromosomes)
+      anchors = list(align.generate_anchors(h))
+      new_hits = []
+      for ch in chain.chain(anchors):
+        nh = hit.Hit(h, [hit.Hit(h, anchors[i]) for i in ch])
+        new_hits.append(nh)
+      for nh in align.refine(h, new_hits):
+        print(nh.__str__(True), file=fo)
+
+
+def run_cluster(bed, genomes, output):
+  import cluster
+  with time.timing("Clustering"):
+    cluster.cluster(genomes, bed, output)
+
+
+def run_decompose(fasta, output):
+  import decompose
+  with time.timing("Decomposition"):
+    decompose.decompose(fasta, fasta.split('/')[-1].split('.')[0], output)
+
+
+if __name__ == "__main__":
+  mode = sys.argv[1]
+  opts, args = getopt.getopt(sys.argv[2:], "t:o:c:")
+  chr, out, threads = '', '', 1
+  for o, a in opts:
+    if o in ("-o", "--output"):
+      out = a
+    elif o in ("-t", "--threads"):
+      threads = int(a)
+    elif o in ("-c", "--chr"):
+      chr = a
+  if not out:
+    raise ValueError("Output not set")
+
+  match mode:
+    case 'search':
+      if not args or len(args) > 2:
+        raise ValueError("Expected one or two input genomes")
+      run_search(args, chr, out)
+    case 'align':
+      if len(args) != 2:
+        raise ValueError("Invalid arguments")
+      genome, bed = args
+      run_align(genome, bed, out)
+    case 'cluster':
+      if len(args) < 2:
+        raise ValueError("Invalid arguments")
+      run_cluster(args[0], args[1:], out)
+    case 'decompose':
+      if len(args) != 1:
+        raise ValueError("Invalid arguments")
+      run_decompose(args[0], out)
+    case mode:
+      raise ValueError(f'Unknown mode {mode}')
