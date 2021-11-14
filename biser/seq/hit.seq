@@ -111,13 +111,14 @@ class Hit:
     yn, ys, ye = self.y.chr.name, self.y.start, self.y.end
     assert not self.x.chr.rc
     if rc and self.y.chr.rc:
-      ys, ye = len(self.y.chr.seq) - ye, len(self.y.chr.seq) - ys
-    if (xn, xs, xe) > (yn, ys, ye):
-      xn, xs, xe, yn, ys, ye = yn, ys, ye, xn, xs, xe
+      ys, ye = self.y.chr.len - ye, self.y.chr.len - ys
+    # if (xn, xs, xe) > (yn, ys, ye):
+      # xn, xs, xe, yn, ys, ye = yn, ys, ye, xn, xs, xe
     return (
       f"{xn}\t{xs}\t{xe}\t" # coordinates
       f"{yn}\t{ys}\t{ye}\t"
-      f"\t{round(100 * self.err(), 1)}\t"
+      f"\t\t"
+      # f".\t{round(100 * self.err(), 1)}\t"
       f"{'+-'[int(self.x.chr.rc)]}\t{'+-'[int(self.y.chr.rc)]}\t" # strands
       f"{max(xe - xs, ye - ys)}\t" # max span
       f"{self.span()}\t{self.simple_cigar()}\t" # span and cigar

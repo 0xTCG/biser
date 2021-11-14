@@ -14,9 +14,8 @@ from hit import Hit, Chromosome, Locus
 
 KMER_SIZE = 14
 WINNOW_SIZE = 16
-TAU = 0.0
-QUERY_THRESHOLD = 300
-REF_THRESHOLD = 1_000
+QUERY_THRESHOLD = 100
+REF_THRESHOLD = 500
 MAX_EXTEND = 5_000
 MAX_DISTANCE = 250
 INDEX_CUTOFF = 0.001
@@ -246,6 +245,7 @@ def valid_chr(chr):
 def get_species_name(path):
   return path.split("/")[-1].split('.')[0].split("_")[0]
 
+
 def search(refs, ref_chr, result):
   tau = tau()
   index = {}
@@ -278,11 +278,12 @@ def search(refs, ref_chr, result):
 
   # Now we find matching subsequences in all other chromosomes that are bigger than 
   # out ref_chr if both specie are same, if not, take all chromosomes from another specie
+  threshold = 1 << 31
   hist, max_len = {}, 0
   for loci in index.values():
     hist[len(loci)] = hist.get(len(loci), 0) + 1
     max_len = max(max_len, len(loci))
-  sum, occurence, threshold = 0, 0, 1 << 31
+  sum, occurence = 0, 0
   for i in sorted(hist.keys(), reverse=True):
     sum += hist[i]
     if sum <= int(frequency * INDEX_CUTOFF):
