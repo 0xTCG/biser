@@ -63,8 +63,8 @@ def biser_search(args):
   else:
     tmp, genome1, chr1, genome2, intv2, species1, species2 = args
     out = f"{tmp}/cross_search/{species1}_{chr1}_{species2}.bed"
-    # o = run_biser("search", genome1, chr1, genome2, intv2, "-o", out)
-    return (None, species1, chr1, species2, out)
+    o = run_biser("search", genome1, chr1, genome2, intv2, "-o", out)
+    return (o, species1, chr1, species2, out)
 
 
 def search(tmp, genomes, threads): # genomes is {sp = Path(g).stem -> PATH}
