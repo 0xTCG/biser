@@ -144,6 +144,7 @@ def cluster(genomes, bed, output):
   chrs = {}
   for g in genomes:
     spc = search.get_species_name(g)
+    print('Species: ', spc)
     with bio.FASTA(g) as f:
       for i in f:
         if search.valid_chr(i.name):
@@ -164,7 +165,10 @@ def cluster(genomes, bed, output):
         SD(
           Pos(chrid[l[0]], int(l[1]), int(l[2])),
           Pos(chrid[l[3]], int(l[4]), int(l[5])),
-          l[9] == '-', bio.CIGAR(l[12]), l_.strip()
+          l[9] == '-', 
+          bio.CIGAR(),
+          # bio.CIGAR(l[12]),
+          l_.strip()
         )
       )
       all_dots.extend(sds[-1].get_first())

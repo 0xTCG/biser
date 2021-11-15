@@ -243,7 +243,8 @@ def valid_chr(chr):
 
 
 def get_species_name(path):
-  return path.split("/")[-1].split('.')[0].split("_")[0]
+  p = path.split("/")[-1].split('.')
+  return '.'.join(p[:-1])
 
 
 def search(refs, ref_chr, result):

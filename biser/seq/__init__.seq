@@ -8,7 +8,7 @@ def run_search(genomes, chr, output):
   import search
   import hit
 
-  species = [f.split("/")[-1].split('.')[0].split("_")[0] for f in genomes]
+  species = [search.get_species_name(f) for f in genomes]
   chromosomes = [i.name for i in bio.FASTA(genomes[0]) if search.valid_chr(i.name)]    
   result = {
     (species[0], c, species[0], d, r): List[hit.Hit]()
@@ -23,20 +23,23 @@ def run_search(genomes, chr, output):
         print(h, file=f)
 
 
-def run_align(genome, bed, output):
+def run_align(genomes, bed, output):
   import align
   import hit
   import chain
+  import search
 
   chromosomes = {}
-  with bio.FASTA(genome) as fa:
-    for r in fa:
-      chromosomes[r.name, False] = hit.Chromosome(
-        len(chromosomes), '', r.name, False, len(r.seq), r.seq
-      )
-      chromosomes[r.name, True] = hit.Chromosome(
-        len(chromosomes), '', r.name, True, len(r.seq), ~r.seq
-      )
+  for genome in genomes:
+    with bio.FASTA(genome) as fa:
+      sp = search.get_species_name(genome)
+      for r in fa:
+        chromosomes[sp, r.name, False] = hit.Chromosome(
+          len(chromosomes), sp, r.name, False, len(r.seq), r.seq
+        )
+        chromosomes[sp, r.name, True] = hit.Chromosome(
+          len(chromosomes), sp, r.name, True, len(r.seq), ~r.seq
+        )
   with time.timing("Alignment"), open(bed) as f, open(output, 'w') as fo:
     for lp in f:
       h = hit.Hit(lp, chromosomes)
@@ -83,8 +86,8 @@ if __name__ == "__main__":
     case 'align':
       if len(args) != 2:
         raise ValueError("Invalid arguments")
-      genome, bed = args
-      run_align(genome, bed, out)
+      genomes, bed = args[:-1], args[-1]
+      run_align(genomes, bed, out)
     case 'cluster':
       if len(args) < 2:
         raise ValueError("Invalid arguments")

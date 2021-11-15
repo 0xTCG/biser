@@ -1,12 +1,12 @@
 #%%
 import sys
+import math
 import itertools
 import pathlib
 import pyranges as pr
 import pandas as pd
 import tabulate
 
-# sys.argv[1:] = ["../_a", "../_data/_hg19_search_2"]
 ranges = {}
 for fn in sys.argv[1:]:
   d = {"Chromosome": [],  "Start": [], "End": [], "Line": []}
@@ -28,7 +28,7 @@ for fn in sys.argv[1:]:
       c2, s2, e2, st2 = l[3].split('#')[-1], int(l[4]), int(l[5]), l[7]
       if (c1, s1, e1) >= (c2, s2, e2):
         c1, s1, e1, c2, s2, e2 = c2, s2, e2, c1, s1, e1
-      d["Chromosome"] += [c1, c2]
+      d["Chromosome"] += [c1+st1, c2+st2]
       d["Start"] += [s1, s2]
       d["End"] += [e1, e2]
       # d["Strand"] += [st1, st2]
@@ -55,7 +55,7 @@ for i in range(len(ranges)):
     rule = do["Size"] > 0
     for r in ranges:
       rule &= (do[r] > 0) if r in c else (do[r] == 0)
-    sz = do[rule]["Size"].sum()
+    sz = do[rule]["Size"].sum() / 1e6
     for r in c:
       totals[r] += sz
     rows.append(['*' if r in c else ' ' for r in ranges] + [sz])
@@ -64,11 +64,26 @@ for i in range(len(ranges)):
 print(tabulate.tabulate(
   sorted(rows, key=lambda x: ''.join(x[:-1][::-1])),
   headers=[r.split('.')[-1][:3] for r in ranges] + ['Coverage'],
-  floatfmt=',.0f'
+  floatfmt=',.1f'
 ))
 print('='* 38)
 for t, sz in totals.items():
-  print(f'{t:20} -> {sz:14,}')
+  print(f'{t:20} -> {sz:14.1f}')
+print()
+
+# Compared to the first one ...
+key = list(ranges)[0]
+rows = [[key, do[do[key] > 0]["Size"].sum() / 1e6, 0, 0]]
+for r in list(ranges)[1:]:
+  total = do[do[r] > 0]["Size"].sum() / 1e6
+  miss = do[(do[key] > 0) & (do[r] == 0)]["Size"].sum() / 1e6
+  extra = do[(do[key] == 0) & (do[r] > 0)]["Size"].sum() / 1e6
+  rows.append([r, total, miss, extra])
+print(tabulate.tabulate(
+  rows,
+  headers='Name Total Miss Extra'.split(),
+  floatfmt=',.1f'
+))
 
 # pd.set_option("display.max_rows", None)
 # print(do[(do._a > 0) & (do._hg19_search_2 == 0)].sort_values(by='Size').tail())

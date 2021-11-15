@@ -63,8 +63,9 @@ class Hit:
       self.cigar = []
   def __init__(self, s: str, chromosomes):
     l = s.strip().split('\t')
-    self.x = Interval(chromosomes[l[0], l[8] == '-'], int(l[1]), int(l[2]))
-    self.y = Interval(chromosomes[l[3], l[9] == '-'], int(l[4]), int(l[5]))
+    sp = l[6].split(':')
+    self.x = Interval(chromosomes[sp[0], l[0], l[8] == '-'], int(l[1]), int(l[2]))
+    self.y = Interval(chromosomes[sp[1], l[3], l[9] == '-'], int(l[4]), int(l[5]))
     assert self.x < self.y
     assert not self.x.chr.rc
     self.cigar = []
@@ -114,11 +115,11 @@ class Hit:
       ys, ye = self.y.chr.len - ye, self.y.chr.len - ys
     # if (xn, xs, xe) > (yn, ys, ye):
       # xn, xs, xe, yn, ys, ye = yn, ys, ye, xn, xs, xe
+    sp = f'{self.x.chr.species}:{self.y.chr.species}'
     return (
       f"{xn}\t{xs}\t{xe}\t" # coordinates
       f"{yn}\t{ys}\t{ye}\t"
-      f"\t\t"
-      # f".\t{round(100 * self.err(), 1)}\t"
+      f"{sp}\t{round(100 * self.err(), 1)}\t"
       f"{'+-'[int(self.x.chr.rc)]}\t{'+-'[int(self.y.chr.rc)]}\t" # strands
       f"{max(xe - xs, ye - ys)}\t" # max span
       f"{self.span()}\t{self.simple_cigar()}\t" # span and cigar
