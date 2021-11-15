@@ -180,14 +180,6 @@ def update_list(L, index, diff, results, visited):
   return L
 
 
-def get_coverage(visited):
-  total, covered = 0, 0
-  for v in visited:
-    total += len(v)
-    covered += sum(1 for i in v if i)
-  return covered, total
-
-
 def find_elems(seq, chr, index, threshold, visited, result):
   difference = 50
   L, loc = None, 0
@@ -269,21 +261,24 @@ def decompose(path, name, output):
         result = merge(result)
       for eset in result:
         for elem in eset:
-          chr, begin, end = chromosomes[elem[0]].split("-")
+          spc, chr, begin, end = chromosomes[elem[0]].split("-")
           chrom, strand = chr[:-1], chr[-1]
           b, e = int(begin) + elem[1], int(begin) + elem[2]
           if strand != '+':
             b, e = int(end) - elem[2], int(end) - elem[1]
           print(
-            f"{chrom}\t{b}\t{e}\t{name}_{elem_sets}\t"
+            f"{spc}\t{chrom}\t{b}\t{e}\t{name}_{elem_sets}\t"
             f"{elem[2] - elem[1]}\t{elem[3]}\t{strand}",
             file=fo
           )
           elem_cnt += 1
         elem_sets += 1
 
-  cov, all = get_coverage(visited)
-  print(f"Sets: {elem_sets}\nElementaries: {elem_cnt}\nCovered: {cov} / {all}")
+  total, covered = 0, 0
+  for v in visited:
+    total += len(v)
+    covered += sum(1 for i in v if i)
+  print(f"Sets: {elem_sets}\nElementaries: {elem_cnt}\nCovered: {covered} / {total}")
 
 
 if __name__ == "__main__":

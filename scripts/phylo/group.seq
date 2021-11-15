@@ -1,10 +1,10 @@
 import sys
 
 
-def grpup_regions(elementary_path, regions_path, output, output_sd):
+def group(elementary_path, regions_path, output, output_sd):
   elem_dict = {}
   for i in open(elementary_path):
-    line = i.strip().split('\t')
+    line = i.strip().split('\t')[1:] # TODO: do multiple species
     clade = line[3]
     chr1 = line[0]
     start = int(line[1])
@@ -38,4 +38,4 @@ def grpup_regions(elementary_path, regions_path, output, output_sd):
 
 
 if __name__ == '__main__':
-  grpup_regions(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+  group(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
