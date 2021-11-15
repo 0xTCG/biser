@@ -243,10 +243,10 @@ def decompose(path, name, output):
   hist = {}
   for loci in index.values():
     hist[len(loci)] = hist.get(len(loci), 0) + 1
-  sum = 0
+  s = 0
   for i in sorted(hist.keys(), reverse=True):
-    sum += hist[i]
-    if sum <= int(frequency * INDEX_CUTOFF):
+    s += hist[i]
+    if s <= int(frequency * INDEX_CUTOFF):
       threshold = i
     else:
       break

@@ -138,11 +138,11 @@ def cluster(genomes, bed, output):
     with open(f'{output}/{i}.fa', 'w') as fo:
       d = {}
       for j in bed:
-        c1 = rev_chrid[j.mate1.chr] + '+'
-        c2 = rev_chrid[j.mate2.chr] + '+_'[int(j.reversed)]
+        c1 = (*rev_chrid[j.mate1.chr], '+')
+        c2 = (*rev_chrid[j.mate2.chr], '+_'[int(j.reversed)])
         d.setdefault(c1, []).append((j.mate1.start, j.mate1.end))
         d.setdefault(c2, []).append((j.mate2.start, j.mate2.end))
-      for (sp, ch), ranges in d.items():
+      for (sp, ch, sr), ranges in d.items():
         ints = []
         ps, pe = 0, 0
         for s, e in sorted(ranges):
@@ -155,11 +155,11 @@ def cluster(genomes, bed, output):
         if pe - ps > 0:
           ints.append((ps, pe))
         for st, ed in ints:
-          print(f'>{sp}-{ch}-{st}-{ed}', file=fo)
-          if ch[-1] == '+':
-            print(chrs[sp, ch[:-1]][st:ed], file=fo)
+          print(f'>{sp}-{ch}{sr}-{st}-{ed}', file=fo)
+          if sr == '+':
+            print(chrs[sp, ch][st:ed], file=fo)
           else:
-            print(~(chrs[sp, ch[:-1]][st:ed]), file=fo)
+            print(~(chrs[sp, ch][st:ed]), file=fo)
           span += ed - st
           cnt += 1
     maxes.append((span, cnt, i))
