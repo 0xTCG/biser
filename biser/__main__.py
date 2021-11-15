@@ -49,10 +49,6 @@ def run_biser(*args):
     raise RuntimeError(f"BISER failed:\n{err}")
   return t, l  # time, output
 
-# def decompose(file):
-#   out = f"{file}_dec"
-#   run_biser("decompose", file, '-o', out)
-#   return out
 
 def biser_search(args):
   if len(args) == 4:
@@ -133,6 +129,12 @@ def align(tmp, genomes, threads, search, nbuckets=50):
   return results
 
 
+def biser_decompose(file):
+  out = f"{file}_dec"
+  o = run_biser("decompose", file, '-o', out)
+  return o, out
+
+
 if __name__ == '__main__':
   tmp = sys.argv[1]
   os.makedirs(tmp, exist_ok=True)
@@ -148,98 +150,105 @@ if __name__ == '__main__':
 
   # with tempfile.TemporaryDirectory(prefix='biser') as tmp:
 
-  a = []
-  for g in glob.glob(f'{tmp}/align/*.bed'):
-    a.append((None, Path(g).stem.split('.')[0], g, f'{g}.align'))
 
-  with timing('Cross-search'):
-    print(len(a), 'results')
-    os.makedirs(f'{tmp}/cross_search', exist_ok=True)
-    beds = {}
-    for _, sp, _, out in a:
-      beds.setdefault(sp, []).append(out)
-    for sp in beds:
-      sp_bed = f'{tmp}/cross_search/{sp}.bed'
-      with open(sp_bed, 'w') as fo:
-        for b in beds[sp]:
-          with open(b) as f:
-            for l in f:
-              print(l.strip(), file=fo)
-      run_biser('extract', sp_bed, '-o', f'{sp_bed}.regions.txt')
+  # with timing('Cross-search'):
+  #   print(len(a), 'results')
+  #   os.makedirs(f'{tmp}/cross_search', exist_ok=True)
+  #   beds = {}
+  #   for _, sp, _, out in a:
+  #     beds.setdefault(sp, []).append(out)
+  #   for sp in beds:
+  #     sp_bed = f'{tmp}/cross_search/{sp}.bed'
+  #     with open(sp_bed, 'w') as fo:
+  #       for b in beds[sp]:
+  #         with open(b) as f:
+  #           for l in f:
+  #             print(l.strip(), file=fo)
+  #     run_biser('extract', sp_bed, '-o', f'{sp_bed}.regions.txt')
 
-    chrs = {}
-    for sp, genome in genomes.items():
-      chrs[sp] = []
-      with open(f'{genome}.fai') as f:
-        chrs[sp] = [l.split()[0] for l in f]
-        chrs[sp] = [c for c in chrs[sp] if '_' not in c and c != 'chrM']
+  #   chrs = {}
+  #   for sp, genome in genomes.items():
+  #     chrs[sp] = []
+  #     with open(f'{genome}.fai') as f:
+  #       chrs[sp] = [l.split()[0] for l in f]
+  #       chrs[sp] = [c for c in chrs[sp] if '_' not in c and c != 'chrM']
 
-    jobs = [
-      (tmp, genomes[g1], c, genomes[g2], f'{tmp}/cross_search/{g2}.bed.regions.txt', g1, g2)
-      for g1 in genomes for g2 in genomes if g1 < g2 for c in chrs[g1]
-    ]
-    results = []
-    with timing('Search', results), mp.Pool(threads) as pool:
-      results[:] = list(progress(pool.imap(biser_search, jobs), total=len(jobs)))
+  #   jobs = [
+  #     (tmp, genomes[g1], c, genomes[g2], f'{tmp}/cross_search/{g2}.bed.regions.txt', g1, g2)
+  #     for g1 in genomes for g2 in genomes if g1 < g2 for c in chrs[g1]
+  #   ]
+  #   results = []
+  #   with timing('Search', results), mp.Pool(threads) as pool:
+  #     results[:] = list(progress(pool.imap(biser_search, jobs), total=len(jobs)))
 
-  with timing('Cross-align'):
-    os.makedirs(f'{tmp}/cross_align', exist_ok=True)
+  # with timing('Cross-align'):
+  #   os.makedirs(f'{tmp}/cross_align', exist_ok=True)
 
-    jobs = []
-    hits = {}
-    for _, sp1, ch1, sp2, out in results:
-      with open(out) as f:
+  #   jobs = []
+  #   hits = {}
+  #   for _, sp1, ch1, sp2, out in results:
+  #     with open(out) as f:
+  #       for l in f:
+  #         l = l.strip()
+  #         s = l.split()
+  #         span = max(int(s[2]) - int(s[1]), int(s[5]) - int(s[4]))
+  #         hits.setdefault((sp1, sp2), []).append((span, l))
+  #   for h in hits.values():
+  #     h.sort()
+  #   nbuckets = 50
+  #   buckets = {sp: [[] for i in range(nbuckets)] for sp in hits}
+  #   for sp, hs in hits.items():
+  #     for i, (_, h) in enumerate(hs):
+  #       buckets[sp][i % nbuckets].append(h)
+
+  #   for sp1, sp2 in buckets:
+  #     for i, b in enumerate(buckets[sp1, sp2]):
+  #       bed = f'{tmp}/cross_align/{sp1}.{sp2}.{i:05d}.bed'
+  #       with open(bed, 'w') as fo:
+  #         for l in b:
+  #           print(l, file=fo)
+  #       jobs.append(((sp1, sp2), bed, [genomes[sp1], genomes[sp2]]))
+
+  #   results = []
+  #   with timing('Align', results), mp.Pool(threads) as pool:
+  #     results[:] = list(progress(pool.imap(biser_align, jobs), total=len(jobs)))
+
+  #   with open(f'{tmp}/cross-align.log', 'w') as fo:
+  #     for (_, log), (sp1, sp2), bed, _ in results:
+  #       for l in log:
+  #         print(f'{sp1}.{sp2}.{bed.split(".")[-2]}: {l}', file=fo)
+
+
+  files = list(glob.glob(f'{tmp}/align/*.align'))
+  files += list(glob.glob(f'{tmp}/cross_align/*.align'))
+  with open(final, 'w') as fo:
+    for fl in files:
+      with open(fl) as f:
         for l in f:
-          l = l.strip()
-          s = l.split()
-          span = max(int(s[2]) - int(s[1]), int(s[5]) - int(s[4]))
-          hits.setdefault((sp1, sp2), []).append((span, l))
-    for h in hits.values():
-      h.sort()
-    nbuckets = 50
-    buckets = {sp: [[] for i in range(nbuckets)] for sp in hits}
-    for sp, hs in hits.items():
-      for i, (_, h) in enumerate(hs):
-        buckets[sp][i % nbuckets].append(h)
+          print(l, end='', file=fo)
 
-    for sp1, sp2 in buckets:
-      for i, b in enumerate(buckets[sp1, sp2]):
-        bed = f'{tmp}/cross_align/{sp1}.{sp2}.{i:05d}.bed'
-        with open(bed, 'w') as fo:
-          for l in b:
-            print(l, file=fo)
-        jobs.append(((sp1, sp2), bed, [genomes[sp1], genomes[sp2]]))
-
-    results = []
-    with timing('Align', results), mp.Pool(threads) as pool:
-      results[:] = list(progress(pool.imap(biser_align, jobs), total=len(jobs)))
-
-    with open(f'{tmp}/cross-align.log', 'w') as fo:
-      for (_, log), (sp1, sp2), bed, _ in results:
+  results = []
+  with timing('Decomposition', results):
+    output = f'{tmp}/clusters'
+    os.makedirs(output, exist_ok=True)
+    o = run_biser('cluster', final, *list(genomes.values()), '-o', output)
+    clusters = []
+    for dirpath, _, files in os.walk(output):
+      for f in files:
+        if f.endswith('.fa'):
+          clusters.append(os.path.abspath(os.path.join(dirpath, f)))
+    with mp.Pool(threads) as pool:
+      results[:] = list(progress(pool.imap(biser_decompose, clusters), total=len(clusters)))
+    with open(f'{tmp}/decompose.log', 'w') as fo:
+      for l in o[1]:
+        print(f'cluster: {l}', file=fo)
+      for (_, log), o in results:
         for l in log:
-          print(f'{sp1}.{sp2}.{bed.split(".")[-2]}: {l}', file=fo)
-
-  #   with open(final, 'w') as fo:
-  #     for _, r in results:
-  #       with open(r) as f:
-  #         for l in f:
-  #           print(l, end='', file=fo)
-
-  # with timing('Decomposition', results):
-  #   output = f'{tmp}/clusters'
-  #   os.makedirs(output, exist_ok=True)
-  #   run_biser('cluster', final, path, '-o', output)
-  #   clusters = []
-  #   for dirpath, _, files in os.walk(output):
-  #     for f in files:
-  #       if f.endswith('.fa'):
-  #         clusters.append(('decompose', os.path.abspath(os.path.join(dirpath, f))))
-  #   with mp.Pool(threads) as pool:
-  #     results[:] = list(progress(pool.imap(star, clusters), total=len(clusters)))
-  #   with open(f'{final}.elem.txt', 'w') as fo:
-  #     for _, r in results:
-  #       with open(r) as f:
-  #         for l in f:
-  #           print(l, end='', file=fo)
+          print(f'{o}: {l}', file=fo)
+    with open(f'{final}.elem.txt', 'w') as fo:
+      for _, r in results:
+        with open(r) as f:
+          for l in f:
+            print(l, end='', file=fo)
 
 

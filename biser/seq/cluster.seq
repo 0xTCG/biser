@@ -46,96 +46,6 @@ class SD:
     c2, e2 = self.mate2.chr, self.mate2.end
     return Dot(c1, e1 - 1 + possible_extension), Dot(c2, e2 - 1 + possible_extension)
 
-  def get_all_dots(self, possible_extension = 0):
-    c1, s1, e1 = self.mate1.chr, self.mate1.start, self.mate1.end
-    c2, s2, e2 = self.mate2.chr, self.mate2.start, self.mate2.end
-    assert s1 < e1 and s2 < e2
-    return (
-      [Dot(c1, i) for i in range(s1 - possible_extension, e1 + possible_extension)],
-      [Dot(c2, i) for i in range(s2 - possible_extension, e2 + possible_extension)]
-    )
-
-  def get_pairs(self):
-    c1, s1, e1 = self.mate1.chr, self.mate1.start, self.mate1.end
-    c2, s2, e2 = self.mate2.chr, self.mate2.start, self.mate2.end
-    dir = 1
-    if self.reversed:
-      s2 = e2 - 1
-      dir = -1
-    for sz, op in self.cigar:
-      if op == 'M':
-        for i in range(sz):
-          yield Dot(c1, s1), Dot(c2, s2)
-          s1 += 1
-          s2 += dir
-      elif op == 'D':
-        s1 += sz
-      elif op == 'I':
-        s2 += dir * sz
-    assert s1 == e1
-
-  def get_pairs_2(self):
-    c1, s1, e1 = self.mate1.chr, self.mate1.start, self.mate1.end
-    c2, s2, e2 = self.mate2.chr, self.mate2.start, self.mate2.end
-    dir = 1
-    if self.reversed:
-      s2 = e2 - 1
-      dir = -1
-    for sz, op in self.cigar:
-      if op == 'M':
-        for i in range(sz):
-          yield Dot(c1, s1), Dot(c2, s2)
-          s1 += 1
-          s2 += dir
-      elif op == 'I': #D
-        for i in range(sz):
-          yield Dot(c1, s1), Dot(c2, s2)
-          s1 += 1
-      elif op == 'D': #I
-        for i in range(sz):
-          yield Dot(c1, s1), Dot(c2, s2)
-          s2 += dir
-    assert s1 == e1
-
-  def get_pairs_3(self):
-    c1, s1, e1 = self.mate1.chr, self.mate1.start, self.mate1.end
-    c2, s2, e2 = self.mate2.chr, self.mate2.start, self.mate2.end
-    l1 = []
-    l2 = []
-    threshold = 0
-
-    d__ = 'D' if self.inv_d_i else 'I'
-    i__ = 'I' if self.inv_d_i else 'D'
-    dir = 1
-    if self.reversed:
-      s2 = e2 - 1
-      dir = -1
-    for sz, op in self.cigar:
-      if op == 'M':
-        for i in range(sz):
-          l1.append(Dot(c1, s1))
-          l2.append(Dot(c2, s2))
-          s1 += 1
-          s2 += dir
-      elif op == i__: #D I
-        if sz < threshold:
-          for i in range(sz):
-            l1.append(Dot(c1, s1))
-            l2.append(Dot(c2, s2))
-            s1 += 1
-        else:
-          s1 += sz
-      elif op == d__: #I D
-        if sz < threshold:
-          for i in range(sz):
-            l1.append(Dot(c1, s1))
-            l2.append(Dot(c2, s2))
-            s2 += dir
-        else:
-          s2 += dir * sz
-    assert s1 == e1
-    return (l1, l2)
-
   def __str__(self):
     return f'{self.mate1}\t{self.mate2}\t{self.reversed}'
 
@@ -167,7 +77,6 @@ def cluster(genomes, bed, output):
           Pos(chrid[l[3]], int(l[4]), int(l[5])),
           l[9] == '-', 
           bio.CIGAR(),
-          # bio.CIGAR(l[12]),
           l_.strip()
         )
       )
