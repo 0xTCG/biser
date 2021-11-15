@@ -78,7 +78,9 @@ def save_sd(L, cur, chrs, result):
     chr1, chr2 = chrs[L.chr], chrs[cur.chr]
     complement = chr1.rc or chr2.rc
     coord = pad_sd(chrs, L.chr, L.first, L.last, cur.chr, L.ref, cur.loc)
-    result[chr1.species, chr1.name, chr2.species, chr2.name, complement].append(
+    result.setdefault(
+      (chr1.species, chr1.name, chr2.species, chr2.name, complement), []
+    ).append(
       Hit(chr1, coord[0], coord[1], chr2, coord[2], coord[3], True)
     )
   else:
@@ -195,6 +197,7 @@ def build_index(
   find_sds = False,
   build_index = False,
   max_frequency = (1 << 32) - 1,
+  st = 0
 ):
   MASK = (1 << (2 * KMER_SIZE)) - 1
 
@@ -202,12 +205,11 @@ def build_index(
   processed_kmer_count = 0
 
   winnow = []
-  h, last_hash = 0, -1  # Hash(-1,0)
+  h, last_hash = 0, -1
   for i, si in enumerate(s): # TODO: use seq k-mers
     h = ((h << 2) | (int(si) & 3)) & MASK
     if i < KMER_SIZE - 1:
       continue
-    # here we ensure that correct elements are in winnow
     while winnow and not (winnow[-1][0] < h):
       winnow.pop()
     while winnow and winnow[-1][1] < (i - KMER_SIZE + 1) - WINNOW_SIZE:
@@ -223,12 +225,12 @@ def build_index(
           if len(index[hash]) >= max_frequency:
             continue
           L = update_list(
-            L, index[hash], Locus(chr, winnow[0][1]), chromosomes, result, tau
+            L, index[hash], Locus(chr, st + winnow[0][1]), chromosomes, result, tau
           )
         if build_index:
-          index[hash].append(Locus(chr, winnow[0][1]))
+          index[hash].append(Locus(chr, st + winnow[0][1]))
       elif build_index:
-        index[hash] = [Locus(chr, winnow[0][1])]
+        index[hash] = [Locus(chr, st + winnow[0][1])]
       last_hash = hash
 
   if find_sds and L:
@@ -247,38 +249,7 @@ def get_species_name(path):
   return '.'.join(p[:-1])
 
 
-def search(refs, ref_chr, result):
-  tau = tau()
-  index = {}
-  chromosomes = []
-  frequency = 0
-  with bio.FASTA(refs[0]) as fr:
-    species = get_species_name(refs[0])
-    if not ref_chr:
-      assert len(refs) > 1
-      for i in fr:
-        if valid_chr(i.name):
-          chromosomes.append(Chromosome(len(chromosomes), species, i.name, False, len(i)))
-          chromosomes.append(Chromosome(len(chromosomes), species, i.name, True, len(i)))
-    else:
-      chromosomes.append(Chromosome(len(chromosomes), species, ref_chr, False, len(fr[ref_chr])))
-      chromosomes.append(Chromosome(len(chromosomes), species, ref_chr, True, len(fr[ref_chr])))
-  
-  with bio.FASTA(refs[0]) as fr:
-    for chr_index, chr in enumerate(chromosomes):
-      frequency = build_index(
-        ~fr[chr.name] if chr.rc else fr[chr.name],
-        chr_index,
-        index,
-        chromosomes,
-        result,
-        tau,
-        build_index=True,
-        find_sds=len(refs) == 1,
-      )
-
-  # Now we find matching subsequences in all other chromosomes that are bigger than 
-  # out ref_chr if both specie are same, if not, take all chromosomes from another specie
+def filter_index(index, frequency):
   threshold = 1 << 31
   hist, max_len = {}, 0
   for loci in index.values():
@@ -293,62 +264,70 @@ def search(refs, ref_chr, result):
     else:
       break
   print(f"filtered {occurence} k-mers")
+  return threshold
 
-  # here we read all other chromosomes:
-  query = refs[0] if len(refs) == 1 else refs[1]
-  with bio.FASTA(query) as fr:
-    species = get_species_name(query)
+
+def search(genome, ch, result):
+  tau = tau()
+  
+  chrs = []
+  species = get_species_name(genome)
+  with bio.FASTA(genome) as fr:
+    for st in [False, True]:
+      chrs.append(Chromosome(len(chrs), species, ch, st, len(fr[ch])))
+  
+  index = {}
+  frequency = 0
+  with bio.FASTA(genome) as fr:
+    for chr_index, chr in enumerate(chrs):
+      frequency = build_index(
+        ~fr[chr.name] if chr.rc else fr[chr.name],
+        chr_index, index, chrs, result, tau,
+        build_index=True, find_sds=True,
+      )
+  
+  threshold = filter_index(index, frequency)
+  with bio.FASTA(genome) as fr:
     for i in fr:
-      if valid_chr(i.name) and (len(refs) > 1 or i.name > ref_chr):
-        chromosomes.append(
-          Chromosome(len(chromosomes), species, i.name, False, len(i.seq))
-        )
+      if valid_chr(i.name) and i.name > ch:
+        chrs.append(Chromosome(len(chrs), species, i.name, False, len(i.seq)))
         build_index(
-          i.seq,
-          len(chromosomes) - 1,
-          index,
-          chromosomes,
-          result,
-          tau,
-          build_index=False,
-          find_sds=True,
-          max_frequency=threshold,
+          i.seq, len(chrs) - 1, index, chrs, result, tau,
+          build_index=False, find_sds=True, max_frequency=threshold,
         )
 
 
-def merge(hits, dist):
-  hits.sort(key=lambda h: (h.x.start, h.y.start))
-  y_sorted, y_hits = [], []
-  ph = Hit()
-  for hi, h in enumerate(hits):
-    if h.x == h.y:
-      continue
-    if hi == 0 or ph.x.end + dist < h.x.start:
-      yield from y_hits
-      y_sorted, y_hits = [h.y.end], [Hit(h)]
-    else:
-      while True:
-        update = False
-        s = bisect.bisect_left(y_sorted, h.y.start - dist)
-        while s < len(y_sorted):
-          if (
-            y_hits[s].x.end + dist >= h.x.start and
-            y_hits[s].y.end + dist >= h.y.start and
-            y_hits[s].y.start <= h.y.end + dist
-          ):
-            h.x.end = max(h.x.end, y_hits[s].x.end)
-            h.y.end = max(h.y.end, y_hits[s].y.end)
-            h.x.start = min(h.x.start, y_hits[s].x.start)
-            h.y.start = min(h.y.start, y_hits[s].y.start)
-            del y_sorted[s], y_hits[s]
-            update = True
-          else:
-            s += 1
-        if not update:
-          break
-      i = bisect.bisect_left(y_sorted, h.y.end)
-      y_sorted.insert(i, h.y.end)
-      y_hits.insert(i, Hit(h))
-    h.x.end = max(h.x.end, ph.x.end)
-    ph = Hit(h)
-  yield from y_hits
+def cross_search(genome, ch, ygenome, yints, result):
+  tau = tau()
+  
+  chrs = []
+  with bio.FASTA(genome) as fr:
+    species = get_species_name(genome)
+    for st in [False, True]:
+      chrs.append(Chromosome(len(chrs), species, ch, st, len(fr[ch])))
+        
+  index = {}
+  frequency = 0
+  with time.timing('Build index'), bio.FASTA(genome) as fr:
+    for chr_index, chr in enumerate(chrs):
+      frequency = build_index(
+        ~fr[chr.name] if chr.rc else fr[chr.name],
+        chr_index, index, chrs, result, tau,
+        build_index=True, find_sds=False,
+      )
+    
+  threshold = filter_index(index, frequency)
+  with time.timing('Search index'), bio.FASTA(ygenome) as fr, open(yints) as fi:
+    ints = {}
+    for lp in fi:
+      l = lp.strip().split('\t')
+      ints.setdefault(l[0], []).append((int(l[1]), int(l[2])))
+
+    species = get_species_name(ygenome)
+    for i in fr:
+      chrs.append(Chromosome(len(chrs), species, i.name, False, len(i.seq)))
+      for st, ed in ints.get(i.name, []):
+        frequency = build_index(
+          i.seq[st:ed], len(chrs) - 1, index, chrs, result, tau,
+          build_index=False, find_sds=True, max_frequency=threshold, st=st
+        )

@@ -1,7 +1,8 @@
 import sys
 import time
 import bio
-from math import round
+import bisect
+import math
 
 
 MATCH = 5 
@@ -119,11 +120,12 @@ class Hit:
     return (
       f"{xn}\t{xs}\t{xe}\t" # coordinates
       f"{yn}\t{ys}\t{ye}\t"
-      f"{sp}\t{round(100 * self.err(), 1)}\t"
+      f"{sp}\t{math.round(100 * self.err(), 1)}\t"
       f"{'+-'[int(self.x.chr.rc)]}\t{'+-'[int(self.y.chr.rc)]}\t" # strands
       f"{max(xe - xs, ye - ys)}\t" # max span
       f"{self.span()}\t{self.simple_cigar()}\t" # span and cigar
-      f"X={round(100 * self.mis_err(), 1)};ID={round(100 * self.gap_err(), 1)}" # mismatch/gap
+      f"X={math.round(100 * self.mis_err(), 1)};" # mismatch
+      f"ID={math.round(100 * self.gap_err(), 1)}" # gap
     )
 
   def simple_cigar(self):
@@ -297,3 +299,40 @@ class Hit:
           c.append((l, op)); yi += l
       s += a.score
     return s, c
+
+  def merge(hits, dist):
+    hits.sort(key=lambda h: (h.x.start, h.y.start))
+    y_sorted, y_hits = [], []
+    ph = Hit()
+    for hi, h in enumerate(hits):
+      if h.x == h.y:
+        continue
+      if hi == 0 or ph.x.end + dist < h.x.start:
+        yield from y_hits
+        y_sorted, y_hits = [h.y.end], [Hit(h)]
+      else:
+        while True:
+          update = False
+          s = bisect.bisect_left(y_sorted, h.y.start - dist)
+          while s < len(y_sorted):
+            if (
+              y_hits[s].x.end + dist >= h.x.start and
+              y_hits[s].y.end + dist >= h.y.start and
+              y_hits[s].y.start <= h.y.end + dist
+            ):
+              h.x.end = max(h.x.end, y_hits[s].x.end)
+              h.y.end = max(h.y.end, y_hits[s].y.end)
+              h.x.start = min(h.x.start, y_hits[s].x.start)
+              h.y.start = min(h.y.start, y_hits[s].y.start)
+              del y_sorted[s], y_hits[s]
+              update = True
+            else:
+              s += 1
+          if not update:
+            break
+        i = bisect.bisect_left(y_sorted, h.y.end)
+        y_sorted.insert(i, h.y.end)
+        y_hits.insert(i, Hit(h))
+      h.x.end = max(h.x.end, ph.x.end)
+      ph = Hit(h)
+    yield from y_hits

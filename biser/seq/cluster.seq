@@ -257,3 +257,29 @@ def cluster(genomes, bed, output):
   print('Top clusters:')
   for span, cnt, i in sorted(maxes, reverse=True)[:10]:
     print(f'  {i} -> {cnt} / {span}')
+
+
+def extract(bed, output):
+  chrs = {}
+  with open(bed) as f:
+    for ln in f:
+      l = ln.split('\t')
+      sp = l[6].split(':')
+      assert sp[0] == sp[1]
+      chrs.setdefault((sp, l[0]), []).append((int(l[1]), int(l[2])))
+      chrs.setdefault((sp, l[3]), []).append((int(l[4]), int(l[5])))
+  with open(output, 'w') as fo:
+    for (sp, ch), ranges in chrs.items():
+      ints = []
+      ps, pe = 0, 0
+      for s, e in sorted(ranges):
+        if s >= pe:
+          if pe - ps > 0:
+            ints.append((ps, pe))
+          ps, pe = s, e
+        else:
+          pe = max(pe, e)
+      if pe - ps > 0:
+        ints.append((ps, pe))
+      for st, ed in ints:
+        print(ch, st, ed, sep='\t', file=fo)
