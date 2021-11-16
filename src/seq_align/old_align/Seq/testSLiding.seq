@@ -1,0 +1,13 @@
+# from slidingO import *
+from globals import *
+from hash import *
+# from slidingB import *
+from avl import *
+# s1 = SlidingMap[Hash](16)
+# for i in range(0,100):
+#     s1.add_to_query(Hash(i + 150,i%2))
+# if(s1.boundary):
+#     print(s1.boundary)
+# for i in range(0,10):
+#     s1.remove_from_query(Hash(i + 150,i%2))
+

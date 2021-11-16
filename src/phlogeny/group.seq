@@ -267,9 +267,15 @@ def group():
     out_sds.close()
 
 
-def group_specific_regions():
-    path_sds = '/home/hiseric1/new_sedef/biser/src/results/npip_hard.txt' # '/home/hiseric1/new_sedef/biser/src/results/chimp_hard6.txt' # '/home/hiseric1/new_sedef/biser/src/results/npip_hard.txt' # 'same8/hg19_hg19/final.bed' # 'different8/final_all.bed' #'data/wgac_hard_aligned_2.bed'
-    elementary_path = '/home/hiseric1/new_sedef/biser/src/results/hg19_elems_100mn/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/results/panTro6_decomp/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/final_elems/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_m/elementaries.bed' # '/home/hiseric1/new_sedef/biser/src/align/results/hg19_5_2/elementaries_hg19.bed' # 'data/cores/out_hg19_new.txt' #'test/final.bed'
+def group_specific_regions(path_sds='',elementary_path='',out='',out_sds=''):
+
+    # example: 
+    # path_sds = 'results/npip_hard.txt'
+    # elementary_path = 'elementaries.bed' 
+
+    # out = open('results/output_distances.txt', 'w')
+    # out_sds = open('results/output.txt', 'w')
+
     distance_matrix = list[list[float]]()
 
     elem_dict = dict[str, list[tuple[str, int,int, str, str]]]()
@@ -312,8 +318,6 @@ def group_specific_regions():
                         
     for_saving = list[str](set[str](for_saving))
 
-    out = open('results/output_distances_hg19_100.txt', 'w')
-    out_sds = open('results/output_hg19_100.txt', 'w')
 
 
     # print 'Building matrix:'
@@ -340,8 +344,10 @@ def group_specific_regions():
                     out.write(f'{i}\t{j}\t{distance}\n')
     out.close()
     out_sds.close()
-        
 
 with timing('all'):
-    # group()
-    group_specific_regions()
+    print (sys.argv)
+    if len(sys.argv) == 5:
+        group_specific_regions(sys.argv[1],sys.argv[2],sys.argv[3], sys.argv[4])
+
+    # group_specific_regions()

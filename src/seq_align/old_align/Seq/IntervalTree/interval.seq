@@ -1,0 +1,150 @@
+# from collections import namedtuple
+
+class Interval[K]:
+    begin: int 
+    end: int
+    data: K
+    
+    def __init__(self: Interval, begin: int, end: int, data: K):
+        self.begin = begin
+        self.end = end
+        self.data = data
+
+    def overlaps(self: Interval, begin:int, end:int) -> bool:
+        return begin < self.end and end > self.begin
+        
+    # def overlaps(self: Interval, begin: int) -> bool:
+    #     return self.contains_point(begin)
+    def overlaps(self: Interval, interv: Interval) -> bool:
+        
+        return self.overlaps(interv.begin, interv.end)
+        
+
+    def contains_point(self: Interval, p: int):
+        return self.begin <= p < self.end
+
+    def range_matches(self: Interval, other: Interval):
+        return self.begin == other.begin and self.end == other.end
+    
+    def contains_interval(self: Interval, other: Interval):
+        return self.begin <= other.begin and self.end >= other.end
+    
+    def distance_to(self: Interval, other: Interval) -> int:
+        
+        if self.overlaps(other):
+            return 0
+        try:
+            if self.begin < other.begin:
+                return other.begin - self.end
+            else:
+                return self.begin - other.end
+        except:
+            if self.end <= other:
+                return other - self.end
+            else:
+                return self.begin - other
+    def is_null(self: Interval):
+        
+        return self.begin >= self.end
+
+    def length(self: Interval):
+        if self.is_null():
+            return 0
+        return self.end - self.begin
+
+    def __hash__(self: Interval):
+        return hash((self.begin, self.end))
+
+    def __eq__(self: Interval, other: Interval):
+        return self.begin == other.begin and self.end == other.end and self.data == other.data
+    def __ne__(self: Interval, other: Interval):
+        return not self == other
+    def __cmp__(self: Interval, other: Interval) -> int:
+        s = self
+        o = other
+        if s.begin < o.begin:
+            return -1
+        elif s.begin == o.begin:
+            if s.end < o.end:
+                return -1
+            elif s.end == o.end:
+                if s.data < o.data:
+                    return -1
+                elif s.data == o.data:
+                    return 0
+                else:
+                    return 1
+            else:
+                return 1
+        else:
+            return 1
+    # def __cmp__(self: Interval, other: int) -> int:
+    #     o = other
+    #     s = self
+    #     if s.begin < o:
+    #         return -1
+    #     elif s.begin == o:
+    #         if s.end < o:
+    #             return -1
+    #         else:
+    #             return 1
+    #     else:
+    #         return 1
+
+    def __str__(self: Interval):
+
+        
+        s_begin = str(self.begin)
+        s_end = str(self.end)
+        if not self.data:
+            return f'Interval({s_begin}, {s_end})'
+        else:
+            return f'Interval({s_begin}, {s_end}, {str(self.data)})'
+
+    def __lt__(self: Interval, other: Interval):
+        return self.__cmp__(other) < 0
+    
+    def __lt__(self: Interval, other: Interval):
+        return self.__cmp__(other) < 0
+    def __gt__(self: Interval, other: Interval):
+        return self.__cmp__(other) > 0
+    def __le__(self: Interval, other: Interval):
+        return self.__cmp__(other) <= 0
+    def __ge__(self: Interval, other: Interval):
+        return self.__cmp__(other) >= 0
+    
+    def _raise_if_null(self: Interval, other: Interval):
+        if self.is_null():
+            raise ValueError("Cannot compare null Intervals!")
+    def lt(self: Interval, other: Interval):
+        self._raise_if_null(other)
+        return self.end <= other.begin
+
+    def le(self: Interval, other: Interval):
+        self._raise_if_null(other)
+        return self.end <= other.end
+    def gt(self: Interval, other: Interval):
+        self._raise_if_null(other)
+        
+        return self.begin >= other.end
+        
+            
+    def gt(self: Interval, other: int):
+        self._raise_if_null(other)
+        
+        return self.begin > other
+    def ge(self: Interval, other: Interval):
+        self._raise_if_null(other)
+        return self.begin >= other.begin
+    
+    def _get_fields(self: Interval):
+        if self.data is not None:
+            return self.begin, self.end, self.data
+        else:
+            return self.begin, self.end
+    def copy(self: Interval):
+        return Interval(self.begin, self.end, self.data)
+    
+    def __reduce__(self: Interval):
+        return Interval, self._get_fields()
+

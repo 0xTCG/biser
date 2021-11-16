@@ -242,7 +242,6 @@ def build_index(
             hash = winnow[0][0]  # Hash(winnow[0][1].hash,winnow[0][1].status)
             if hash in index:
                 if find_sds:
-                    if len(index[hash]) < max_frequency:
                         L = update_list(L, index[hash], Locus(chr, winnow[0][1]), chromosomes, result)
                 if build_index:
                     index[hash].append(Locus(chr, winnow[0][1]))
@@ -254,12 +253,11 @@ def build_index(
         for i in L:
             if i.potentional and (i.last - i.first > QUERY_THRESHOLD or i.count >= 4):
                 save_sd(i, Locus(chr, i.ref_last), chromosomes, result)
-
-    return processed_kmer_count
-
-
-def biser_search(ref_path, query_path, ref_chr):
-    """
+        if len(index) == 0 or winnow._arr[0][0] != last_hash:
+            processed_kmer_count += 1
+            hash = winnow._arr[0][0]  # Hash(winnow[0][1].hash,winnow[0][1].status)
+            if hash in index:
+                if find_sds:
     this is main function for parallel call if one chr is specified,
     it finds all SDs within that chr and between that chr and all other chromosomes
     that are lexicographically bigger than it

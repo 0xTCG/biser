@@ -1,0 +1,354 @@
+# from align_hit import *
+from common import *
+from segment import *
+from refine import *
+from search import *
+from time import *
+from globals import *
+import sys
+
+class Coor:
+    x: tuple[int,int]
+    score: int
+    pos: int
+
+    def __init__(self: Coor, x: tuple[int,int], score: int, pos: int):
+        self.x = x
+        self.score = score
+        self.pos = pos
+    
+    def __lt__(self: Coor, a: Coor):
+        return self.x < a.x
+
+def generate_anchors(query: str, ref: str, orig: Hit, kmer_size: int):
+
+
+    MASK = ( (1 << (2*kmer_size)) - 1)
+    ref_hashes = dict[int,list[int]]()
+    last_n = -kmer_size
+    
+    h = 0
+    for i in range(len(ref)):
+        if(ref[i].upper() == 'N'):
+            last_n = i
+        
+        h = ((h << 2) | hash_dna(seq(ref[i]))) & MASK
+        if(i < kmer_size -1):
+            continue
+        
+        if(last_n >= (i-kmer_size+1)):
+            continue
+        
+        ref_hashes.setdefault(h,list[int]()).append(i-kmer_size+1)
+
+    print f' Len hashes: {len(ref_hashes)}'
+    slide = list[int]() # [-1]*(len(query)+len(ref))
+    for i in range(len(query)+len(ref)):
+        slide.append(-1)
+    anchors = list[Anchor]()
+    print("got " + str(len(ref_hashes)) + " hash(es)")
+
+    same_chr = orig.query.name == orig.ref.name and orig.query.is_rc == orig.ref.is_rc
+    
+    last_n = -kmer_size
+    h = 0
+    w = 0
+    for i in range(len(query)):
+        if(query[i].upper() == 'N'):
+            last_n = i
+        
+        h = ((h << 2) | hash_dna(seq(query[i]))) & MASK
+        if(i < kmer_size-1):
+            continue
+
+        if(last_n >= (i-kmer_size+1)):
+            continue
+        
+        if h not in ref_hashes: # or len(ref_hashes[h]) >= 1000:
+            continue
+
+        it = ref_hashes[h]
+
+        if(len(it) >= 1000):
+            continue
+
+        q = i - kmer_size + 1
+        # print(q)
+        off = len(query)
+        for r in it:
+            if(same_chr and abs(orig.ref_start + r - (orig.query_start+q)) <= kmer_size):
+                continue
+
+            d = off + r - q
+            assert(d>=0 and d < len(slide))
+            if(q >= slide[d]):
+                assert(r >= d - off + slide[d])
+                has_u = True
+                lens = 0
+                while((q+lens < len(query)) and (r+lens < len(ref))):
+                    # if(query[q+lens].upper() == 'N' or ref[r+lens].upper() == 'N'):
+                    #     assert(lens>=kmer_size)
+                    #     assert(False)
+                    #     break
+                    if(query[q+lens].upper() != ref[r+lens].upper()):
+                        break
+                    lens+=1
+                
+                if(lens >= kmer_size):
+                    # if(len(anchors) >= (1 << 20) and len(anchors))
+                    anchors.append(Anchor(q,r,lens,has_u))
+                    slide[d] = q+lens
+                else:
+                    #both fail
+                    assert(slide[d] >= q +kmer_size) # subset unless it has N
+                    assert(d-off+slide[d] >= r + kmer_size)
+    
+    return anchors
+
+
+
+def generate_anchors2(query: str, ref: str, orig: Hit, kmer_size: int):
+
+
+    MASK = ( (1 << (2*kmer_size)) - 1)
+    ref_hashes = dict[int,list[int]]()
+    last_n = -kmer_size
+    
+    h = 0
+    for i in range(len(ref)):
+        if(ref[i].upper() == 'N'):
+            last_n = i
+        
+        h = ((h << 2) | hash_dna(seq(ref[i]))) & MASK
+        if(i < kmer_size -1):
+            continue
+        
+        if(last_n >= (i-kmer_size+1)):
+            continue
+        
+        ref_hashes.setdefault(h,list[int]()).append(i-kmer_size+1)
+
+    print f' Len hashes: {len(ref_hashes)}'
+    slide = list[int]() # [-1]*(len(query)+len(ref))
+    for i in range(len(query)+len(ref)):
+        slide.append(-1)
+    anchors = list[tuple[int,int,int]]()
+
+    print("got " + str(len(ref_hashes)) + " hash(es)")
+
+    same_chr = orig.query.name == orig.ref.name and orig.query.is_rc == orig.ref.is_rc
+    
+    last_n = -kmer_size
+    h = 0
+    w = 0
+    for i in range(len(query)):
+        # print i
+        if(query[i].upper() == 'N'):
+            last_n = i
+        
+        h = ((h << 2) | hash_dna(seq(query[i]))) & MASK
+        if(i < kmer_size-1):
+            continue
+
+        if(last_n >= (i-kmer_size+1)):
+            continue
+        
+        if h not in ref_hashes: # or len(ref_hashes[h]) >= 1000:
+            continue
+
+        it = ref_hashes[h]
+
+        if(len(it) >= 1000):
+            continue
+
+        q = i - kmer_size + 1
+        # print(q)
+        off = len(query)
+        for r in it:
+            if(same_chr and abs(orig.ref_start + r - (orig.query_start+q)) <= kmer_size):
+                continue
+
+            d = off + r - q
+            assert(d>=0 and d < len(slide))
+            if(q >= slide[d]):
+                assert(r >= d - off + slide[d])
+                has_u = True
+                lens = 0
+                while((q+lens < len(query)) and (r+lens < len(ref))):
+                    # if(query[q+lens].upper() == 'N' or ref[r+lens].upper() == 'N'):
+                    #     assert(lens>=kmer_size)
+                    #     assert(False)
+                    #     break
+                    if(query[q+lens].upper() != ref[r+lens].upper()):
+                        break
+                    lens+=1
+                
+                if(lens >= kmer_size):
+                    # if(len(anchors) >= (1 << 20) and len(anchors))
+                    anchors.append((q,r,lens))
+
+                    slide[d] = q+lens
+                else:
+                    #both fail
+                    assert(slide[d] >= q +kmer_size) # subset unless it has N
+                    assert(d-off+slide[d] >= r + kmer_size)
+    
+    return anchors
+
+def chain_anchors(anchors: list[Anchor]):
+    T = time()
+
+    xs = list[Coor]()
+    ys = list[Coor]()
+    max_q = 0
+    max_r = 0
+    l =0
+    for i in range(len(anchors)):
+        l+=1
+        a = anchors[i]
+        xs.append(Coor((a.q, i), 0, i))# add segment tree stuff
+        xs.append(Coor((a.q + a.l, i), 0, i))# add segment tree stuff
+        ys.append(Coor((a.r + a.l - 1, i), 0, i))# add segment tree stuff
+
+        assert(a.l)
+        max_q = max(max_q, a.q + a.l)
+        max_r = max(max_r, a.r +a.l)
+
+    print("-- anchors to dp: ", l)
+
+    #sort(xs)
+    tree = SegmentTree(ys)
+    prev = [-1]*len(anchors)
+    dp = list[tuple[int,int]]()
+    for i in range(len(anchors)):
+        dp.append((0,i))
+    
+    deactivate_bound = 0
+    c = Chain()
+    for x in xs:
+        i = x.x[1]
+        a = anchors[i]
+        if(x.x[1] == a.q):
+            while(deactivate_bound < (x- xs[0])):
+                t = xs[deactivate_bound].x[1]
+                if(xs[deactivate_bound].x[0] == anchors[t].q + anchors[t].l):
+                    # end point
+                    if(a.q - (anchors[t].q + anchors[t].l) <= c.MAX_CHAIN_GAP):
+                        break
+                    
+                    tree.deactivate((anchors[t].r +anchors[t].l, t))
+                
+                deactivate_bound+=1
+            
+            assert(a.has_u <= a.l)
+            w = c.MATCH_CHAIN_SCORE * a.has_u + (c.MATCH_CHAIN_SCORE/2) * (a.l - a.has_u)
+            j = tree.rmq((a.r - c.MAX_CHAIN_GAP,0), (a.r -1, len(anchors)))
+
+            if( j!= -1 and ys[j].score != 0):
+                # add segment tree
+                j = ys[j].pos
+                p = anchors[j]
+                assert(a.q >= p.q + p.l)
+                assert(a.r >= p.r + p.l)
+                gap = (a.q - (p.q + p.l) + a.r - (p.r + p.l))
+                if(w + dp[j][0] - gap > 0):
+                    dp[i][0] = w + dp[j][0] - gap
+                    prev[i] = j
+                else:
+                    dp[i][0] = w
+            else:
+                dp[i][0] = w
+        else:
+            gap = (max_q + 1 - (a.q + a.l) + max_r + 1 -(a.r + a.l))
+            tree.activate((a.r + a.l - 1, i), dp[i][0] - gap)
+    
+    #sort(dp)
+
+    path = list[int]()
+    boundaries = list[tuple[int,bool]]()
+    used = [0]*len(anchors)
+
+    for m in dp :
+        maxi = m[1]
+        if(used[maxi]):
+            continue
+        
+        has_u = 0
+        while(maxi != -1 and ~used[maxi]):
+            path.append(maxi)
+            has_u += anchors[maxi].has_u
+            used[maxi] = 1
+            maxi = prev[maxi]
+        
+        boundaries.append((len(path), has_u))
+    
+    return (path, boundaries)
+
+
+def fast_align(query: str, ref: str, orig:Hit, kmer_size:int):
+    
+    T = time()
+    c = Chain()
+    s = Search()
+    print("-- aligning query " + str(len(query))+ " --> ref " + str(len(ref)))
+    query_ptr = Sequence("QRY",seq(query), False)
+    ref_ptr = Sequence("REF",seq(ref), False)
+
+    ## 1. Generate the list of hits (small anchors) inside the dot graph
+    anchors = generate_anchors(query, ref, orig, kmer_size)
+    elapsed = time() - T
+    print("-- got " + str(len(anchors)) + " anchors in " + str(elapsed) + " s")
+    for i in anchors:
+        print i
+    ##2. Run DP on the anchors and collect all different anchors
+    hits = list[Hit]()
+    guides = list[list[int]]()
+    # chains_init = chain_anchors(anchors)
+    # bounds = chains_init[1]
+    # chain = chains_init[0]
+    # for bi in range(1,len(bounds)):
+    #     has_u = bounds[bi][1]
+    #     be = bounds[bi][0]
+    #     bs = bounds[bi-1][0]
+    #     up = bounds[bi][1]
+
+    #     qlo = anchors[chain[be-1]].q
+    #     qhi = anchors[chain[bs]].q + anchors[chain[bs]].l
+    #     rlo = anchors[chain[be-1]].r
+    #     rhi = anchors[chain[bs]].r + anchors[chain[bs]].l
+
+    #     # check error
+    #     span = max(rhi-rlo, qhi-qlo)
+    #     if((~has_u or span < c.MIN_UPPERCASE_MATCH) and span < s.MIN_READ_SIZE * s.MAX_ERROR):
+    #         continue
+        
+    #     assert(qhi <= len(query))
+    #     assert(rhi <= len(ref))
+
+    #     a = Hit(query_ptr,qlo,qhi,ref_ptr,rlo,rhi,up,"","")
+    #     guides.append(list[int]())
+        
+    #     for bi in range(be-1,bs):
+    #         guides[len(guides)].append(chain[bi])
+        
+    #     hits.append(a)
+
+    # print(":: elapsed/dp = " + str(T-time()) + "s")
+    # T = time()
+
+    # ## 3. Perform the full alignment
+    # new_hits = list[Hit]()
+    # for h in hits:
+    #     h.aln = Alignment(query,ref,anchors,guides[h-hits[0]])
+    #     h.update_from_alignment()
+    
+    # print(":: elapsed/alignment = " + str(T-time()) + "s")
+    # T = time()
+
+    # ## 3. Refine these chains
+    # refine_chains(hits,query,ref,orig)
+    # print(":: elapsed/refinement = " + str(T-time()) + "s")
+
+    return hits
+
+

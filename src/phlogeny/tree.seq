@@ -1,1 +1,3 @@
 from ..decomposition.IntervalTree.interval import *
+from ..decomposition.IntervalTree.intervaltree import *
+

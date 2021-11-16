@@ -23,6 +23,8 @@ ifndef CLANG
 	$(error "No CLANG found. Please install CLANG to proceed.")
 endif
 	seqc build -release src/search/biser_search.seq -o exec/biser_search
+	seqc build src/search/search.seq -o exec/search
+
 	seqc build -release src/decomposition/big_cluster.seq -o exec/big_cluster
 	seqc build -release src/decomposition/decompose.seq -o exec/decompose
 

@@ -1,0 +1,213 @@
+import bisect
+from util import *
+
+LOAD = 1000 # was 2
+class SlidingMap[T]:
+	keys: list[list[T]]
+	vals: list[list[int]]
+	# Boundary coordinates
+	bi: int
+	bj: int
+	intersection: int
+	qsize: int
+	# added
+	estimate_memoize: dict[int, int]
+	kmer_size:int
+	limit: float
+
+
+
+	def __init__(self: SlidingMap[T], kmer_size: int):
+		# put here minimum and maximum hash value (e.g. 0xfff... for uint32) for sentinels 
+		# in our case, minimum = AAA..AA and maximum = TTT..TT are filtered out and 
+		# are not used anyways
+		self.keys = [[0, (1 << 31)]] 
+		self.vals = [[0, 0]]
+		self.bi, self.bj = 0, 0
+		self.intersection, self.qsize = 0, 0
+		# added
+		self.estimate_memoize =  dict[int, int]()
+		self.kmer_size = kmer_size
+		self.limit = 0.0
+
+	def _incbnd(self: SlidingMap[T]):
+		self.bj += 1
+		if self.bj == len(self.keys[self.bi]):
+			self.bi, self.bj = self.bi + 1, 0
+		self.intersection += int(self.vals[self.bi][self.bj] == 3)
+	
+	def _decbnd(self: SlidingMap[T]):
+		self.intersection -= int(self.vals[self.bi][self.bj] == 3)
+		self.bj -= 1
+		if self.bj < 0:
+			self.bi, self.bj = self.bi - 1, len(self.keys[self.bi - 1]) - 1
+
+	def _expand(self: SlidingMap[T], i: int):
+		if len(self.keys[i]) <= LOAD << 1:
+			return
+		self.keys.insert(i + 1, self.keys[i][LOAD:])
+		self.vals.insert(i + 1, self.vals[i][LOAD:])
+		del self.keys[i][LOAD:], self.vals[i][LOAD:]
+		if self.bi > i:
+			self.bi += 1
+		elif self.bi == i and self.bj >= LOAD:
+			self.bi, self.bj = self.bi + 1, self.bj - LOAD
+
+	def _contract(self: SlidingMap[T], i: int):
+		if len(self.keys[i]) > LOAD >> 1: 
+			return
+		if len(self.keys) > 1:
+			if not i: i += 1
+			prev = i - 1
+			if self.bi > i: 
+				self.bi -= 1
+			elif self.bi == i: 
+				self.bi, self.bj = self.bi - 1, self.bj + len(self.keys[prev])
+			self.keys[prev] += self.keys[i]
+			self.vals[prev] += self.vals[i]
+			del self.keys[i], self.vals[i]
+			self._expand(prev)
+		elif not self.keys[i]:
+			if self.bi > i:
+				self.bi -= 1
+			del self.keys[i], self.vals[i]
+	def jaccard(self:SlidingMap):
+		if (self.intersection >= self.limit):
+				return self.intersection
+		else:
+				return int(self.intersection - self.limit)
+	def find_insert(self: SlidingMap[T], hash: T):
+		lo, hi = 0, len(self.keys)
+		while lo < hi:
+			mid = (lo + hi) // 2
+			if self.keys[mid][-1] < hash:
+				lo = mid + 1
+			else:
+				hi = mid
+		return (lo, bisect.bisect_left(self.keys[lo], hash))
+
+	def add(self: SlidingMap[T], hash: T, bit: int):
+		i, j = self.find_insert(hash)
+		if i < len(self.keys) and j < len(self.keys[i]) and self.keys[i][j] == hash:
+			if self.vals[i][j] & bit: 
+				return False
+			self.vals[i][j] |= bit
+			if (i, j) <= (self.bi, self.bj):
+				self.intersection += int(self.vals[i][j] == 3)
+		else:
+			self.keys[i].insert(j, hash) 
+			self.vals[i].insert(j, bit)
+			if i < self.bi:
+				self._decbnd()
+			elif i == self.bi and j <= self.bj:
+				self.intersection -= int(self.vals[self.bi][self.bj + 1] == 3)
+			self._expand(i)
+		return True
+
+	def delete(self: SlidingMap[T], hash: T, bit: int):
+		i, j = self.find_insert(hash)
+		if (i >= len(self.keys) or j >= len(self.keys[i]) or 
+				self.keys[i][j] != hash or not (self.vals[i][j] & bit)):
+			return False
+		if self.vals[i][j] != bit:
+			if (i, j) <= (self.bi, self.bj): 
+				self.intersection -= int(self.vals[i][j] == 3)
+			self.vals[i][j] &= ~bit
+		else:
+			del self.keys[i][j], self.vals[i][j]
+			if i < self.bi:
+				self._incbnd()
+			elif i == self.bi and j <= self.bj:
+				if self.bj == len(self.keys[i]):
+					self.bi, self.bj = self.bi + 1, 0
+				self.intersection += int(self.vals[self.bi][self.bj] == 3)
+			self._contract(i)
+		return True
+
+	def add_query(self: SlidingMap[T], hash: T):
+		if self.add(hash, 1):
+			self.qsize += 1
+			# limit = self.estimate(self.qsize, self.ksize, self.memoize)
+			self._incbnd()
+
+	def del_query(self: SlidingMap[T], hash: T):
+		if self.delete(hash, 1):
+			self.qsize -= 1
+			# limit = self.estimate(self.qsize, self.ksize, self.memoize)
+			self._decbnd()
+
+	def add_ref(self: SlidingMap[T], hash: T):
+		# TODO: if hash.kind != KIND_N:
+		self.add(hash, 2)
+
+	def del_ref(self: SlidingMap[T], hash: T):
+		# TODO: if hash.kind != KIND_N:
+		self.delete(hash, 2)
+
+	def __str__(self: SlidingMap[T]):
+		s = f'Map: intersection={self.intersection} bound={self.bi},{self.bj}\n'
+		for i, k in enumerate(self.keys):
+			s += f'{i}:'
+			for j, kk in enumerate(k):
+				v = " -=*"[self.vals[i][j]]
+				s += f' {j}:[{kk}{v}]'
+				if (i, j) == (self.bi, self.bj):
+					s += "‖ "
+			s += "\n"
+		return s
+
+# q = [1, 2, 3, 4, 5]
+# r = [1, 3, 5, 7, 9, 11]
+
+# s = SlidingMap[int]()
+# for i in q:
+#   s.add_query(i)
+# print s
+# for i in r:
+#   s.add_ref(i)
+# print s
+# for i in r:
+#   s.del_ref(i)
+# print s
+# for i in r:
+#   s.del_query(i)
+# print s
+
+# print '-----------'
+
+
+# vector<int> q{1, 2, 3, 4, 5};
+#   vector<int> r{1, 3, 5, 7, 9, 11};
+	
+#   SlidingMap2<int> s(12);
+#   for (auto i : q)
+#     s.add_to_query(i);
+#   s.prn();
+#   for (auto i : r)
+#     s.add_to_reference(i);
+#   s.prn();
+
+
+#   printf("============================\n");
+
+#   s = SlidingMap2<int>(12);
+#   for (auto i : r)
+#     s.add_to_reference(i);
+#   s.prn();
+#   for (auto i : q)
+#     s.add_to_query(i);
+#   s.prn();
+	
+#   for (auto i : q) {
+#     printf("del %d\n", i);
+#     s.remove_from_query(i);
+#   }
+#   s.prn();
+	
+#   for (auto i : r) {
+#     printf("del %d\n", i);
+#     s.remove_from_reference(i);
+#   }
+#   s.prn();
+	 
+

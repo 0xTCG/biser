@@ -1,0 +1,305 @@
+import getopt
+import sys
+from common import *
+from align_hit import *
+from merge import *
+import math
+from fasta import *
+from time import *
+from chain import *
+
+
+
+def bucket_alignments_extern(bed_path,nbins,output_dir, extends):
+    files = list[str]()    
+    hits = list[Hit]() # vector of hits
+    
+    # append single file from bed path
+    files.append(bed_path)
+	
+    tmp_bins = dict[str,str]()
+    lens = dict[str,int]()
+    ix = 0
+    total_nhits=0
+    e = Extend()
+    for file in files:
+        f = open(file,"r")
+        nhits = 0;
+        f1 = f.readlines()
+        for s in f1:
+            h = Hit.from_bed(s)
+            if(extends):
+                h.extends(e.RATIO,e.MAX_EXTEND)
+            
+            assert(h.ref)
+            assert(h.query)
+            if(h.query.name > h.ref.name and h.query_start > h.ref_start and h.query_end > h.ref_end):
+                temp = h.query.name
+                h.query.name = h.ref.name
+                h.ref.name = temp
+
+                temp1 = h.query_start
+                h.query_start = h.ref_start
+                h.ref_start = temp1
+
+                temp1 = h.query_end
+                h.query_end = h.ref_end
+                h.ref_end = temp1
+            
+            fno = output_dir + "/tmp_" + h.query.name + "_" + h.ref.name + ".tmp"
+            it = ""
+            if fno not in tmp_bins:
+                tmp_bins[fno] = fno
+                f = open(fno,"w")
+                f.close()
+                it = fno
+            else:    
+                it = fno
+
+            f = open(fno,"a")
+            f.write(h.to_bed(False) + "\n")
+            f.close()
+            if(fno in lens):
+                lens[fno]+=1
+            else:
+                lens[fno]=1
+            nhits+=1
+            total_nhits+=1
+        
+        print("Read " + str(nhits) + " alignments in " + file)
+    print("Read total " + str(total_nhits) + " alignments")
+
+    max_complexity = 0
+    complexity = dict[int,int]()
+    for file in tmp_bins:
+        print("Processing bucket " + file + "...")
+        hits = list[Hit]()
+        f = open(file,"r")
+        f1 = f.readlines()
+        for line in f1:
+            h = Hit.from_bed(line)
+            hits.append(h)
+        f.close()
+
+        if(extends):
+            e = Extend()
+            hits = merge(hits,e.MERGE_DIST)
+            print("after merging remaining " + str(len(hits)) + " alignments")
+        
+        for h in hits:
+            c = int(math.sqrt(float(h.query_end-h.query_start)*float(h.ref_end-h.ref_start)))
+            max_complexity = max(max_complexity,c)
+            if int(c/1000) in complexity:
+                complexity[int(c/1000)]+=1
+            else:
+                complexity[int(c/1000)]=1
+        
+        f = open(file,"w")
+        for h in hits:
+            f.write(h.to_bed(False)+ "\n")
+        f.close()
+    print("Finished with sorting")
+
+    next_bin = [0]
+    for c in range(1,int(max_complexity/1000)):
+        if c-1 not in complexity:
+            complexity[c-1] = 0
+        next_bin.append((next_bin[c-1]+complexity[c-1]) % nbins)
+        
+    
+    BUFF_SZ = 1000
+    buffer = [list[Hit]()]*nbins
+    # for i in range(nbins):
+    #     buffer.append(list[Hit]())
+
+    fout = list[str]()
+    for b in range(nbins):
+        of = output_dir + "/bucket_" + str(b)
+        fout.append(of)
+        f = open(of, "w")
+        f.close()
+
+   
+
+    for bins in tmp_bins:
+        f = open(bins, "r")
+        print("Processing bucket " + bins + "...")
+        f1 = f.readlines()
+        for s in f1:
+            h = Hit.from_bed(s)
+            complexityN = int(math.sqrt(float((h.query_end-h.query_start))*float(h.ref_end-h.ref_start)))
+            complexityN = int(complexityN/1000)-1 # might get rid of -1 as it is not in c++
+
+            bin2 = next_bin[complexityN]
+            next_bin[complexityN] = (next_bin[complexityN]+1) % nbins
+            if(h.query.is_rc):
+                temp = h.query
+                h.query = h.ref
+                h.ref = temp
+
+                temp1 = h.query_start
+                h.query_start = h.ref_start
+                h.ref_start = temp1
+
+                temp1 = h.query_end
+                h.query_end = h.ref_end
+                h.ref_end = temp1
+
+            buffer[bin2].append(h)
+            if(len(buffer[bin2]) == BUFF_SZ):
+                for h in buffer[bin2]:
+                    f2 = open(fout[bin2],"a")
+                    f2.write(h.to_bed(False) + "\n") # add false
+                    f.close()
+                buffer[bin2] = list[Hit]()
+        
+        f.close()
+    
+    for b in range(nbins):
+        for h in buffer[b]:
+            f = open(fout[b], "a")
+            f.write(h.to_bed(False) + "\n") # add false
+            f.close()
+    
+    for s in tmp_bins:
+        del tmp_bins[s]
+    #     unlink(s.keys())
+
+def bucket_alignments(bed_path: str, nbins: int, output_dir:str, extends: bool):
+    files = list[str]()
+    files.append(bed_path)
+    hits = list[Hit]()
+    e = Extend()
+    for file in files:
+        f = open(file, "r")
+
+        nhits = 0
+        f1 = f.readlines()
+        for s in f1:
+            h = Hit.from_bed(s)
+            if extends:
+                h.extends(e.RATIO,e.MAX_EXTEND)
+            hits.append(h)
+            nhits+=1
+        f.close()
+        
+        print("Read " + str(nhits) + " alignments in " + file)
+    
+    print("Read total " + str(len(hits)) + " alignments")
+    if(extends):
+        hits = merge(hits, e.MERGE_DIST)
+        print("After merging remaining " + str(len(hits)) + " alignments")
+    
+    max_complexity = 0.0
+    for h in hits:
+        max_complexity = max(max_complexity,float(int(math.sqrt(float(h.query_end-h.query_start)*float(h.ref_end-h.ref_start)))))
+    
+    bins = list[list[Hit]]()
+    for i in range(int(max_complexity/1000 + 1)):
+        bins.append(list[Hit]())
+    for h in hits:
+        complexity = math.sqrt(float(h.query_end-h.query_start)*float(h.ref_end-h.ref_start))
+        assert(complexity/1000 < len(bins))
+        bins[int(complexity/1000)].append(h)
+    
+    results = [list[Hit]()]*nbins
+    bc = 0
+    for sbin in bins:
+        for hit in sbin:
+            results[bc].append(hit)
+            bc = (bc+1) % nbins
+    
+    if(output_dir != ""):
+        count = 0
+        for sbin in results:
+            of = output_dir + "/bucket_" + str(count)
+            count+=1
+            f = open(of,"w")
+            for h in sbin:
+                f.write(h.to_bed(False) + "\n")#add false
+            
+            f.close()
+            print("Wrote " + str(len(sbin)) + " alignments in " + of)
+    
+    return results
+
+
+def generate_alignments(ref_path:str,bed_path:str,kmer_size:int):
+
+    T = time()
+    schedule = bucket_alignments(bed_path,1,"",False) 
+    lines = 0
+    total = 0
+    fr = FastaReference(ref_path)
+    for s in schedule:
+        total+=len(s)
+    print("Using k-mer size " + str(kmer_size))
+    total_written = 0
+
+    # for i in range(len(schedule)):
+    for i in open(bed_path, 'r').readlines():
+        h = Hit.from_bed(i)
+        # print h.to_bed()
+        # for h in schedule[i]:
+        lines+=1
+
+        fa = fr.get_sequence_slice(h.query.name.split('#')[1],h.query_start,h.query_end)
+        fb = fr.get_sequence_slice(h.ref.name.split('#')[1],h.ref_start,h.ref_end)
+        # print h.ref.is_rc, h.query.is_rc
+        if(h.ref.is_rc):
+            fb = ~fb
+        print("Processing " + str(lines) + " out of " + str(total) + " ("+ str(pct(float(lines),float(total))) + "%, len "+ str(len(fa)) + " to "+ str(len(fb)) + ")")
+
+        alns = fast_align(str(fa),str(fb),h,kmer_size)
+        break
+#             for hh in alns:
+#                 hh.query_start+=h.query_start
+#                 hh.query_end+=h.query_start
+#                 if (h.ref.is_rc):
+#                     temp = h.ref_start
+#                     h.ref_start = h.ref_end
+#                     h.ref_end = temp
+
+#                     hh.ref_start = h.ref_end - hh.ref_start
+#                     hh.ref_end = h.ref_end = hh.ref_end
+#                     hh.ref.is_rc = True
+                
+#                 else:
+#                     hh.ref_start += h.ref_start
+#                     hh.ref_end += h.ref_start
+                
+#                 hh.query.name = h.query.name
+#                 hh.ref.name = h.ref.name
+#                 total_written+=1
+#                 print(hh.to_bed(False) + "\t" + h.to_bed(False)) #add false
+
+#     curr_T = time()
+#     print("Finished BED " + bed_path + "in " + curr_T-T + "s (" + lines + "lines, generated " + total_written + "hits)")
+
+
+def align_main(opts,args):
+
+    command =args[0]
+    if command == "bucket":
+        nbins = -1
+        for o,a in opts:
+            if o in ("-n","--bins"):
+                nbins = int(a)
+        if nbins == -1:
+            print("Must provide number of bins (--bins)")
+            sys.exit(0)	
+        bucket_alignments_extern(args[1],nbins,args[2],True)#(cmdl[1], nbins, cmdl[2], true);
+    elif command == "generate":
+        kmer_size = -1
+        for o,a in opts:
+            if o in ("-k","--kmer"):
+                kmer_size = int(a)
+               
+        if kmer_size == -1:
+            print("Must provide k-mer size (--kmer)")
+            sys.exit(0)
+
+        ref_path = args[1]
+        bed_path = args[2]
+        generate_alignments(ref_path,bed_path,kmer_size)
+				

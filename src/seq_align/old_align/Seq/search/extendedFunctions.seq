@@ -1,0 +1,105 @@
+from align_hit import *
+from hash import *
+from slidingO import *
+from globals import*
+from common import *
+
+def do_extend_query_right(winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:#add tuple and put return values in it
+    # query_start = list_of_parameters[0]
+    # query_end = list_of_parameters[1]
+    # query_winnow_start = list_of_parameters[2]
+    # query_winnow_end = list_of_parameters[3]
+    # ref_start = list_of_parameters[4]
+    # ref_end = list_of_parameters[5]
+    # ref_winnow_start = list_of_parameters[6]
+    # ref_winnow_end= list_of_parameters[7]
+    if (list_of_parameters[3] >= len(query_hash.minimizers)):
+        return False
+    winnow.add_to_query(query_hash.minimizers[list_of_parameters[3]].hash)
+    list_of_parameters[3]+=1
+    list_of_parameters[1] = query_hash.minimizers[list_of_parameters[3]].loc if(list_of_parameters[3] < len(query_hash.minimizers)) else len(query_hash.seq.seq)
+    return True
+def undo_extend_query_right (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    
+    list_of_parameters[3]-=1
+    winnow.remove_from_query(query_hash.minimizers[list_of_parameters[3]].hash)
+    
+    list_of_parameters[1] = query_hash.minimizers[list_of_parameters[3]].loc
+    return True
+def do_extend_ref_right (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    if (list_of_parameters[7] >= len(ref_hash.minimizers)):
+        return False
+    winnow.add_to_reference(ref_hash.minimizers[list_of_parameters[7]].hash)
+    list_of_parameters[7]+=1
+    list_of_parameters[5] = ref_hash.minimizers[list_of_parameters[7]].loc  if list_of_parameters[7] < len(ref_hash.minimizers) else len(ref_hash.seq.seq)
+    return True
+def undo_extend_ref_right (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    list_of_parameters[7]-=1
+    winnow.remove_from_reference(ref_hash.minimizers[list_of_parameters[7]].hash)
+    list_of_parameters[5] = ref_hash.minimizers[list_of_parameters[7]].loc
+    return True
+def do_extend_both_right(winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    
+    if (list_of_parameters[7] >= len(ref_hash.minimizers) or list_of_parameters[3] >= len(query_hash.minimizers)):
+        return False
+    r = True
+    r = do_extend_query_right(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    r = r & do_extend_ref_right(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    return r
+
+def undo_extend_both_right (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    undo_extend_ref_right(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    undo_extend_query_right(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+def do_extend_query_left (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    
+    if (not list_of_parameters[2]):
+        return False
+    list_of_parameters[2]-=1
+    winnow.add_to_query(query_hash.minimizers[list_of_parameters[2]].hash)
+    list_of_parameters[0] = query_hash.minimizers[list_of_parameters[2] - 1].loc + 1  if  list_of_parameters[2] else 0
+    return True
+def undo_extend_query_left (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    
+    list_of_parameters[0] = query_hash.minimizers[list_of_parameters[2]].loc + 1
+    winnow.remove_from_query(query_hash.minimizers[list_of_parameters[2]].hash)
+    list_of_parameters[2]+=1
+    return True
+def do_extend_ref_left (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    if (not list_of_parameters[6]):
+        return False
+    list_of_parameters[6]-=1
+    winnow.add_to_reference(ref_hash.minimizers[list_of_parameters[6]].hash)
+    list_of_parameters[4] = ref_hash.minimizers[list_of_parameters[6] - 1].loc + 1 if list_of_parameters[6] else 0
+    return True
+def undo_extend_ref_left (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    list_of_parameters[4] = ref_hash.minimizers[list_of_parameters[6]].loc + 1
+    winnow.remove_from_reference(ref_hash.minimizers[list_of_parameters[6]].hash)
+    list_of_parameters[6]+=1
+    return True
+def do_extend_both_left (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    
+    if (not list_of_parameters[2] or not list_of_parameters[6]):
+        return False
+    r = True
+    r = do_extend_query_left(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    r =  r & do_extend_ref_left(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+
+    return r
+def undo_extend_both_left (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    undo_extend_ref_left(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    undo_extend_query_left(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    return True
+def do_extend_both_both (winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    
+    if (not list_of_parameters[2] or not list_of_parameters[6]):
+        return False
+    if ( list_of_parameters[7] >= len(ref_hash.minimizers) or list_of_parameters[3] >= len(query_hash.minimizers)):
+        return False
+    r = True
+    r = do_extend_both_left(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    r = r & do_extend_both_right(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    return r
+def undo_extend_both_both(winnow: SlidingMap, query_hash: Index, ref_hash: Index, same_genome:bool,list_of_parameters: list[int])-> bool:
+    undo_extend_both_right(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    undo_extend_both_left(winnow, query_hash, ref_hash, same_genome,list_of_parameters)
+    return True

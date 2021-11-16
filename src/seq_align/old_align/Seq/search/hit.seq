@@ -1,0 +1,181 @@
+from hash import *
+# from align import Alignment
+from bio import CIGAR
+class Hit:
+    query: Sequence
+    query_start: int
+    query_end: int
+    ref: Sequence
+    ref_start: int
+    ref_end: int
+    jaccard: int
+    name: str
+    comment: str
+    aln: Alignment
+
+    def __init__(self:Hit):
+        self.name = ""
+
+    def __init__(self:Hit, query: Sequence, query_start: int, query_end: int, ref: Sequence, ref_start: int, ref_end: int, jaccard: int, name: str, comment: str):
+        self.query = query
+        self.query_start = query_start
+        self.query_end = query_end
+        self.ref = ref
+        self.ref_start = ref_start
+        self.ref_end = ref_end
+        self.jaccard = jaccard
+        self.name = name
+        self.comment = ""
+        self.aln = Alignment()
+
+    def __eq__(self: Hit, hit: Hit):
+        if(self.query.name == hit.query.name and self.ref.name == hit.ref.name):
+            return True
+        else:
+            return False
+    def from_bed(bed: str):
+        ss = bed.split()
+        assert(len(ss)>=10)
+        h = Hit(Sequence(ss[0],s"",(ss[8])[0] != '+'),0,0, Sequence(ss[3],s"",(ss[0])[0] != '+'),0,0,0,"","", Alignment())
+        h.query_start = int(ss[1])
+        h.query_end = int(ss[2])
+        h.ref_start = int(ss[4])
+        h.ref_end = int(ss[5])
+        h.name = ss[6]
+        if(len(ss)>=15):
+            h.comment = ss[14]
+        if(len(ss)>=14):
+            h.jaccard = int(ss[13])
+        if(len(ss)>=13):
+            cigar = CIGAR(ss[11])
+        
+        return h
+
+        
+
+    def from_bed2(bed: str,query: Sequence,ref: Sequence):
+        
+        ss = bed.split()
+        assert(len(ss)>=10)
+
+        h = Hit(query,0,0,ref,0,0,0,"","")
+
+        h.query_start = int(ss[1])
+        h.query_end = int(ss[2])
+
+        h.ref_start = int(ss[4])
+        h.ref_end = int(ss[5])
+
+        assert(h.query.is_rc == (ss[8][0] != '+'))
+        assert(h.ref.is_rc == (ss[9][0] != '+'))
+
+        assert(~h.query.is_rc)
+        if(h.ref.is_rc):
+            temp = h.ref_start
+            h.ref_start = h.ref_end
+            h.ref_end = temp
+            seq_len = len(h.ref.seq)
+            h.ref_start = seq_len - h.ref_start + 1
+            h.ref_end = seq_len = h.ref_end + 1
+        
+        h.name = ss[6]
+        if(len(ss)>=14):
+            h.jaccard = int(ss[13])
+        if(len(ss)>=13):
+            
+            print("")# change ending back once good bed string is given
+            #h.aln = Alignment(query.seq,ref.seq,ss[12]))
+
+        return h
+
+    def from_wgac(bed):
+        ss = bed.split()
+        assert(len(ss)>=27)
+        h = Hit(Sequence(ss[0],"",False),0,0, Sequence(ss[6],"",(ss[5])[0] != '+'),0,0,0,"","")
+        h.query_start = ss[1]
+        h.query_end = ss[2]
+        h.ref_start = ss[7]
+        h.ref_end = ss[8]
+        h.name = ss[16]
+        h.comment = "err=.1f"
+        #fmt::format("err={:.1f}", 100 - 100 * atof(ss[26].c_str()))
+        assert(h.ref.is_rc == ((ss[5])[0] != '+'))
+        assert(~h.query.is_rc)
+        
+        return h
+    
+    def to_bed(self: Hit, do_rc = True, with_cigar = True, file = ""):
+        #print(self.aln)
+        assert(~self.query.is_rc)
+        qn = self.query.name
+        rn = self.ref.name
+        
+        qs = 0
+        if(do_rc and self.query.is_rc):
+            qs = len(self.query.seq) - self.query_end + 1
+        else:
+            qs = self.query_start
+        qe = 0
+        if(do_rc and self.query.is_rc):
+            qe = len(self.query.seq) - self.query_start + 1
+        else:
+            qe = self.query_end
+
+        rs = 0
+        if(do_rc and self.ref.is_rc):
+            rs = len(self.ref.seq) - self.ref_end + 1
+        else:
+            rs = self.ref_start
+        re = 0
+        if(do_rc and self.ref.is_rc):
+            re = len(self.ref.seq) - self.ref_start + 1
+        else:
+            re = self.ref_end
+
+        bed = qn + "\t" + str(qs) + "\t" + str(qe) + "\t" + rn + "\t" + str(rs) + "\t" + str(re) + "\t" + self.name
+        if(self.aln.span()):
+            bed = bed + "\t" + str(self.aln.total_error())
+        else:
+            bed = bed + "\t" + ""
+        
+        if(self.query.is_rc):
+            bed = bed + "\t" + "-"
+        else:
+            bed = bed + "\t" + "+"
+        
+        if(self.ref.is_rc):
+            bed = bed + "\t" + "-"
+        else:
+            bed = bed + "\t" + "+"
+        
+        bed = bed + "\t" + str(max(self.query_end-self.query_start,self.ref_end-self.ref_start))
+        bed = bed + "\t" + str(self.aln.span())
+        if(with_cigar):
+            bed = bed + "\t" + self.aln.cigar_string()
+        else:
+            bed = bed + "\t" + ""
+        
+        if(self.aln.span()):
+            bed = bed + "\t" + "m=" + str(self.aln.mismatch_error()) + ";g=" + str(self.gap_error())
+        else:
+            bed = bed + "\t" + ""
+        
+        return bed
+
+    
+    def extends(self: Hit, factor: float, max_entend:int):
+        w = max(self.query_end-self.query_start,self.ref_end-self.ref_start)
+        w = min(max_entend,int(w*factor))
+        self.query_start = max(0,self.query_start-w)
+        self.query_end += w
+        self.ref_start = max(0,self.ref_start-w)
+        self.ref_end += w
+    
+    def update_from_alignment(self: Hit):
+        self.query_start = self.aln.start_a
+        self.query_end = self.aln.end_a
+        self.ref_start = self.aln.start_b
+        self.ref_end = self.aln.end_a
+
+def get_position(ar: CIGAR, ppos:int):
+    print('yes')
