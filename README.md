@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/320/emojipedia/181/oyster_1f9aa.png" style="max-height: 100px; max-width: 100px;" />
+  <img src="https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/320/emojipedia/181/oyster_1f9aa.png" height=100 />
 </p>
 
-# 🔮 BISER: Brisk Inference of Segmental duplication Evolutionary stRucture
+# BISER
 
-BISER is a fast tool for detecting and decomposing segmental duplications in genome assemblies.
+BISER (Brisk Inference of Segmental duplication Evolutionary stRucture) is a fast tool for detecting and decomposing segmental duplications in genome assemblies.
 
 
 ## Instalation
