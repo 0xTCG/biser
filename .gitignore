@@ -5,3 +5,4 @@ _*
 *__pycache__*
 biser/seq/biser
 *.pyc
+biser.egg-info

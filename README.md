@@ -1,70 +1,50 @@
 # BISER: Brisk Inference of Segmental duplication Evolutionary stRucture
 
-Biser is a fast tool for detecting and decomposing SDs in a one or multiple genomes.
-
-Needed installations:
-* SEDEF
-* Seq compiler
+BISER is a fast tool for detecting and decomposing segmental duplications in genome assemblies.
 
 
 ## Instalation
 
-BISER depends on Seq. To install it, consult:
-https://docs.seq-lang.org/intro.html#install
+BISER requires [Seq programming language](https://docs.seq-lang.org/intro.html#install) 
+and Python 3.7+ to run.
 
-For installign BISER, run the following:
+To install BISER, install Seq and then run:
 ```bash
-make
-```
-
-BISER requires Boost (https://www.boost.org/) libraries in order to compile. In case you installed Boost in a non-standard directory, you can still compile as follows:
-```bash
-CPATH={path_to_boost} make
+pip install git+https://github.com/0xTCG/biser.git
 ```
 
 ## Usage
-### One species
-For finding SDs and decomposing them into elementary SDs in one species, go to `src` directory and run:
+### Single genome
+
+To find SDs in a single genome, just run:
 ```bash
-./biser_1s.sh  -o <output> -j <jobs> <hard_masked_genome> 
-```
-For example, to run hg19_hard_masked.fa on 8 cores, type:
-```bash
-./biser_1s.sh -o biser_out_hg19 -j 8 hg19_hard_masked.fa
+biser -o <output> -t <threads> <genome.fa> 
 ```
 
-### Multiple species
-For finding SDs and decomposing them into elementary SDs in multiple species, go to `src` directory and run:
+BISER will also produce `output.elem.txt` file that contains the elementary SD
+decomposition of the final SD set.
+
+All genomes should be indexed beforehand with `samtools faidx genome.fa`.
+
+> **WARNING!** Genomes *must* be hard-masked. This requirement will be lifted in the 
+> next release of BISER.
+
+### Multiple genomes
+
+To find SDs in multiple genomes, just run:
 ```bash
-./biser_ms.sh  -o <output> -j <jobs> <destionation_where_hard_masked_genomes_are> 
-```
-For example, to run hg19_hard_masked.fa on 8 cores, type:
-```bash
-./biser_ms.sh -o biser_out_ms -j 8 data/genomes/
+biser -o <output> -j <jobs> <genome1.fa> <genome2.fa> ...
 ```
 
+## Paper & Simulations
 
-All genome names must be in the following format `{species_name}_hard_50.fa`
+BISER was published in WABI 2021 proceedings and [is available here](https://drops.dagstuhl.de/opus/volltexte/2021/14368/pdf/LIPIcs-WABI-2021-15.pdf).
 
-Optional parameters that you can set (for both, one and multiple species):
-* `-p <padding value>` - change padding (default 5000)
-* `-d <1/0>` - change to dynamic gap (max SD length set to 1Mbp)
-* `-l <1/0>` - if you want to use filtering
-* `-g <1/0>` - if you want to use winnowing
-* `-f` - force, if output folder already exists
+Paper simulations are available in [scripts](scripts/) and [simulation](simulation/)
+directories.
 
-## Output
-Output is generated in the specified `output` folder. `{output}/final.bed` contains all SDs and `{output}/elementaries.txt` contains all elementaries in format:
-* `elementary_id`, `chromosome`, `begin`, `end`,  `length`
-* at the end are lines in format: `[core]`, `elementary_id`, `# of SDs that contain this core`
+> We will provide more experimental details soon.
 
-For multiple species, chromosome names are written in the following format `{species_name}#{chromosome}`
+## Contact
 
-## Simulations
-Path for SD detection simulations:
-https://github.com/0xTCG/biser/blob/master/simulations/plot_simulations.ipynb
-
-
-Path for core detection simulations:
-https://github.com/0xTCG/biser/blob/master/simulations/simulate_cores.ipynb   
-
+Please reach out to [Ibrahim Numanagić](inumanag at uvic dot oh caaanaaadaaa).

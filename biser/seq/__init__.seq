@@ -68,7 +68,16 @@ def run_extract(bed, output):
     cluster.extract(bed, output)
 
 
+def help():
+  print('BISER v1.0')
+  print('Usage: biser [search|align|extract|cluster|decompose] -o [output]')
+  sys.exit(0)
+
+
 if __name__ == "__main__":
+  if len(sys.argv) < 3:
+    help()
+  
   mode = sys.argv[1]
   opts, args = getopt.getopt(sys.argv[2:], "t:o:c:")
   chr, out, threads = '', '', 1
@@ -80,7 +89,7 @@ if __name__ == "__main__":
     elif o in ("-c", "--chr"):
       chr = a
   if not out:
-    raise ValueError("Output not set")
+    help()
 
   match mode:
     case 'search':
@@ -105,4 +114,4 @@ if __name__ == "__main__":
         raise ValueError("Invalid arguments")
       run_decompose(args[0], out)
     case mode:
-      raise ValueError(f'Unknown mode {mode}')
+      help()
