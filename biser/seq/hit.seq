@@ -1,0 +1,338 @@
+import sys
+import time
+import bio
+import bisect
+import math
+
+
+MATCH = 5 
+MISMATCH = -4
+GAPO = -40
+GAPE = -1
+
+
+class Chromosome:
+  id: int
+  species: str
+  name: str
+  rc: bool
+  len: int
+  seq: bio.seq = bio.seq()
+  
+  def __eq__(self, o: Chromosome):
+    return self.id == o.id
+  def __ne__(self, o: Chromosome):
+    return not self == o
+  def __lt__(self, o: Chromosome):
+    return (self.rc, self.species, self.name) < (o.rc, o.species, o.name)
+  
+  def __getitem__(self, s):
+    if isinstance(s, slice): assert s.step is None
+    return self.seq[s]
+
+
+@tuple
+class Locus:
+  chr: int  # Chromosome ID
+  loc: int
+
+
+@dataclass(eq=True, order=True)
+class Hit:
+  @dataclass(eq=True, order=True)
+  class Interval:
+    chr: Chromosome
+    start: int
+    end: int
+  
+  x: Interval
+  y: Interval
+  cigar: List[Tuple[int, str]]
+
+  def __init__(self, h: Hit):
+    self.x = Interval(h.x.chr, h.x.start, h.x.end)
+    self.y = Interval(h.y.chr, h.y.start, h.y.end)
+    self.cigar = copy(h.cigar)
+  def __init__(self, xch: Chromosome, xs, xe, ych: Chromosome, ys, ye, flip=False):
+    self.x, self.y = Interval(xch, xs, xe), Interval(ych, ys, ye)
+    if flip and self.y < self.x:
+      self.y, self.x = self.x, self.y
+    assert not self.x.chr.rc
+    if len(xch.seq) > 0:
+      self.cigar = Hit.align(xch[xs:xe], ych[ys:ye])[1]
+    else:
+      self.cigar = []
+  def __init__(self, s: str, chromosomes):
+    l = s.strip().split('\t')
+    sp = l[6].split(':')
+    self.x = Interval(chromosomes[sp[0], l[0], l[8] == '-'], int(l[1]), int(l[2]))
+    self.y = Interval(chromosomes[sp[1], l[3], l[9] == '-'], int(l[4]), int(l[5]))
+    assert self.x < self.y
+    assert not self.x.chr.rc
+    self.cigar = []
+  def __init__(self, h: Hit, anchor: Tuple[int, int, int]):
+    self.x = Interval(h.x.chr, anchor[0], anchor[0] + anchor[2])
+    self.y = Interval(h.y.chr, anchor[1], anchor[1] + anchor[2])
+    self.cigar = [(anchor[2], '=')]
+  def __init__(self, h: Hit, anchors: List[Hit], side = 0):
+    self.x = Interval(h.x.chr, anchors[0].x.start, anchors[-1].x.end)
+    self.y = Interval(h.y.chr, anchors[0].y.start, anchors[-1].y.end)
+    self.cigar = []
+    prev = anchors[0]
+    for a in anchors[1:]:
+      if a.x.start < prev.x.end or a.y.start < prev.y.end:
+        prev.extend(a)
+        continue
+      self.cigar += prev.cigar
+      self.cigar += self.align_gap(prev.x.end, a.x.start, prev.y.end, a.y.start) 
+      prev = a
+    self.cigar += prev.cigar
+    
+    if side > 0:
+      off = min(side, self.x.start, self.y.start)
+      a = Hit(
+        self.x.chr, self.x.start - off, self.x.start,
+        self.y.chr, self.y.start - off, self.y.start
+      )
+      a.ltrim()
+      if a.cigar:
+        self.x.start, self.y.start = a.x.start, a.y.start
+        self.cigar = a.cigar + self.cigar
+      
+      a = Hit(
+        self.x.chr, self.x.end, self.x.end + off,
+        self.y.chr, self.y.end, self.y.end + off
+      )
+      a.rtrim()
+      if a.cigar:
+        self.x.end, self.y.end = a.x.end, a.y.end
+        self.cigar = self.cigar + a.cigar
+      
+  def __str__(self, rc=False):
+    xn, xs, xe = self.x.chr.name, self.x.start, self.x.end
+    yn, ys, ye = self.y.chr.name, self.y.start, self.y.end
+    assert not self.x.chr.rc
+    if rc and self.y.chr.rc:
+      ys, ye = self.y.chr.len - ye, self.y.chr.len - ys
+    # if (xn, xs, xe) > (yn, ys, ye):
+      # xn, xs, xe, yn, ys, ye = yn, ys, ye, xn, xs, xe
+    sp = f'{self.x.chr.species}:{self.y.chr.species}'
+    return (
+      f"{xn}\t{xs}\t{xe}\t" # coordinates
+      f"{yn}\t{ys}\t{ye}\t"
+      f"{sp}\t{math.round(100 * self.err(), 1)}\t"
+      f"{'+-'[int(self.x.chr.rc)]}\t{'+-'[int(self.y.chr.rc)]}\t" # strands
+      f"{max(xe - xs, ye - ys)}\t" # max span
+      f"{self.span()}\t{self.simple_cigar()}\t" # span and cigar
+      f"X={math.round(100 * self.mis_err(), 1)};" # mismatch
+      f"ID={math.round(100 * self.gap_err(), 1)}" # gap
+    )
+
+  def simple_cigar(self):
+    c, i = [], 0
+    while i < len(self.cigar):
+      l = 0
+      while i < len(self.cigar) and self.cigar[i][1] in '=X':
+        l += self.cigar[i][0]; i += 1
+      if l > 0: 
+        c.append(f'{l}M')
+      else:
+        c.append(f'{self.cigar[i][0]}{"I" if self.cigar[i][1] == "D" else "D"}')
+        i += 1
+    return ''.join(c)
+  
+  def __lt__(self, o: Hit):
+    return (self.x.chr, self.y.chr, self.x, self.y) < (o.x.chr, o.y.chr, o.x, o.y)
+  def __eq__(self, o: Hit):
+    return (self.x, self.y) == (o.x, o.y)
+  
+  def __iter__(self):
+    x, y = self.x.start, self.y.start
+    for l, op in self.cigar:
+      yield x, y, l, op
+      match op: 
+        case 'X' | '=': x += l; y += l
+        case 'I': x += l
+        case 'D': y += l
+
+  def nice(self):
+    a, m, b = [], [], []
+    for x, y, l, op in self:
+      match op:
+        case 'X' | '=': 
+          a.append(str(self.x.chr[x:x+l])); b.append(str(self.y.chr[y:y+l]))
+          m.append(('|' if op == '=' else '*') * l)
+        case 'I':
+          a.append(str(self.x.chr[x:x+l])); b.append('-' * l)
+          m.append('*' * l)
+        case 'D':
+          a.append('-' * l); b.append(str(self.y.chr[y:y+l]))
+          m.append('*' * l)
+      # a.append(' ');b.append(' ');m.append(' ')
+    return ''.join(a), ''.join(m), ''.join(b)
+    
+  def score(self, match, mismatch, gap):
+    total = 0.0
+    for l, op in self.cigar:
+      match op:
+        case 'X': total += mismatch * l
+        case '=': total += match * l
+        case 'I' | 'D': total += gap * l
+    return total
+
+  def span(self):
+    return sum(l for l, _ in self.cigar)
+
+  def gap_err(self):
+    return sum(l for l, o in self.cigar if o in 'ID') / float(self.span())
+  def mis_err(self):
+    return sum(l for l, o in self.cigar if o == 'X') / float(self.span())
+  def err(self):
+    return self.gap_err() + self.mis_err()
+
+  def align_gap(self, xs, xe, ys, ye):
+    if xe - xs == 0 and ye - ys == 0:
+      return []
+    if xe - xs == 0:
+      return [(ye - ys, 'D')]
+    elif ye - ys == 0:
+      return [(xe - xs, 'I')]
+    elif max(xe - xs, ye - ys) <= 1000:
+      return Hit.align(self.x.chr[xs:xe], self.y.chr[ys:ye])[1]
+    else:
+      mi, ma = min(xe - xs, ye - ys), max(xe - xs, ye - ys)
+      al = Hit.align(self.x.chr[xs:xs + mi], self.y.chr[ys:ys + mi])
+      ar = Hit.align(self.x.chr[xe - mi:xe], self.y.chr[ye - mi:ye])
+      gc = []
+      if ma - mi > 0:
+        gc.append((ma - mi, 'ID'[int(xe - xs == mi)]))
+      if al[0] > ar[0]:
+        return al[1] + gc
+      else:
+        return gc + ar[1]
+
+  def same_chr(self):
+    return self.x.chr == self.y.chr
+
+  def extend(self, other):
+    # WARN: modifies other!
+    # I: *- (insertion in first seq) ; D: -* (deletion in first seq)
+
+    assert other.x.start < self.x.end or other.y.start < self.y.end
+    assert self.x.end <= other.x.end and self.y.end <= other.y.end
+
+    ocig = [o for l, o in other.cigar for _ in range(l)]
+    bi = 0
+    for i in range(self.x.end - other.x.start):
+      while bi < len(ocig) and ocig[bi] == 'D':
+        other.y.start += 1
+        bi += 1
+      other.x.start += 1
+      if ocig[bi] != 'I':
+        other.y.start += 1
+      bi += 1
+    for i in range(self.y.end - other.y.start):
+      while bi < len(ocig) and ocig[bi] == 'I':
+        other.x.start += 1
+        bi += 1
+      other.y.start += 1
+      if ocig[bi] != 'D':
+        other.x.start += 1
+      bi += 1
+    
+    self.cigar += self.align_gap(self.x.end, other.x.start, self.y.end, other.y.start)
+    c = 0
+    for i in range(bi, len(ocig)):
+      c += 1
+      if i == len(ocig) - 1 or ocig[i + 1] != ocig[i]:
+        self.cigar.append((c, ocig[i]))
+        c = 0
+    self.x.end, self.y.end = other.x.end, other.y.end
+
+  def ltrim(self):  # ABCD -> --CD
+    s, maxs = 0, 0
+    maxi = len(self.cigar), self.x.end, self.y.end
+    for ci, (x, y, l, o) in enumerate(list(self)[::-1]):
+      match o:
+        case '=': s += l * MATCH
+        case 'X': s += l * MISMATCH
+        case 'I' | 'D': s += GAPO + l * GAPE
+      if s >= maxs:
+        maxs, maxi = s, (len(self.cigar) - ci - 1, x, y)
+    self.cigar = self.cigar[maxi[0]:]
+    self.x.start, self.y.start = maxi[1], maxi[2]
+
+  def rtrim(self):  # ABCD -> AB--
+    s, maxs = 0, 0
+    maxi = 0, self.x.start, self.y.start
+    for ci, (x, y, l, o) in enumerate(self):
+      match o:
+        case '=': s += l * MATCH
+        case 'X': s += l * MISMATCH
+        case 'I' | 'D': s += GAPO + l * GAPE
+      if s >= maxs:
+        maxs, maxi = s, (ci + 1, x + l, y + l)
+    self.cigar = self.cigar[:maxi[0]]
+    self.x.end, self.y.end = maxi[1], maxi[2]
+
+  def align(x, y):
+    MAX_ALIGN = 60 * 1000
+    s, c = 0, []
+    for oi in range(0, max(len(x), len(y)), MAX_ALIGN):
+      a = bio.seq.align(
+        x[oi:oi + MAX_ALIGN], y[oi:oi + MAX_ALIGN], 
+        a=MATCH, b=-MISMATCH, gapo=-GAPO, gape=-GAPE
+      )
+      xi, yi = oi, oi
+      for l, op in a.cigar:
+        if op == 'M':
+          i = 0
+          while i < l:
+            j, eq = 0, x[xi + i] == y[yi + i]
+            while i < l and (x[xi + i] == y[yi + i]) == eq:
+              i += 1; j += 1
+            c.append((j, '=' if eq else 'X'))
+          xi += l; yi += l
+        elif op == 'I':
+          c.append((l, op)); xi += l
+        elif op == 'D':
+          c.append((l, op)); yi += l
+      s += a.score
+    return s, c
+
+  def merge(hits, dist):
+    hits.sort(key=lambda h: (h.x.start, h.y.start))
+    y_sorted, y_hits = [], []
+    ph = Hit()
+    for hi, h in enumerate(hits):
+      if h.x == h.y:
+        continue
+      if hi == 0 or ph.x.end + dist < h.x.start:
+        yield from y_hits
+        y_sorted, y_hits = [h.y.end], [Hit(h)]
+      else:
+        while True:
+          update = False
+          s = bisect.bisect_left(y_sorted, h.y.start - dist)
+          while s < len(y_sorted):
+            if (
+              y_hits[s].x.end + dist >= h.x.start and
+              y_hits[s].y.end + dist >= h.y.start and
+              y_hits[s].y.start <= h.y.end + dist
+            ):
+              h.x.end = max(h.x.end, y_hits[s].x.end)
+              h.y.end = max(h.y.end, y_hits[s].y.end)
+              h.x.start = min(h.x.start, y_hits[s].x.start)
+              h.y.start = min(h.y.start, y_hits[s].y.start)
+              del y_sorted[s], y_hits[s]
+              update = True
+            else:
+              s += 1
+          if not update:
+            break
+        i = bisect.bisect_left(y_sorted, h.y.end)
+        y_sorted.insert(i, h.y.end)
+        y_hits.insert(i, Hit(h))
+      h.x.end = max(h.x.end, ph.x.end)
+      ph = Hit(h)
+    yield from y_hits

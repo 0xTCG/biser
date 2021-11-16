@@ -1,0 +1,41 @@
+import sys
+
+
+def group(elementary_path, regions_path, output, output_sd):
+  elem_dict = {}
+  for i in open(elementary_path):
+    line = i.strip().split('\t')[1:] # TODO: do multiple species
+    clade = line[3]
+    chr1 = line[0]
+    start = int(line[1])
+    end = int(line[2])
+    strand = line[6]
+    elem_dict.setdefault(clade, []).append((chr1, start, end, clade, strand))
+  coords = []
+  for i in open(regions_path):
+    ch, coord1, coord2, npip_k = i.strip().split()
+    # Seq TODO: fix type inference here
+    # Seq TODO: allow return_list variable name
+    coords.append(
+      (ch, int(coord1), int(coord2), npip_k, List[Tuple[int, int, str, str]]())
+    )
+  for key in elem_dict:
+    for el in elem_dict[key]:
+      for i in coords:
+        if el[0] == i[0] and el[1] > i[1] and el[2] < i[2]:
+          i[4].append((el[1], el[2] - el[1], key, el[4]))
+  with open(output, 'w') as fo, open(output_sd, 'w') as fos:
+    print(len(coords), file=fo)
+    for i in range(len(coords)):
+      coords[i][4].sort()
+      print(*coords[i], sep='\t', file=fos)
+      for j in range(i + 1, len(coords)):
+        if i != j:
+          set1 = set(k[2] for k in coords[i][4])
+          set2 = set(k[2] for k in coords[j][4])
+          if (distance := 1 - (len(set1 - set2) / len(set1 | set2))) != 1:
+            print(i, j, distance, sep='\t', file=fo)
+
+
+if __name__ == '__main__':
+  group(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])

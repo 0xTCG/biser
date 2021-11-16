@@ -1,0 +1,194 @@
+from time import timing
+import bio
+import search
+
+
+@dataclass(init=True, eq=True, order=True)
+class Dot:
+  chr: int
+  pos: int
+  def __hash__(self):
+    return (self.chr, self.pos).__hash__()
+  def __str__(self):
+    return f'{self.chr}, {self.pos}'
+
+
+@dataclass(init=True)
+class Pos:
+  chr: int
+  start: int
+  end: int
+
+
+class SD:
+  id: int
+  mate1: Pos
+  mate2: Pos
+  reversed: bool
+  cigar: bio.CIGAR
+  inv_d_i: bool = True
+  whole_line: str = ''
+
+  def __init__(self, p1: Pos, p2: Pos, reversed: bool, cigar: bio.CIGAR, line: str):
+    self.mate1 = p1
+    self.mate2 = p2
+    self.reversed = reversed
+    self.cigar = cigar
+    self.whole_line = line
+
+  def get_first(self, possible_extension = 0):
+    c1, s1 = self.mate1.chr, self.mate1.start
+    c2, s2 = self.mate2.chr, self.mate2.start
+    return Dot(c1, s1 - possible_extension), Dot(c2, s2 - possible_extension)
+
+  def get_last(self, possible_extension = 0):
+    c1, e1 = self.mate1.chr, self.mate1.end
+    c2, e2 = self.mate2.chr, self.mate2.end
+    return Dot(c1, e1 - 1 + possible_extension), Dot(c2, e2 - 1 + possible_extension)
+
+  def __str__(self):
+    return f'{self.mate1}\t{self.mate2}\t{self.reversed}'
+
+
+def cluster(genomes, bed, output):
+  chrs = {}
+  for g in genomes:
+    spc = search.get_species_name(g)
+    print('Species: ', spc)
+    with bio.FASTA(g) as f:
+      for i in f:
+        if search.valid_chr(i.name):
+          chrs[spc, i.name] = i.seq
+
+  sds = []
+  all_dots = []
+  chrid = {}
+  with timing('Load BED'), open(bed) as f:
+    for l_ in f:
+      l = l_.split('\t')
+      sp = l[6].split(':')
+      if (sp[0], l[0]) not in chrid: 
+        chrid[sp[0], l[0]] = len(chrid)
+      if (sp[1], l[3]) not in chrid: 
+        chrid[sp[1], l[3]] = len(chrid)
+      sds.append(
+        SD(
+          Pos(chrid[sp[0], l[0]], int(l[1]), int(l[2])),
+          Pos(chrid[sp[1], l[3]], int(l[4]), int(l[5])),
+          l[9] == '-', 
+          bio.CIGAR(),
+          l_.strip()
+        )
+      )
+      all_dots.extend(sds[-1].get_first())
+      all_dots.extend(sds[-1].get_last())
+  help_all_dots = sorted(set(all_dots))
+  colors = [0] * len(help_all_dots)
+  dots = {j: i for i, j in enumerate(help_all_dots)}
+  belongs = {i: i for i in range(len(help_all_dots))}
+  sets = {i: [i] for i in range(len(help_all_dots))}
+
+  # here we do coloring for spliting all SDs in larger groups:
+  colors_dict = {}
+  color = 1
+  for sd in sds:
+    s1, s2 = sd.get_first()
+    e1, e2 = sd.get_last()
+    start1 = dots[s1]
+    end1 = dots[e1]
+    start2 = dots[s2]
+    end2 = dots[e2]
+
+    colors_avail = {i for i in colors[start1:end1]} | {i for i in colors[start2:end2]}
+    if len(colors_avail) == 1:
+      if colors_avail.pop() == 0:
+        colors[start1:end1] = [color] * (end1 - start1)
+        colors[start2:end2] = [color] * (end2 - start2)
+        colors_dict[color] = color
+        color += 1
+    else:
+      l = sorted(colors_avail)
+      if l[0] == 0:
+        l.pop(0)
+      for i in l:
+        colors_dict[i] = l[0]
+      colors[start1:end1] = [l[0]] * (end1 - start1)
+      colors[start2:end2] = [l[0]] * (end2 - start2)
+  # Coloring is done here
+
+  all_colors = set()
+  output_dict = {}
+  dict_lens = {}
+  for i in sds:
+    parent = colors[dots[i.get_first()[0]]]
+    while colors_dict[parent] != parent:
+      parent = colors_dict[parent]
+    color = colors_dict[parent]
+    if color in dict_lens:
+      dict_lens[color] += 1
+    else:
+      dict_lens[color] = 1
+    all_colors.add(color)
+    output_dict.setdefault(color, []).append(i)
+  
+  rev_chrid = {j: i for i, j in chrid.items()}
+  maxes = []
+  for i, bed in output_dict.items():
+    span, cnt = 0, 0
+    with open(f'{output}/{i}.fa', 'w') as fo:
+      d = {}
+      for j in bed:
+        c1 = (*rev_chrid[j.mate1.chr], '+')
+        c2 = (*rev_chrid[j.mate2.chr], '+_'[int(j.reversed)])
+        d.setdefault(c1, []).append((j.mate1.start, j.mate1.end))
+        d.setdefault(c2, []).append((j.mate2.start, j.mate2.end))
+      for (sp, ch, sr), ranges in d.items():
+        ints = []
+        ps, pe = 0, 0
+        for s, e in sorted(ranges):
+          if s >= pe:
+            if pe - ps > 0:
+              ints.append((ps, pe))
+            ps, pe = s, e
+          else:
+           pe = max(pe, e)
+        if pe - ps > 0:
+          ints.append((ps, pe))
+        for st, ed in ints:
+          print(f'>{sp}-{ch}{sr}-{st}-{ed}', file=fo)
+          if sr == '+':
+            print(chrs[sp, ch][st:ed], file=fo)
+          else:
+            print(~(chrs[sp, ch][st:ed]), file=fo)
+          span += ed - st
+          cnt += 1
+    maxes.append((span, cnt, i))
+  print('Top clusters:')
+  for span, cnt, i in sorted(maxes, reverse=True)[:10]:
+    print(f'  {i} -> {cnt} / {span}')
+
+
+def extract(bed, output):
+  chrs = {}
+  with open(bed) as f:
+    for ln in f:
+      l = ln.split('\t')
+      sp = l[6].split(':')
+      assert sp[0] == sp[1]
+      chrs.setdefault((sp, l[0]), []).append((int(l[1]), int(l[2])))
+      chrs.setdefault((sp, l[3]), []).append((int(l[4]), int(l[5])))
+  with open(output, 'w') as fo:
+    for (sp, ch), ranges in chrs.items():
+      ints = []
+      ps, pe = 0, 0
+      for s, e in sorted(ranges):
+        if s >= pe:
+          if pe - ps > 0:
+            ints.append((ps, pe))
+          ps, pe = s, e
+        else:
+          pe = max(pe, e)
+      if pe - ps > 0:
+        ints.append((ps, pe))
+      for st, ed in ints:
+        print(ch, st, ed, sep='\t', file=fo)

@@ -1,0 +1,8 @@
+_*
+*.d
+*.o
+*.dSYM
+*__pycache__*
+biser/seq/biser
+*.pyc
+biser.egg-info

@@ -1,0 +1,285 @@
+import sys
+from time import *
+from bio import *
+
+
+K: Static[int] = 10
+MIN_MATE_LEN = 100  # 50 # 100# 2# 100
+INDEX_CUTOFF = 0.001
+NODE_ID = 0
+
+
+class ListNode:
+  id: int
+  begin: int
+  end: int
+  chr: int
+  next: Optional[ListNode]
+  age: int = 0
+  count: int = 0
+  gap: int = 0
+  mappings: Dict[int, int] = {}
+  potentional: bool = False
+  score: int = 0
+
+  def __init__(self, id, first, last, chr, next, age, count):
+    self.id = id
+    self.begin = first
+    self.end = last
+    self.chr = chr
+    self.next = next
+    self.age = age
+    self.count = count
+    self.potentional = False
+    self.score = 0
+    self.gap = 0
+    self.mappings = {}
+
+  def insert_after(self, id, first, chr, age, count):
+    self.next = ListNode(id, first, first, chr, self.next, age, count)
+
+  def __iter__(self):
+    walker: Optional[ListNode] = self
+    while walker is not None:
+      yield walker
+      walker = walker.next
+
+  def __eq__(self, other):
+    return self.begin == other.begin and self.end == other.end
+
+
+def process(
+  threads: Optional[ListNode],
+  visited,
+  result: List[Tuple[int,int,int,int]] = [],
+  mappings: Dict[int, int] = {}
+):
+  if threads and len(mappings) == 0:
+    for w in threads:
+      if w.end - w.begin > MIN_MATE_LEN:
+        result.append((w.chr, w.begin, w.end, w.score))
+  elif threads:
+    for w in threads:
+      if w.id in mappings and mappings[w.id] - w.begin > MIN_MATE_LEN:
+        result.append((w.chr, w.begin, mappings[w.id], w.score))
+        w.begin = mappings[w.id] + 1
+  if len(result) != 1:
+    for c, s, e in result:
+      for i in range(s, e):
+        assert not visited[c][i]
+        visited[c][i] = True
+  return result if len(result) != 1 else []
+
+
+def update_list(L, index, diff, results, visited):
+  global NODE_ID
+
+  n, prev, holder = L, None, L # n is node
+  mappings = {}
+  i = len(index) - 1
+  while L and i >= 0 and index[i] > (L.chr, L.end + diff):
+    if i >= 0 and visited[index[i][0]][index[i][1]]:
+      i -= 1
+      continue
+    n = ListNode(NODE_ID, index[i][1], index[i][1], index[i][0], L, 0, 1)
+    NODE_ID += 1
+    n.score += 1
+    n.mappings = mappings
+    if prev:
+      prev.next = n
+    else:
+      holder = n
+    prev = n
+    i -= 1
+
+  n, L = L, holder
+  while n:
+    event = 0
+    if i >= 0 and visited[index[i][0]][index[i][1]]:
+      i -= 1
+      continue
+    if i >= 0 and n.chr == index[i][0] and index[i][1] - diff <=  n.end < index[i][1]:
+      if (
+        n.end - n.begin < MIN_MATE_LEN
+        and index[i][1] - n.begin >= MIN_MATE_LEN
+        and len(n.mappings) > 1
+      ):
+        if tmp := process(L, visited, [], n.mappings):
+          results.append(tmp)
+      n.end = index[i][1]
+      n.score += 1
+      n.gap = 0
+      n.count += 1
+      i -= 1
+      continue
+    elif (
+      i >= 0 and
+      n.chr == index[i][0] and n.end + diff > index[i][1] and n.begin <= index[i][1]
+    ):
+      i -= 1
+      n.score += 1
+      continue
+    elif i >= 0 and (
+      not n.next
+      or n.next.chr < index[i][0]
+      or n.next.chr == index[i][0] and n.next.end + diff < index[i][1]
+    ):
+      n.insert_after(NODE_ID, index[i][1], index[i][0], 1, 1)
+      n.next.score += 1
+      n.next.mappings = mappings
+      i -= 1
+      NODE_ID += 1
+    n.gap += 1
+    n.age += 1
+    if n.gap < diff:
+      n.potentional = True
+    else:
+      if n.potentional:
+        if n.end - n.begin > MIN_MATE_LEN:
+          if tmp := process(L, visited):
+            results.append(tmp)
+          L = None
+          NODE_ID = 0
+          return L
+      if n is L:
+        L.next, L = None, L.next
+        event = 1
+      else:
+        if n.next is None:
+          prev.next = None
+        else:
+          event = 3
+          prev.next = n.next
+          n.next = None
+    if n.end - n.begin > MIN_MATE_LEN:
+      mappings[n.id] = n.end
+    if event == 3:
+      n = prev.next
+    elif event == 1:
+      n = L
+    else:
+      prev = n
+      n = n.next
+
+  while i >= 0:
+    if i >= 0 and visited[index[i][0]][index[i][1]]:
+      i -= 1
+      continue
+    if not L:
+      L = ListNode(NODE_ID, index[i][1], index[i][1], index[i][0], None, 1, 1)
+      L.score += 1
+      L.mappings = mappings
+      prev = L
+    else:
+      prev.insert_after(NODE_ID, index[i][1], index[i][0], 1, 1)
+      prev.next.mappings = mappings
+      prev = prev.next
+      prev.score += 1
+    i -= 1
+    NODE_ID += 1
+  return L
+
+
+def find_elems(seq, chr, index, threshold, visited, result):
+  difference = 50
+  L, loc = None, 0
+  for k in seq.kmers(1, k=K):
+    if len(index[int(k.as_int())]) >= threshold:
+      loc += 1
+      continue
+    if visited[chr][loc]:
+      loc += 1
+      if L:
+        if tmp := process(L, visited):
+          result.append(tmp)
+        L = None
+      continue
+    L = update_list(L, index[int(k.as_int())], difference, result, visited)
+    loc += 1
+  if tmp := process(L, visited):
+    result.append(tmp)
+
+
+def merge(elems):
+  def can_merge(e1, e2, gap=500):
+    if len(e1) == len(e2):
+      results = []
+      for i in range(len(e1)):
+        if e1[i][0] == e2[i][0] and e1[i][2] <= e2[i][1] and e1[i][2] + gap >= e2[i][1]:
+          results.append((e1[i][0], e1[i][1], e2[i][2], e1[i][3] + e2[i][3]))
+        else:
+          break
+      if len(results) == len(e2):
+        return results
+    return []
+
+  results = [elems[0]]
+  for i in range(1, len(elems)):
+    if r := can_merge(results[-1], elems[i]):
+      results[-1] = r
+    else:
+      results.append(elems[i])
+  return results
+
+
+def decompose(path, name, output):
+  chromosomes = []
+  index = {}
+  visited = []
+  frequency = 0
+
+  with timing("Initialize"):
+    for ic, i in enumerate(FASTA(path, fai=False)):
+      visited.append([])
+      chromosomes.append(i.name)
+      for loc, k in enumerate(i.seq.kmers(1,  k=K)):
+        visited[-1].append(False)
+        frequency += 1
+        index.setdefault(int(k.as_int()), []).append((ic, loc))
+      for i in range(9):
+        visited[-1].append(False)
+
+  threshold = 1 << 31
+  hist = {}
+  for loci in index.values():
+    hist[len(loci)] = hist.get(len(loci), 0) + 1
+  s = 0
+  for i in sorted(hist.keys(), reverse=True):
+    s += hist[i]
+    if s <= int(frequency * INDEX_CUTOFF):
+      threshold = i
+    else:
+      break
+  print(f"Threshold is: {threshold}")
+
+  elem_sets, elem_cnt = 0, 0
+  with timing("Finding elementaries"), open(output, "w") as fo:
+    for ic, i in enumerate(FASTA(path, fai=False)):
+      result: List[List[Tuple[int, int, int, int]]] = []
+      find_elems(i.seq, chromosomes.index(i.name), index, threshold, visited, result)
+      if len(result) > 0:
+        result = merge(result)
+      for eset in result:
+        for elem in eset:
+          spc, chr, begin, end = chromosomes[elem[0]].split("-")
+          chrom, strand = chr[:-1], chr[-1]
+          b, e = int(begin) + elem[1], int(begin) + elem[2]
+          if strand != '+':
+            b, e = int(end) - elem[2], int(end) - elem[1]
+          print(
+            f"{spc}\t{chrom}\t{b}\t{e}\t{name}_{elem_sets}\t"
+            f"{elem[2] - elem[1]}\t{elem[3]}\t{strand}",
+            file=fo
+          )
+          elem_cnt += 1
+        elem_sets += 1
+
+  total, covered = 0, 0
+  for v in visited:
+    total += len(v)
+    covered += sum(1 for i in v if i)
+  print(f"Sets: {elem_sets}\nElementaries: {elem_cnt}\nCovered: {covered} / {total}")
+
+
+if __name__ == "__main__":
+  decompose(sys.argv[1], 80, sys.argv[2])
