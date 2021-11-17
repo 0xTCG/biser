@@ -51,4 +51,4 @@ directories.
 
 ## Contact
 
-Please reach out to [Ibrahim Numanagić](mailto:inumanag at uvic dot oh caaanaaadaaa).
+Please reach out to [Ibrahim Numanagić](mailto:inumanag_at_uvic_dot_ca).
