@@ -267,9 +267,9 @@ def decompose(path, name, output):
           if strand != '+':
             b, e = int(end) - elem[2], int(end) - elem[1]
           print(
-            f"{spc}\t{chrom}\t{b}\t{e}\t{name}_{elem_sets}\t"
-            f"{elem[2] - elem[1]}\t{elem[3]}\t{strand}",
-            file=fo
+            spc, chrom, b, e, f"{name}_{elem_sets}",
+            elem[2] - elem[1], elem[3], strand,
+            sep='\t', file=fo
           )
           elem_cnt += 1
         elem_sets += 1

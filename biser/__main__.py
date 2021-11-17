@@ -12,6 +12,8 @@ import time
 import contextlib
 from pathlib import Path
 
+from .cover import cover
+
 
 @contextlib.contextmanager
 def timing(title, results=None, force=False):
@@ -26,9 +28,7 @@ def timing(title, results=None, force=False):
 
 
 def progress(*args, **kwargs):
-  return tqdm.tqdm(
-    *args, **kwargs, bar_format='{l_bar}{bar:40}| {n_fmt}/{total_fmt}'
-  )
+  return tqdm.tqdm(*args, **kwargs, bar_format='{l_bar}{bar:40}| {n_fmt}/{total_fmt}')
 
 
 def run_biser(*args):
@@ -37,8 +37,7 @@ def run_biser(*args):
   o = subprocess.run(
     [path, *args],
     env={"OMP_NUM_THREADS": "1"},
-    capture_output=True,
-    shell=True
+    capture_output=True
   )
   t = time.time() - t
   l = ['[p] ' + ' '.join(o.args)]
@@ -236,9 +235,18 @@ def decompose(tmp, genomes, threads, final):
         with open(r) as f:
           for l in f:
             print(l, end='', file=fo)
+    cover(final, f'{final}.elem.txt')
 
 
 def main(argv):
+  if len(argv) > 0 and argv[0] == 'test':
+    _, l = run_biser('hello')
+    if len(l) < 2 or l[1] != '[o] BISER v1.0':
+      print('Error: unexpected respose from BISER')
+      print('\n'.join(l))
+      sys.exit(1)
+    sys.exit(0)
+
   parser = argparse.ArgumentParser(
     prog="biser",
     description="Segmental duplication detection tool",
@@ -255,21 +263,11 @@ def main(argv):
   parser.add_argument(
     "--output", "-o", required=True, help="Indexed genomes in FASTA format."
   )
-  parser.add_argument(
-    "--test", help="Test BISER installation.", action='store_true'
-  )
   args = parser.parse_args(argv)
 
-  if args.test:
-    _, l = run_biser('hello')
-    if len(l) < 2 or l[1] != '[o] BISER v1.0':
-      print('Error: unexpected respose from BISER')
-      print('\n'.join(l))
-      sys.exit(1)
-    sys.exit(0)
   try:
     threads = args.threads
-    genomes = {Path(path).stem: path for path in args.genomes}
+    genomes = {Path(path).stem: os.path.abspath(path) for path in args.genomes}
 
     with timing("BISER", force=True), \
         tempfile.TemporaryDirectory(prefix='biser', dir=args.temp) as tmp:

@@ -75,6 +75,7 @@ def help():
 
 
 if __name__ == "__main__":
+  print sys.argv 
   if len(sys.argv) < 3:
     help()
   
@@ -88,7 +89,7 @@ if __name__ == "__main__":
       threads = int(a)
     elif o in ("-c", "--chr"):
       chr = a
-  if not out:
+  if out == '':
     help()
 
   match mode:
@@ -113,5 +114,5 @@ if __name__ == "__main__":
       if len(args) != 1:
         raise ValueError("Invalid arguments")
       run_decompose(args[0], out)
-    case mode:
+    case _:
       help()

@@ -55,7 +55,7 @@ setup(
   download_url="https://github.com/0xTCG/biser/tarball/master",
   license="MIT License.",
   keywords=["genome analysis", "fast alignment", "segmental duplications", "sequence decomposition"],
-  install_requires=["tqdm"],
+  install_requires=["tqdm", "ncls"],
   entry_points={"console_scripts": ["biser = biser.__main__:console"]},
   packages=find_packages(),
   package_data={ "biser": ["biser/seq"], },
