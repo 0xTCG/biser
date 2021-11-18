@@ -341,7 +341,7 @@ def main(argv):
         shutil.rmtree(tmp, ignore_errors=True)
 
       if not args.hard:
-        run_biser('translate', '-o', args.output, final, list(orig_genomes.values()))
+        run_biser('translate', '-o', args.output, final, *list(orig_genomes.values()))
       else:
         shutil.copy(final, args.output)
         if not args.no_decompostion:
@@ -349,8 +349,7 @@ def main(argv):
 
       print(f'Done! Results are available in {args.output}')
   except Exception as e:
-    print(f'A BISER error has occured:')
-    print(f'{e}')
+    print(f'ERROR:', e)
     sys.exit(1)
 
 
