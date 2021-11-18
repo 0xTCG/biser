@@ -279,7 +279,3 @@ def decompose(path, name, output):
     total += len(v)
     covered += sum(1 for i in v if i)
   print(f"Sets: {elem_sets}\nElementaries: {elem_cnt}\nCovered: {covered} / {total}")
-
-
-if __name__ == "__main__":
-  decompose(sys.argv[1], 80, sys.argv[2])

@@ -93,14 +93,14 @@ def cover(bed, elems):
       if len(se) > 0:
         sd_elem[li] = se
         li += 1
-    print(f'{len(elem_sd)} elementary SDs')
+    # print(f'{len(elem_sd)} elementary SDs')
 
     cores = set()
     for eid, sds in greedy_set_cover(elem_sd, sd_elem):
       if len(sds) < 2:
         continue
       cores.add(eid)
-    print(f'{len(cores)} core SDs')
+    # print(f'{len(cores)} core SDs')
 
     with open(elems, 'w') as fo:
       for l in lines:

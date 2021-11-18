@@ -3,69 +3,13 @@ import bio
 import time
 import sys
 
-
-def run_search(genomes, chr, output):
-  import search
-  import hit
-
-  result: Dict[Tuple[str, str, str, str, bool], List[hit.Hit]] = {}
-  with time.timing("Search"):  
-    if len(genomes) == 1:
-      search.search(genomes[0], chr, result)
-    else:
-      genome, ch, ygenome, yints = genomes
-      search.cross_search(genome, ch, ygenome, yints, result)
-  with open(output, "w") as f:
-    for r in result.values():
-      for h in hit.Hit.merge(r, search.MERGE_DIST):
-        print(h, file=f)
-
-
-def run_align(genomes, bed, output):
-  import align
-  import hit
-  import chain
-  import search
-
-  chromosomes = {}
-  for genome in genomes:
-    with bio.FASTA(genome) as fa:
-      sp = search.get_species_name(genome)
-      for r in fa:
-        chromosomes[sp, r.name, False] = hit.Chromosome(
-          len(chromosomes), sp, r.name, False, len(r.seq), r.seq
-        )
-        chromosomes[sp, r.name, True] = hit.Chromosome(
-          len(chromosomes), sp, r.name, True, len(r.seq), ~r.seq
-        )
-  with time.timing("Alignment"), open(bed) as f, open(output, 'w') as fo:
-    for lp in f:
-      h = hit.Hit(lp, chromosomes)
-      anchors = list(align.generate_anchors(h))
-      new_hits = []
-      for ch in chain.chain(anchors):
-        nh = hit.Hit(h, [hit.Hit(h, anchors[i]) for i in ch])
-        new_hits.append(nh)
-      for nh in align.refine(h, new_hits):
-        print(nh.__str__(True), file=fo)
-
-
-def run_cluster(bed, genomes, output):
-  import cluster
-  with time.timing("Clustering"):
-    cluster.cluster(genomes, bed, output)
-
-
-def run_decompose(fasta, output):
-  import decompose
-  with time.timing("Decomposition"):
-    decompose.decompose(fasta, fasta.split('/')[-1].split('.')[0], output)
-
-
-def run_extract(bed, output):
-  import cluster
-  with time.timing("Extraction"):
-    cluster.extract(bed, output)
+import align
+import hit
+import chain
+import search
+import cluster
+import decompose
+import mask
 
 
 def help():
@@ -75,7 +19,6 @@ def help():
 
 
 if __name__ == "__main__":
-  print sys.argv 
   if len(sys.argv) < 3:
     help()
   
@@ -96,23 +39,65 @@ if __name__ == "__main__":
     case 'search':
       if not args or len(args) not in [1, 4]:
         raise ValueError("Invalid arguments")
-      run_search(args, chr, out)
+      result: Dict[Tuple[str, str, str, str, bool], List[hit.Hit]] = {}
+      with time.timing("Search"):  
+        if len(args) == 1:
+          search.search(args[0], chr, result)
+        else:
+          genome, ch, ygenome, yints = args
+          search.cross_search(genome, ch, ygenome, yints, result)
+      with open(out, "w") as f:
+        for r in result.values():
+          for h in hit.Hit.merge(r, search.MERGE_DIST):
+            print(h, file=f)
     case 'align':
       if len(args) < 2:
         raise ValueError("Invalid arguments")
-      genomes, bed = args[:-1], args[-1]
-      run_align(genomes, bed, out)
+      chromosomes = {}
+      for genome in args[:-1]:
+        with bio.FASTA(genome) as fa:
+          sp = search.get_species_name(genome)
+          for r in fa:
+            chromosomes[sp, r.name, False] = hit.Chromosome(
+              len(chromosomes), sp, r.name, False, len(r.seq), r.seq
+            )
+            chromosomes[sp, r.name, True] = hit.Chromosome(
+              len(chromosomes), sp, r.name, True, len(r.seq), ~r.seq
+            )
+      with time.timing("Alignment"), open(args[-1]) as f, open(out, 'w') as fo:
+        for lp in f:
+          h = hit.Hit(lp, chromosomes)
+          anchors = list(align.generate_anchors(h))
+          new_hits = []
+          for ch in chain.chain(anchors):
+            nh = hit.Hit(h, [hit.Hit(h, anchors[i]) for i in ch])
+            new_hits.append(nh)
+          for nh in align.refine(h, new_hits):
+            print(nh.__str__(True), file=fo)
     case 'extract':
       if len(args) != 1:
         raise ValueError("Invalid arguments")
-      run_extract(args[0], out)
+      with time.timing("Extraction"):
+        cluster.extract(args[0], out)
     case 'cluster':
       if len(args) < 2:
         raise ValueError("Invalid arguments")
-      run_cluster(args[0], args[1:], out)
+      with time.timing("Clustering"):
+        cluster.cluster(args[1:], args[0], out)
     case 'decompose':
       if len(args) != 1:
         raise ValueError("Invalid arguments")
-      run_decompose(args[0], out)
+      with time.timing("Decomposition"):
+        decompose.decompose(args[0], args[0].split('/')[-1].split('.')[0], out)
+    case 'mask':
+      if len(args) != 1:
+        raise ValueError("Invalid arguments")
+      with time.timing("Masking"):
+        mask.mask(args[0], out)
+    case 'translate':
+      if len(args) < 2:
+        raise ValueError("Invalid arguments")
+      with time.timing("Translate"):
+        mask.translate(args[1:], args[0], out)
     case _:
       help()

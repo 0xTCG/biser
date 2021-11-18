@@ -6,6 +6,7 @@ import sys
 import subprocess
 import tempfile
 import argparse
+import shutil
 import os
 import glob
 import time
@@ -16,15 +17,16 @@ from .cover import cover
 
 
 @contextlib.contextmanager
-def timing(title, results=None, force=False):
+def timing(title, results=None, force=False, indent=2):
   t = time.time()
   yield
   t = int(time.time() - t)
+  ind = " " * indent
   if results:
     st = int(sum(i[0][0] for i in results if i[0]))
-    print(f'  {title}: {t//60:02d}:{t%60:02d}s (single: {st//60:02d}:{st%60:02d}s)')
+    print(f'{ind}{title}: {t//60:02d}:{t%60:02d}s (single: {st//60:02d}:{st%60:02d}s)')
   elif force:
-    print(f'  {title}: {t//60:02d}:{t%60:02d}s')
+    print(f'{ind}{title}: {t//60:02d}:{t%60:02d}s')
 
 
 def progress(*args, **kwargs):
@@ -33,6 +35,7 @@ def progress(*args, **kwargs):
 
 def run_biser(*args):
   path = f'{os.path.dirname(__file__)}/exe/biser.exe'
+  path = "/Users/inumanag/.pyenv/versions/3.7.5/Library/Frameworks/Python.framework/Versions/3.7/lib/python3.7/site-packages/biser/exe/biser.exe"
   t = time.time()
   o = subprocess.run(
     [path, *args],
@@ -127,6 +130,7 @@ def align(tmp, genomes, threads, search, nbuckets=50):
     for (_, log), sp, bed, _ in results:
       for l in log:
         print(f'{sp}.{bed.split(".")[-2]}: {l}', file=fo)
+      os.remove(bed)
   return results
 
 
@@ -205,6 +209,7 @@ def cross_biser(tmp, genomes, threads, alignments):
       for (_, log), (sp1, sp2), bed, _ in results:
         for l in log:
           print(f'{sp1}.{sp2}.{bed.split(".")[-2]}: {l}', file=fo)
+        os.remove(bed)
 
   return results
 
@@ -238,6 +243,14 @@ def decompose(tmp, genomes, threads, final):
     cover(final, f'{final}.elem.txt')
 
 
+def biser_mask(args):
+  tmp, species, genome = args
+  out = f'{tmp}/genomes/{species}.fa'
+  o = run_biser('mask', genome, "-o", out)
+  subprocess.check_call(['samtools', 'faidx', out])
+  return o, species, out
+
+
 def main(argv):
   if len(argv) > 0 and argv[0] == 'test':
     _, l = run_biser('hello')
@@ -263,15 +276,42 @@ def main(argv):
   parser.add_argument(
     "--output", "-o", required=True, help="Indexed genomes in FASTA format."
   )
+  parser.add_argument(
+    "--hard", "-H", action="store_true", help="Are input genomes already hard-masked?"
+  )
+  parser.add_argument(
+    "--keep-temp", "-k", action="store_true",
+    help="Keep temporary directory after the execution. Useful for debugging."
+  )
+  parser.add_argument(
+    "--no-decomposition", action="store_true",
+    help="Skip SD decomposition step."
+  )
   args = parser.parse_args(argv)
 
   try:
     threads = args.threads
-    genomes = {Path(path).stem: os.path.abspath(path) for path in args.genomes}
 
-    with timing("BISER", force=True), \
-        tempfile.TemporaryDirectory(prefix='biser', dir=args.temp) as tmp:
-      print(f'Running BISER on {len(genomes)} genome(s): {", ".join(genomes)}\n')
+    genomes = {Path(path).stem: os.path.abspath(path) for path in args.genomes}
+    with timing("BISER", force=True, indent=0):
+      tmp = tempfile.mkdtemp(prefix='biser', dir=args.temp)
+      print(f'Running BISER on {len(genomes)} genome(s): {", ".join(genomes)}')
+      if args.keep_temp:
+        print(f'Temporary directory: {tmp}')
+      print()
+
+      if not args.hard:
+        orig_genomes = genomes.copy()
+        results = []
+        print('0. Hard-masking genomes')
+        with timing("Hard-masking", results):
+          os.makedirs(f'{tmp}/genomes')
+          jobs = [(tmp, *g) for g in genomes.items()]
+          with mp.Pool(threads) as pool:
+            results[:] = list(progress(pool.imap(biser_mask, jobs), total=len(jobs)))
+          for _, g, out in results:
+            genomes[g] = out
+        print()
 
       r = search(tmp, genomes, threads)
       print()
@@ -286,13 +326,26 @@ def main(argv):
       files = list(glob.glob(f'{tmp}/align/*.align'))
       if len(genomes) > 1:
         files += list(glob.glob(f'{tmp}/cross_align/*.align'))
-      with open(args.output, 'w') as fo:
+
+      final = f'{tmp}/final.bed'
+      with open(final, 'w') as fo:
         for fl in files:
           with open(fl) as f:
             for l in f:
               print(l, end='', file=fo)
 
-      decompose(tmp, genomes, threads, args.output)
+      if not args.no_decomposition:
+        decompose(tmp, genomes, threads, final)
+
+      if not args.keep_temp:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+      if not args.hard:
+        run_biser('translate', '-o', args.output, final, list(orig_genomes.values()))
+      else:
+        shutil.copy(final, args.output)
+        if not args.no_decompostion:
+          shutil.copy(f'{final}.elem.txt', f'{args.output}.elem.txt')
 
       print(f'Done! Results are available in {args.output}')
   except Exception as e:

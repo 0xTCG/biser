@@ -1,0 +1,153 @@
+import bio
+import sys
+import bisect
+import search
+from time import timing
+
+
+def mask(path, out, width=80):
+  with bio.FASTA(path, fai=False) as fr, open(out, 'w') as fo:
+    for i in fr:
+      print(i.name)
+      print(f'>{i.name}', file=fo)
+      s = [c for c in str(i.seq) if c.isupper()]
+      for j in range(0, len(s), width):
+        print(''.join(s[j:j+width]), file=fo)
+
+
+def translate(genomes, bed, output):
+  def conv(uppers, lowers, up):
+    i = bisect.bisect(uppers, up) - 1
+    return i, lowers[i][0] + (up - uppers[i])
+
+  def add(s, name, chr):
+    u, l = [], []
+    up = 0
+    i = 0
+    while i < len(s):
+      upper = s[i].isupper()
+      st, ln = i, 0
+      while i < len(s) and s[i].isupper() == upper:
+        i += 1; ln += 1
+      if upper:
+        u.append(up); l.append((st, st + ln))
+        up += ln
+    u.append(up); l.append((len(s), len(s)))
+    return u, l
+  
+  uppers = {}
+  lowers = {}
+  for genome in genomes:
+    spc = search.get_species_name(genome)
+    with timing("Loading"), open(genome) as f:
+      name, chr = '', []
+      for l in f:
+        if l[0] == '>' and name:
+          uppers[spc, name], lowers[spc, name] = add(''.join(chr), name, chr)
+          name, chr = l.split()[0][1:], []
+        elif l[0] == '>':
+          name = l.split()[0][1:]
+        else:
+          chr.append(l.strip())
+      if name:
+        uppers[spc, name], lowers[spc, name] = add(''.join(chr), name, chr)
+
+  with timing("Translating"), open(bed) as f:
+    sds = []
+    for lp in f:
+      l = lp.strip().split('\t')
+      c1, s1, e1 = l[0], int(l[1]), int(l[2])
+      c2, s2, e2 = l[3], int(l[4]), int(l[5])
+      sp1, sp2 = l[6].split(':')
+      i1, p1 = conv(uppers[sp1, c1], lowers[sp1, c1], s1)
+      i2, p2 = conv(uppers[sp2, c2], lowers[sp2, c2], s2)
+      new_cigar = []
+      for sz, op in bio.CIGAR(l[12]):
+        if op == 'M':
+          i = 0
+          while i < sz:
+            spc = min(lowers[sp1, c1][i1][1] - p1, lowers[sp2, c2][i2][1] - p2)
+            if spc == 0:
+              if lowers[sp1, c1][i1][1] - p1 == 0:
+                nsz = lowers[sp1, c1][i1 + 1][0] - lowers[sp1, c1][i1][1] 
+                new_cigar.append((nsz, 'S'))
+                p1 += nsz; i1 += 1
+              else:
+                nsz = lowers[sp2, c2][i2 + 1][0] - lowers[sp2, c2][i2][1]
+                new_cigar.append((nsz, 'N'))
+                p2 += nsz; i2 += 1
+            elif spc >= sz - i:
+              nsz = sz - i
+              new_cigar.append((nsz, 'M'))
+              p1 += nsz; p2 += nsz; i += nsz
+            else:
+              new_cigar.append((spc, 'M'))
+              p1 += spc; p2 += spc; i += spc
+        elif op == 'I':
+          i = 0
+          while i < sz:
+            spc = lowers[sp1, c1][i1][1] - p1
+            if spc == 0:
+              nsz = lowers[sp1, c1][i1 + 1][0] - lowers[sp1, c1][i1][1]
+              new_cigar.append((nsz, 'S'))
+              p1 += nsz; i1 += 1
+            elif spc >= sz - i:
+              nsz = sz - i
+              new_cigar.append((nsz, 'I'))
+              p1 += nsz; i += nsz
+            else:
+              new_cigar.append((spc, 'I'))
+              p1 += spc; i += spc
+        elif op == 'D':
+          i = 0
+          while i < sz:
+            spc = lowers[sp2, c2][i2][1] - p2
+            if spc == 0:
+              nsz = lowers[sp2, c2][i2 + 1][0] - lowers[sp2, c2][i2][1]
+              new_cigar.append((nsz, 'N'))
+              p2 += nsz; i2 += 1
+            elif spc >= sz - i:
+              nsz = sz - i
+              new_cigar.append((nsz, 'D'))
+              p2 += nsz; i += nsz
+            else:
+              new_cigar.append((spc, 'D'))
+              p2 += spc; i += spc
+      
+      cigar, psz, pop = [], 0, ''
+      for sz, op in new_cigar:
+        if op == pop: 
+          psz += sz
+        else: 
+          if psz:
+            cigar.append(f'{psz}{pop}')
+          psz, pop = sz, op
+      if psz:
+        cigar.append(f'{psz}{pop}')
+      l[12] = ''.join(cigar)
+      l[1] = str(conv(uppers[sp1, c1], lowers[sp1, c1], s1)[1])
+      l[2] = str(conv(uppers[sp1, c1], lowers[sp1, c1], e1)[1])
+      l[4] = str(conv(uppers[sp2, c2], lowers[sp2, c2], s2)[1])
+      l[5] = str(conv(uppers[sp2, c2], lowers[sp2, c2], e2)[1])
+      sds.append(l)
+    
+    sds.sort(
+      key=lambda l: (l[6], l[0], l[3], l[9], int(l[1]), int(l[4]), int(l[2]), int(l[5]))
+    )
+    with open(output, 'w') as fo:
+      for l in sds:
+        print('\t'.join(l), file=fo)
+
+  try:
+    with open(f'{bed}.elem.txt') as f, open(f'{output}.elem.txt', 'w') as fo:
+      elems = []
+      for lp in f:
+        l = lp.strip().split('\t')
+        l[2] = str(conv(uppers[l[0], l[1]], lowers[l[0], l[1]], int(l[2]))[1])
+        l[3] = str(conv(uppers[l[0], l[1]], lowers[l[0], l[1]], int(l[3]))[1])
+        elems.append(l)
+      elems.sort(key=lambda l: (l[4], l[0], l[1], l[2], l[3]))
+      for l in elems:
+        print('\t'.join(l), file=fo)
+  except: 
+    pass
