@@ -45,14 +45,13 @@ biser -o <output> -j <jobs> <genome1.fa> <genome2.fa> ...
 
 ### Other options
 
-Run `biser -h` to list the available options.
+Run `biser -h` to list available options.
 
 ## Paper & Simulations
 
 BISER was published in WABI 2021 proceedings and [is available here](https://drops.dagstuhl.de/opus/volltexte/2021/14368/pdf/LIPIcs-WABI-2021-15.pdf).
 
-Paper simulations are available in [scripts](scripts/) and [simulation](simulation/)
-directories.
+Paper simulations are available in [paper](paper/) directory.
 
 > We will provide more experimental details soon.
 
