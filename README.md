@@ -31,7 +31,7 @@ decomposition of the final SD set.
 
 All genomes should be indexed beforehand with `samtools faidx genome.fa`.
 
-> ⚠️: BISER requires soft-masked or hard-masked genome assemblies for 
+> ⚠️ BISER requires soft-masked or hard-masked genome assemblies for 
 > the optimal performance. 
 > Check for the presence of lowercase bases in your genome; if you have them,
 > you are good to go.
