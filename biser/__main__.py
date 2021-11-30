@@ -35,7 +35,6 @@ def progress(*args, **kwargs):
 
 def run_biser(*args):
   path = f'{os.path.dirname(__file__)}/exe/biser.exe'
-  path = "/Users/inumanag/.pyenv/versions/3.7.5/Library/Frameworks/Python.framework/Versions/3.7/lib/python3.7/site-packages/biser/exe/biser.exe"
   t = time.time()
   o = subprocess.run(
     [path, *args],
