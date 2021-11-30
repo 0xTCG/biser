@@ -27,7 +27,7 @@ class CustomBuild(build_py):
       else:
         ext = "so"
         subprocess.check_call(
-          ["patchelf", "--set-rpath", "'$ORIGIN'", f'{target_dir}/biser.exe']
+          ["patchelf", "--set-rpath", "$ORIGIN", f'{target_dir}/biser.exe']
         )
       seqpath = Path(shutil.which('seqc')).parent
       for lib in ["libseqrt", "libomp"]:
