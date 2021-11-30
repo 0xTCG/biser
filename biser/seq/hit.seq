@@ -25,6 +25,12 @@ class Chromosome:
     return not self == o
   def __lt__(self, o: Chromosome):
     return (self.rc, self.species, self.name) < (o.rc, o.species, o.name)
+  def __le__(self, o: Chromosome):
+    return self < o or self == o
+  def __ge__(self, o: Chromosome):
+    return not (self < o)
+  def __gt__(self, o: Chromosome):
+    return not (self <= o)
   
   def __getitem__(self, s):
     if isinstance(s, slice): assert s.step is None
@@ -141,10 +147,16 @@ class Hit:
         i += 1
     return ''.join(c)
   
-  def __lt__(self, o: Hit):
-    return (self.x.chr, self.y.chr, self.x, self.y) < (o.x.chr, o.y.chr, o.x, o.y)
   def __eq__(self, o: Hit):
     return (self.x, self.y) == (o.x, o.y)
+  def __lt__(self, o: Hit):
+    return (self.x.chr, self.y.chr, self.x, self.y) < (o.x.chr, o.y.chr, o.x, o.y)
+  def __le__(self, o: Hit):
+    return self < o or self == o
+  def __ge__(self, o: Hit):
+    return not (self < o)
+  def __gt__(self, o: Hit):
+    return not (self <= o)
   
   def __iter__(self):
     x, y = self.x.start, self.y.start
