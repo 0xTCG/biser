@@ -183,6 +183,8 @@ def chain(
   Complexity: O(n log n) where {n = len(anchors)}.
   """
 
+  if not anchors:
+    return
   # Construct a tree from y-points (query)
   xs = [(x, i) for i, (x, _, _) in enumerate(anchors)]
   xs += [(x + l, i) for i, (x, _, l) in enumerate(anchors)]

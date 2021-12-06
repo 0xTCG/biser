@@ -340,7 +340,12 @@ def main(argv):
         shutil.rmtree(tmp, ignore_errors=True)
 
       if not args.hard:
-        run_biser('translate', '-o', args.output, final, *list(orig_genomes.values()))
+        run_biser(
+          'translate', 
+          '-o', args.output, 
+          os.path.abspath(final), 
+          *list(orig_genomes.values())
+        )
       else:
         shutil.copy(final, args.output)
         if not args.no_decompostion:

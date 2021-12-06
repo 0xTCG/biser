@@ -9,10 +9,11 @@ def mask(path, out, width=80):
   with bio.FASTA(path, fai=False) as fr, open(out, 'w') as fo:
     for i in fr:
       print(i.name)
-      print(f'>{i.name}', file=fo)
       s = [c for c in str(i.seq) if c.isupper()]
-      for j in range(0, len(s), width):
-        print(''.join(s[j:j+width]), file=fo)
+      if len(s) > 0:
+        print(f'>{i.name}', file=fo)
+        for j in range(0, len(s), width):
+          print(''.join(s[j:j+width]), file=fo)
 
 
 def translate(genomes, bed, output):
