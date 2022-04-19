@@ -33,6 +33,7 @@ class CustomBuild(build_py):
         subprocess.check_call(
           ["patchelf", "--set-rpath", "$ORIGIN", f'{target_dir}/biser.exe']
         )
+      os.unlink(f'{target_dir}/biser.exe.o')
       seqpath = Path(shutil.which('seqc')).parent
       for lib in ["libseqrt", "libomp"]:
         for p in [
@@ -53,7 +54,8 @@ setup(
   name="biser",
   version=__version__,
   description="Fast Characterization of Segmental Duplication Structure in Multiple Genome Assemblies",
-  url="https://github.com/0xTCG/aldy",
+  url="https://github.com/0xTCG/biser",
+  long_description="Please see https://github.com/0xTCG/biser for more details.",
   author="Hamza Išerić, Ibrahim Numanagić",
   author_email="inumanag@uvic.ca",
   download_url="https://github.com/0xTCG/biser/tarball/master",

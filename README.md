@@ -5,15 +5,22 @@
 # BISER
 
 BISER (🦪🔮; Brisk Inference of Segmental duplication Evolutionary stRucture) is 
-a fast tool for detecting and decomposing segmental duplications in genome assemblies.
+a fast tool for detecting and decomposing segmental duplications (SDs) in a single genome 
+or multiple genomes.
 
 
 ## Instalation
 
-BISER requires [Seq programming language](https://docs.seq-lang.org/intro.html#install),
-Python 3.7+ and Samtools to run.
+BISER needs Python 3.7+ and Samtools to run.
 
-To install BISER, install Seq and then run:
+To install BISER, just run:
+```bash
+pip install biser
+```
+
+If you wish to build BISER from source, you will also need 
+[Seq programming language](https://docs.seq-lang.org/intro.html#install).
+To install BISER from source, run:
 ```bash
 pip install git+https://github.com/0xTCG/biser.git
 ```
@@ -26,12 +33,12 @@ To find SDs in a single genome, just run:
 biser -o <output> -t <threads> <genome.fa> 
 ```
 
-BISER will also produce `output.elem.txt` file that contains the elementary SD
-decomposition of the final SD set.
+BISER will also produce a file called `output.elem` that will contain the elementary SD
+decomposition of the found SDs.
 
 All genomes should be indexed beforehand with `samtools faidx genome.fa`.
 
-> ⚠️ BISER requires soft-masked or hard-masked genome assemblies for 
+> ⚠️ BISER requires a soft-masked or a hard-masked genome assemblies for 
 > the optimal performance. 
 > Check for the presence of lowercase bases in your genome; if you have them,
 > you are good to go.
@@ -45,7 +52,7 @@ biser -o <output> -j <jobs> <genome1.fa> <genome2.fa> ...
 
 ### Other options
 
-Run `biser -h` to list available options.
+Run `biser -h` to see the available options.
 
 ### Output format
 
