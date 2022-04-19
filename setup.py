@@ -16,8 +16,12 @@ class CustomBuild(build_py):
     def compile_seq():
       target_dir = os.path.join(self.build_lib, 'biser/exe')
       self.mkpath(target_dir)
+      env = os.environ.copy()
+      if shutil.which("seqc"):
+        env["SEQ_LIBRARY_PATH"] = Path(os.path.dirname(shutil.which("seqc"))) / ".." / "lib" / "seq"
       subprocess.check_call(
         ['seqc', 'build', 'biser/seq/__init__.seq', '-release', '-o', f'{target_dir}/biser.exe'],
+        env=env
       )
       if sys.platform == "darwin":
         ext = "dylib"
@@ -50,7 +54,7 @@ setup(
   version=__version__,
   description="Fast Characterization of Segmental Duplication Structure in Multiple Genome Assemblies",
   url="https://github.com/0xTCG/aldy",
-  author="Ibrahim Numanagić",
+  author="Hamza Išerić, Ibrahim Numanagić",
   author_email="inumanag@uvic.ca",
   download_url="https://github.com/0xTCG/biser/tarball/master",
   license="MIT License.",
@@ -59,6 +63,7 @@ setup(
   entry_points={"console_scripts": ["biser = biser.__main__:console"]},
   packages=find_packages(),
   package_data={ "biser": ["biser/seq"], },
+  include_package_data=True,
   cmdclass={
     'build_py': CustomBuild,
   },
