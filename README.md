@@ -4,7 +4,7 @@
 
 # BISER
 
-BISER (🦪🔮; Brisk Inference of Segmental duplication Evolutionary stRucture) is 
+[BISER](https://en.wiktionary.org/wiki/biser#Serbo-Croatian) (🦪🔮; Brisk Inference of Segmental duplication Evolutionary stRucture) is 
 a fast tool for detecting and decomposing segmental duplications (SDs) in a single genome 
 or multiple genomes.
 
