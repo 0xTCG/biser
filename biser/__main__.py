@@ -39,12 +39,14 @@ def run_biser(*args):
   o = subprocess.run(
     [path, *args],
     env={"OMP_NUM_THREADS": "1"},
-    capture_output=True
+    stdout=subprocess.PIPE, 
+    stderr=subprocess.PIPE,
   )
   t = time.time() - t
   l = ['[p] ' + ' '.join(o.args)]
   l += [f'[o] {l}' for l in o.stdout.decode('ascii').strip().split('\n')]
   l += [f'[e] {l}' for l in o.stderr.decode('ascii').strip().split('\n')]
+  # print([path, *args], o.returncode)
   if o.returncode != 0:
     err = '\n'.join(l)
     raise RuntimeError(f"BISER failed:\n{err}")
@@ -336,9 +338,6 @@ def main(argv):
       if not args.no_decomposition:
         decompose(tmp, genomes, threads, final)
 
-      if not args.keep_temp:
-        shutil.rmtree(tmp, ignore_errors=True)
-
       if not args.hard:
         run_biser(
           'translate', 
@@ -350,6 +349,9 @@ def main(argv):
         shutil.copy(final, args.output)
         if not args.no_decompostion:
           shutil.copy(f'{final}.elem.txt', f'{args.output}.elem.txt')
+
+      if not args.keep_temp:
+        shutil.rmtree(tmp, ignore_errors=True)
 
       print(f'Done! Results are available in {args.output}')
   except Exception as e:

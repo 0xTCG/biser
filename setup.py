@@ -52,6 +52,7 @@ class CustomBuild(build_py):
 exec(open("biser/version.py").read())
 setup(
   name="biser",
+  python_requires='>=3.7',
   version=__version__,
   description="Fast Characterization of Segmental Duplication Structure in Multiple Genome Assemblies",
   url="https://github.com/0xTCG/biser",
@@ -69,6 +70,4 @@ setup(
   cmdclass={
     'build_py': CustomBuild,
   },
-  # test_suite="pytest-runner",
-  # tests_require=["pytest"],
 )
