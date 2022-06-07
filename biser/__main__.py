@@ -34,7 +34,9 @@ def progress(*args, **kwargs):
 
 
 def run_biser(*args):
-  path = f'{os.path.dirname(__file__)}/exe/biser.exe'
+  root = os.path.dirname(__file__)
+  root = '/home/vagrant/.pyenv/versions/3.7.13/lib/python3.7/site-packages/biser'
+  path = f'{root}/exe/biser.exe'
   t = time.time()
   o = subprocess.run(
     [path, *args],
@@ -66,7 +68,7 @@ def biser_search(args):
     return (o, species1, chr1, species2, out)
 
 
-def search(tmp, genomes, threads):
+def search(tmp, genomes, threads, contigs = False):
   os.makedirs(f'{tmp}/search', exist_ok=True)
   print('1. Putative SD detection')
 
@@ -74,16 +76,27 @@ def search(tmp, genomes, threads):
   for sp, genome in genomes.items():
     with open(f'{genome}.fai') as f:
       chrs = [l.split()[0] for l in f]
-      jobs += [(tmp, genome, sp, c) for c in chrs if '_' not in c and c != 'chrM']
+      jobs += [
+        (tmp, genome, sp, c) 
+        for c in chrs 
+        if contigs or ('_' not in c and c != 'chrM')
+      ]
 
   results = []
-  with timing('Search', results), mp.Pool(threads) as pool:
-    results[:] = list(progress(pool.imap(biser_search, jobs), total=len(jobs)))
 
-  with open(f'{tmp}/search.log', 'w') as fo:
-    for (_, log), sp, ch, _ in results:
-      for l in log:
-        print(f'{sp}.{ch}: {l}', file=fo)
+  if jobs:
+    with timing('Search', results), mp.Pool(threads) as pool:
+      results[:] = list(progress(pool.imap(biser_search, jobs), total=len(jobs)))
+
+    with open(f'{tmp}/search.log', 'w') as fo:
+      for (_, log), sp, ch, _ in results:
+        for l in log:
+          print(f'{sp}.{ch}: {l}', file=fo)
+  else:
+    print(
+      "   No chromosomes found. Try running with --keep-contigs "
+      "if you are using scaffolds."
+    )
   return results
 
 
@@ -141,7 +154,7 @@ def biser_decompose(file):
   return o, out
 
 
-def cross_biser(tmp, genomes, threads, alignments):
+def cross_biser(tmp, genomes, threads, alignments, contigs = False):
   with timing('Cross-search'):
     os.makedirs(f'{tmp}/cross_search', exist_ok=True)
     print('1. Cross-genome putative SD detection')
@@ -163,7 +176,11 @@ def cross_biser(tmp, genomes, threads, alignments):
       chrs[sp] = []
       with open(f'{genome}.fai') as f:
         chrs[sp] = [l.split()[0] for l in f]
-        chrs[sp] = [c for c in chrs[sp] if '_' not in c and c != 'chrM']
+        chrs[sp] = [
+          c 
+          for c in chrs[sp] 
+          if contigs or ('_' not in c and c != 'chrM')
+        ]
 
     jobs = [
       (tmp, genomes[g1], c, genomes[g2], f'{tmp}/cross_search/{g2}.bed.regions.txt', g1, g2)
@@ -228,21 +245,23 @@ def decompose(tmp, genomes, threads, final):
       for f in files:
         if f.endswith('.fa'):
           clusters.append(os.path.abspath(os.path.join(dirpath, f)))
-    with mp.Pool(threads) as pool:
-      results[:] = list(progress(pool.imap(biser_decompose, clusters), total=len(clusters)))
-    with open(f'{tmp}/decompose.log', 'w') as fo:
-      for l in o[1]:
-        print(f'cluster: {l}', file=fo)
-      for (_, log), o in results:
-        for l in log:
-          print(f'{o}: {l}', file=fo)
-    with open(f'{final}.elem.txt', 'w') as fo:
-      for _, r in results:
-        with open(r) as f:
-          for l in f:
-            print(l, end='', file=fo)
-    cover(final, f'{final}.elem.txt')
-
+    if clusters:
+      with mp.Pool(threads) as pool:
+        results[:] = list(progress(pool.imap(biser_decompose, clusters), total=len(clusters)))
+      with open(f'{tmp}/decompose.log', 'w') as fo:
+        for l in o[1]:
+          print(f'cluster: {l}', file=fo)
+        for (_, log), o in results:
+          for l in log:
+            print(f'{o}: {l}', file=fo)
+      with open(f'{final}.elem.txt', 'w') as fo:
+        for _, r in results:
+          with open(r) as f:
+            for l in f:
+              print(l, end='', file=fo)
+      cover(final, f'{final}.elem.txt')
+    else:
+      print("   No SDs found to decompose.")
 
 def biser_mask(args):
   tmp, species, genome = args
@@ -281,6 +300,15 @@ def main(argv):
     "--hard", "-H", action="store_true", help="Are input genomes already hard-masked?"
   )
   parser.add_argument(
+    "--keep-contigs", action="store_true",
+    help=(
+      "Do not ignore contigs, unplaced sequences, alternate alleles, patch chromosomes "
+      "and mitochondrion sequences "
+      "(i.e., chrM and chromosomes whose name contains underscore). "
+      "Enable this when running BISER on scaffolds and custom assemblies."
+    )
+  )
+  parser.add_argument(
     "--keep-temp", "-k", action="store_true",
     help="Keep temporary directory after the execution. Useful for debugging."
   )
@@ -314,14 +342,14 @@ def main(argv):
             genomes[g] = out
         print()
 
-      r = search(tmp, genomes, threads)
+      r = search(tmp, genomes, threads, args.keep_contigs)
       print()
 
       r = align(tmp, genomes, threads, r)
       print()
 
       if len(genomes) > 1:
-        r = cross_biser(tmp, genomes, threads, r)
+        r = cross_biser(tmp, genomes, threads, r, args.keep_contigs)
         print()
 
       files = list(glob.glob(f'{tmp}/align/*.align'))
