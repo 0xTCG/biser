@@ -4,10 +4,10 @@
 
 # BISER
 
-BISER (🦪🔮; Brisk Inference of Segmental duplication Evolutionary stRucture) is 
+[BISER](https://en.wiktionary.org/wiki/biser#Serbo-Croatian) (🦪🔮; Brisk Inference of Segmental duplication Evolutionary stRucture) is 
 a fast tool for detecting and decomposing segmental duplications (SDs) in a single genome 
 or multiple genomes.
-
+BISER is [SEDEF](https://github.com/vpc-ccg/sedef)'s successor.
 
 ## Instalation
 
@@ -91,7 +91,7 @@ The format of decomposition file is as follows:
 
 ## Paper & Simulations
 
-BISER was published in the [Algorithms for Molecular Biology](https://link.springer.com/article/10.1186/s13015-022-00210-2) and was presented at the [WABI 2021(https://drops.dagstuhl.de/opus/volltexte/2021/14368/pdf/LIPIcs-WABI-2021-15.pdf).
+BISER was published in the [Algorithms for Molecular Biology](https://link.springer.com/article/10.1186/s13015-022-00210-2) and was presented at the [WABI 2021](https://drops.dagstuhl.de/opus/volltexte/2021/14368/pdf/LIPIcs-WABI-2021-15.pdf).
 
 Please cite:
 > Išerić, H., Alkan, C., Hach, F. et al. Fast characterization of segmental duplication structure in multiple genome assemblies. Algorithms Mol Biol 17, 4 (2022). https://doi.org/10.1186/s13015-022-00210-2
