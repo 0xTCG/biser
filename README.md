@@ -52,7 +52,27 @@ biser -o <output> -j <jobs> <genome1.fa> <genome2.fa> ...
 
 ### Other options
 
-Run `biser -h` to see the available options.
+```
+Usage: biser [-h] [--temp TEMP] [--threads THREADS] --output OUTPUT [--hard]
+             [--keep-contigs] [--keep-temp] [--no-decomposition]
+             genomes [genomes ...]
+
+Positional arguments:
+  genomes               Indexed genomes in FASTA format.
+
+Optional arguments:
+  -h, --help                  Show the help message and exit.
+  --temp TEMP, -T TEMP        Temporary directory location. Must exist beforehand.
+  --threads N, -t N           Number of cores to use.
+  --output OUTPUT, -o OUTPUT  Output filename.
+  --hard, -H                  Pass if the input genomes are already hard-masked.
+  --keep-contigs              Do not ignore contigs, unplaced sequences, alternate
+                              alleles, patch chromosomes and mitochondrion sequences
+                              (e.g., chrM and chromosomes whose name contains underscore). 
+                              Enable this when running BISER on scaffolds and custom assemblies.
+  --keep-temp, -k             Keep temporary directory after the execution. Useful for debugging.
+  --no-decomposition          Skip the SD decomposition step.
+```
 
 ### Output format
 
