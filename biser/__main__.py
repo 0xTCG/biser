@@ -35,7 +35,7 @@ def progress(*args, **kwargs):
 
 def run_biser(*args):
   root = os.path.dirname(__file__)
-  root = '/home/vagrant/.pyenv/versions/3.7.13/lib/python3.7/site-packages/biser'
+  # root = '/home/vagrant/.pyenv/versions/3.7.13/lib/python3.7/site-packages/biser'
   path = f'{root}/exe/biser.exe'
   t = time.time()
   o = subprocess.run(
