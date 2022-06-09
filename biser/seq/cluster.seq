@@ -57,8 +57,7 @@ def cluster(genomes, bed, output):
     print('Species: ', spc)
     with bio.FASTA(g) as f:
       for i in f:
-        if search.valid_chr(i.name):
-          chrs[spc, i.name] = i.seq
+        chrs[spc, i.name] = i.seq
 
   sds = []
   all_dots = []
@@ -67,15 +66,15 @@ def cluster(genomes, bed, output):
     for l_ in f:
       l = l_.split('\t')
       sp = l[6].split(':')
-      if (sp[0], l[0]) not in chrid: 
+      if (sp[0], l[0]) not in chrid:
         chrid[sp[0], l[0]] = len(chrid)
-      if (sp[1], l[3]) not in chrid: 
+      if (sp[1], l[3]) not in chrid:
         chrid[sp[1], l[3]] = len(chrid)
       sds.append(
         SD(
           Pos(chrid[sp[0], l[0]], int(l[1]), int(l[2])),
           Pos(chrid[sp[1], l[3]], int(l[4]), int(l[5])),
-          l[9] == '-', 
+          l[9] == '-',
           bio.CIGAR(),
           l_.strip()
         )
@@ -130,7 +129,7 @@ def cluster(genomes, bed, output):
       dict_lens[color] = 1
     all_colors.add(color)
     output_dict.setdefault(color, []).append(i)
-  
+
   rev_chrid = {j: i for i, j in chrid.items()}
   maxes = []
   for i, bed in output_dict.items():

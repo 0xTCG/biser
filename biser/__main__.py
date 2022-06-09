@@ -14,6 +14,7 @@ import contextlib
 from pathlib import Path
 
 from .cover import cover
+from .version import __version__
 
 
 @contextlib.contextmanager
@@ -33,6 +34,10 @@ def progress(*args, **kwargs):
   return tqdm.tqdm(*args, **kwargs, bar_format='{l_bar}{bar:40}| {n_fmt}/{total_fmt}')
 
 
+def valid_chr(c):
+  return '_' not in c and c != 'chrM'
+
+
 def run_biser(*args):
   root = os.path.dirname(__file__)
   # root = '/home/vagrant/.pyenv/versions/3.7.13/lib/python3.7/site-packages/biser'
@@ -41,7 +46,7 @@ def run_biser(*args):
   o = subprocess.run(
     [path, *args],
     env={"OMP_NUM_THREADS": "1"},
-    stdout=subprocess.PIPE, 
+    stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
   )
   t = time.time() - t
@@ -77,9 +82,9 @@ def search(tmp, genomes, threads, contigs = False):
     with open(f'{genome}.fai') as f:
       chrs = [l.split()[0] for l in f]
       jobs += [
-        (tmp, genome, sp, c) 
-        for c in chrs 
-        if contigs or ('_' not in c and c != 'chrM')
+        (tmp, genome, sp, c)
+        for c in chrs
+        if contigs or valid_chr(c)
       ]
 
   results = []
@@ -123,7 +128,7 @@ def align(tmp, genomes, threads, search, nbuckets=50):
           hits[sp].append((span, l))
     for h in hits.values():
       h.sort()
-    buckets = {sp: [[] for i in range(nbuckets)] for sp in genomes}
+    buckets = {sp: [[] for _ in range(nbuckets)] for sp in genomes}
     for sp, hs in hits.items():
       for i, (_, h) in enumerate(hs):
         buckets[sp][i % nbuckets].append(h)
@@ -177,9 +182,9 @@ def cross_biser(tmp, genomes, threads, alignments, contigs = False):
       with open(f'{genome}.fai') as f:
         chrs[sp] = [l.split()[0] for l in f]
         chrs[sp] = [
-          c 
-          for c in chrs[sp] 
-          if contigs or ('_' not in c and c != 'chrM')
+          c
+          for c in chrs[sp]
+          if contigs or valid_chr(c)
         ]
 
     jobs = [
@@ -196,7 +201,7 @@ def cross_biser(tmp, genomes, threads, alignments, contigs = False):
 
     jobs = []
     hits = {}
-    for _, sp1, ch1, sp2, out in results:
+    for _, sp1, _, sp2, out in results:
       with open(out) as f:
         for l in f:
           l = l.strip()
@@ -206,7 +211,7 @@ def cross_biser(tmp, genomes, threads, alignments, contigs = False):
     for h in hits.values():
       h.sort()
     nbuckets = 50
-    buckets = {sp: [[] for i in range(nbuckets)] for sp in hits}
+    buckets = {sp: [[] for _ in range(nbuckets)] for sp in hits}
     for sp, hs in hits.items():
       for i, (_, h) in enumerate(hs):
         buckets[sp][i % nbuckets].append(h)
@@ -274,7 +279,7 @@ def biser_mask(args):
 def main(argv):
   if len(argv) > 0 and argv[0] == 'test':
     _, l = run_biser('hello')
-    if len(l) < 2 or l[1] != '[o] BISER v1.0':
+    if len(l) < 2 or not l[1].startswith('[o] BISER v'):
       print('Error: unexpected respose from BISER')
       print('\n'.join(l))
       sys.exit(1)
@@ -316,6 +321,7 @@ def main(argv):
     "--no-decomposition", action="store_true",
     help="Skip SD decomposition step."
   )
+  parser.add_argument('--version', '-v', action='version', version=f'%(prog)s v{__version__}')
   args = parser.parse_args(argv)
 
   try:
@@ -324,7 +330,7 @@ def main(argv):
     genomes = {Path(path).stem: os.path.abspath(path) for path in args.genomes}
     with timing("BISER", force=True, indent=0):
       tmp = tempfile.mkdtemp(prefix='biser', dir=args.temp)
-      print(f'Running BISER on {len(genomes)} genome(s): {", ".join(genomes)}')
+      print(f'Running BISER v{__version__} on {len(genomes)} genome(s): {", ".join(genomes)}')
       if args.keep_temp:
         print(f'Temporary directory: {tmp}')
       print()
@@ -368,9 +374,9 @@ def main(argv):
 
       if not args.hard:
         run_biser(
-          'translate', 
-          '-o', args.output, 
-          os.path.abspath(final), 
+          'translate',
+          '-o', args.output,
+          os.path.abspath(final),
           *list(orig_genomes.values())
         )
       else:

@@ -65,9 +65,5 @@ setup(
   install_requires=["tqdm", "ncls"],
   entry_points={"console_scripts": ["biser = biser.__main__:console"]},
   packages=find_packages(),
-  package_data={ "biser": ["biser/seq"], },
-  include_package_data=True,
-  cmdclass={
-    'build_py': CustomBuild,
-  },
+  cmdclass={'build_py': CustomBuild},
 )

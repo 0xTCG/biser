@@ -73,7 +73,7 @@ def save_sd(L, cur, chrs, result):
     if c1 == c2: b2 = max(b2, e1)
     e2 = min(chrs[c2].len - 1, e2 + MAX_EXTEND)
     return (b1, e1, b2, e2)
-  
+
   if L.chr < len(chrs) and cur.chr < len(chrs):
     chr1, chr2 = chrs[L.chr], chrs[cur.chr]
     complement = chr1.rc or chr2.rc
@@ -90,7 +90,7 @@ def save_sd(L, cur, chrs, result):
 def update_list(L: Optional[ListNode], loci, current, chrs, result, tau):
   lidx = 0
 
-  # if certain values in the beginning of the loci are lower that first node, 
+  # if certain values in the beginning of the loci are lower that first node,
   # add them all beforehand
   walker, previous, holder = L, L, L
   while L and lidx < len(loci) and (loci[lidx].chr, loci[lidx].loc) < (L.chr, L.first):
@@ -101,7 +101,7 @@ def update_list(L: Optional[ListNode], loci, current, chrs, result, tau):
     ):
       walker = ListNode(
         loci[lidx].loc, loci[lidx].loc,
-        current.loc, current.loc, 
+        current.loc, current.loc,
         loci[lidx].chr, 1, 1, L
       )
       if previous is not L:
@@ -155,7 +155,7 @@ def update_list(L: Optional[ListNode], loci, current, chrs, result, tau):
         # for last was previously used walker.first + current - walker.ref
         # (< walker.ref -> for checking how close they are?)
         if (
-          current.loc - walker.ref >= REF_THRESHOLD and 
+          current.loc - walker.ref >= REF_THRESHOLD and
           walker.last - walker.first > QUERY_THRESHOLD
         ):
           save_sd(walker, Locus(current.chr, walker.ref_last), chrs, result)
@@ -240,10 +240,6 @@ def build_index(
   return processed_kmer_count
 
 
-def valid_chr(chr):
-  return "_" not in chr and chr != "chrM"
-
-
 def get_species_name(path):
   p = path.split("/")[-1].split('.')
   return '.'.join(p[:-1])
@@ -255,27 +251,27 @@ def filter_index(index, frequency):
   for loci in index.values():
     hist[len(loci)] = hist.get(len(loci), 0) + 1
     max_len = max(max_len, len(loci))
-  sum, occurence = 0, 0
+  sum, occurrence = 0, 0
   for i in sorted(hist.keys(), reverse=True):
     sum += hist[i]
     if sum <= int(frequency * INDEX_CUTOFF):
       threshold = i
-      occurence += hist[i]
+      occurrence += hist[i]
     else:
       break
-  print(f"filtered {occurence} k-mers")
+  print(f"filtered {occurrence} k-mers")
   return threshold
 
 
 def search(genome, ch, result):
   tau = tau()
-  
+
   chrs = []
   species = get_species_name(genome)
   with bio.FASTA(genome) as fr:
     for st in [False, True]:
       chrs.append(Chromosome(len(chrs), species, ch, st, len(fr[ch])))
-  
+
   index = {}
   frequency = 0
   with bio.FASTA(genome) as fr:
@@ -285,11 +281,11 @@ def search(genome, ch, result):
         chr_index, index, chrs, result, tau,
         build_index=True, find_sds=True,
       )
-  
+
   threshold = filter_index(index, frequency)
   with bio.FASTA(genome) as fr:
     for i in fr:
-      if valid_chr(i.name) and i.name > ch:
+      if i.name > ch:
         chrs.append(Chromosome(len(chrs), species, i.name, False, len(i.seq)))
         build_index(
           i.seq, len(chrs) - 1, index, chrs, result, tau,
@@ -299,13 +295,13 @@ def search(genome, ch, result):
 
 def cross_search(genome, ch, ygenome, yints, result):
   tau = tau()
-  
+
   chrs = []
   with bio.FASTA(genome) as fr:
     species = get_species_name(genome)
     for st in [False, True]:
       chrs.append(Chromosome(len(chrs), species, ch, st, len(fr[ch])))
-        
+
   index = {}
   frequency = 0
   with time.timing('Build index'), bio.FASTA(genome) as fr:
@@ -315,7 +311,7 @@ def cross_search(genome, ch, ygenome, yints, result):
         chr_index, index, chrs, result, tau,
         build_index=True, find_sds=False,
       )
-    
+
   threshold = filter_index(index, frequency)
   with time.timing('Search index'), bio.FASTA(ygenome) as fr, open(yints) as fi:
     ints = {}
