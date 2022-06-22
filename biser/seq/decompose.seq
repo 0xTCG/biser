@@ -261,7 +261,8 @@ def decompose(path, name, output):
         result = merge(result)
       for eset in result:
         for elem in eset:
-          spc, chr, begin, end = chromosomes[elem[0]].split("-")
+          spc, *c, begin, end = chromosomes[elem[0]].split("#")
+          chr = '#'.join(c)
           chrom, strand = chr[:-1], chr[-1]
           b, e = int(begin) + elem[1], int(begin) + elem[2]
           if strand != '+':

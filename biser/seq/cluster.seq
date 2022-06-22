@@ -154,7 +154,7 @@ def cluster(genomes, bed, output):
         if pe - ps > 0:
           ints.append((ps, pe))
         for st, ed in ints:
-          print(f'>{sp}-{ch}{sr}-{st}-{ed}', file=fo)
+          print(f'>{sp}#{ch}{sr}#{st}#{ed}', file=fo)
           if sr == '+':
             print(chrs[sp, ch][st:ed], file=fo)
           else:

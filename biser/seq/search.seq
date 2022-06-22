@@ -242,7 +242,7 @@ def build_index(
 
 def get_species_name(path):
   p = path.split("/")[-1].split('.')
-  return '.'.join(p[:-1])
+  return '.'.join(p[:-1]).replace('#', '')
 
 
 def filter_index(index, frequency):
