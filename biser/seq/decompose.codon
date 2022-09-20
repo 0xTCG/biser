@@ -22,7 +22,8 @@ class ListNode:
   potentional: bool = False
   score: int = 0
 
-  def __init__(self, id, first, last, chr, next, age, count):
+  # SEQ TODO: unify Optional[T] and Optional[NoneType]
+  def __init__(self, id, first, last, chr, next: Optional[ListNode], age, count):
     self.id = id
     self.begin = first
     self.end = last

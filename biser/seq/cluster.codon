@@ -84,8 +84,6 @@ def cluster(genomes, bed, output):
   help_all_dots = sorted(set(all_dots))
   colors = [0] * len(help_all_dots)
   dots = {j: i for i, j in enumerate(help_all_dots)}
-  belongs = {i: i for i in range(len(help_all_dots))}
-  sets = {i: [i] for i in range(len(help_all_dots))}
 
   # here we do coloring for spliting all SDs in larger groups:
   colors_dict = {}

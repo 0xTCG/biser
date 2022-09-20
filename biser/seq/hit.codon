@@ -3,9 +3,10 @@ import time
 import bio
 import bisect
 import math
+import copy
 
 
-MATCH = 5 
+MATCH = 5
 MISMATCH = -4
 GAPO = -40
 GAPE = -1
@@ -18,7 +19,7 @@ class Chromosome:
   rc: bool
   len: int
   seq: bio.seq = bio.seq()
-  
+
   def __eq__(self, o: Chromosome):
     return self.id == o.id
   def __ne__(self, o: Chromosome):
@@ -31,7 +32,7 @@ class Chromosome:
     return not (self < o)
   def __gt__(self, o: Chromosome):
     return not (self <= o)
-  
+
   def __getitem__(self, s):
     if isinstance(s, slice): assert s.step is None
     return self.seq[s]
@@ -50,7 +51,7 @@ class Hit:
     chr: Chromosome
     start: int
     end: int
-  
+
   x: Interval
   y: Interval
   cigar: List[Tuple[int, str]]
@@ -58,7 +59,7 @@ class Hit:
   def __init__(self, h: Hit):
     self.x = Interval(h.x.chr, h.x.start, h.x.end)
     self.y = Interval(h.y.chr, h.y.start, h.y.end)
-    self.cigar = copy(h.cigar)
+    self.cigar = copy.copy(h.cigar)
   def __init__(self, xch: Chromosome, xs, xe, ych: Chromosome, ys, ye, flip=False):
     self.x, self.y = Interval(xch, xs, xe), Interval(ych, ys, ye)
     if flip and self.y < self.x:
@@ -90,10 +91,10 @@ class Hit:
         prev.extend(a)
         continue
       self.cigar += prev.cigar
-      self.cigar += self.align_gap(prev.x.end, a.x.start, prev.y.end, a.y.start) 
+      self.cigar += self.align_gap(prev.x.end, a.x.start, prev.y.end, a.y.start)
       prev = a
     self.cigar += prev.cigar
-    
+
     if side > 0:
       off = min(side, self.x.start, self.y.start)
       a = Hit(
@@ -104,7 +105,7 @@ class Hit:
       if a.cigar:
         self.x.start, self.y.start = a.x.start, a.y.start
         self.cigar = a.cigar + self.cigar
-      
+
       a = Hit(
         self.x.chr, self.x.end, self.x.end + off,
         self.y.chr, self.y.end, self.y.end + off
@@ -113,7 +114,7 @@ class Hit:
       if a.cigar:
         self.x.end, self.y.end = a.x.end, a.y.end
         self.cigar = self.cigar + a.cigar
-      
+
   def __str__(self, rc=False):
     xn, xs, xe = self.x.chr.name, self.x.start, self.x.end
     yn, ys, ye = self.y.chr.name, self.y.start, self.y.end
@@ -140,13 +141,13 @@ class Hit:
       l = 0
       while i < len(self.cigar) and self.cigar[i][1] in '=X':
         l += self.cigar[i][0]; i += 1
-      if l > 0: 
+      if l > 0:
         c.append(f'{l}M')
       else:
         c.append(f'{self.cigar[i][0]}{self.cigar[i][1]}')
         i += 1
     return ''.join(c)
-  
+
   def __eq__(self, o: Hit):
     return (self.x, self.y) == (o.x, o.y)
   def __lt__(self, o: Hit):
@@ -157,12 +158,12 @@ class Hit:
     return not (self < o)
   def __gt__(self, o: Hit):
     return not (self <= o)
-  
+
   def __iter__(self):
     x, y = self.x.start, self.y.start
     for l, op in self.cigar:
       yield x, y, l, op
-      match op: 
+      match op:
         case 'X' | '=': x += l; y += l
         case 'I': x += l
         case 'D': y += l
@@ -171,7 +172,7 @@ class Hit:
     a, m, b = [], [], []
     for x, y, l, op in self:
       match op:
-        case 'X' | '=': 
+        case 'X' | '=':
           a.append(str(self.x.chr[x:x+l])); b.append(str(self.y.chr[y:y+l]))
           m.append(('|' if op == '=' else '*') * l)
         case 'I':
@@ -182,7 +183,7 @@ class Hit:
           m.append('*' * l)
       # a.append(' ');b.append(' ');m.append(' ')
     return ''.join(a), ''.join(m), ''.join(b)
-    
+
   def score(self, match, mismatch, gap):
     total = 0.0
     for l, op in self.cigar:
@@ -251,7 +252,7 @@ class Hit:
       if ocig[bi] != 'D':
         other.x.start += 1
       bi += 1
-    
+
     self.cigar += self.align_gap(self.x.end, other.x.start, self.y.end, other.y.start)
     c = 0
     for i in range(bi, len(ocig)):
@@ -292,7 +293,7 @@ class Hit:
     s, c = 0, []
     for oi in range(0, max(len(x), len(y)), MAX_ALIGN):
       a = bio.seq.align(
-        x[oi:oi + MAX_ALIGN], y[oi:oi + MAX_ALIGN], 
+        x[oi:oi + MAX_ALIGN], y[oi:oi + MAX_ALIGN],
         a=MATCH, b=-MISMATCH, gapo=-GAPO, gape=-GAPE
       )
       xi, yi = oi, oi
