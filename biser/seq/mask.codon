@@ -5,14 +5,21 @@ import search
 from time import timing
 
 
+MAX_CHROMOSOME_SIZE = 300_000_000
+
+
 def mask(path, out, width=80):
   with bio.FASTA(path, fai=False) as fr, open(out, 'w') as fo:
     for i in fr:
       print(i.name)
       s = [c for c in str(i.seq) if c.isupper()]
-      if len(s) > 0:
-        print(f'>{i.name}', file=fo)
-        for j in range(0, len(s), width):
+      for ist, st in enumerate(range(0, len(s), MAX_CHROMOSOME_SIZE)):
+        print(f'>{i.name}:{ist}:biser', file=fo)
+        for j in range(
+          max(0, st - search.MAX_SD_LEN),
+          min(len(s), st + MAX_CHROMOSOME_SIZE),
+          width
+        ):
           print(''.join(s[j:j+width]), file=fo)
 
 
@@ -35,7 +42,7 @@ def translate(genomes, bed, output):
         up += ln
     u.append(up); l.append((len(s), len(s)))
     return u, l
-  
+
   uppers = {}
   lowers = {}
   for genome in genomes:
@@ -70,7 +77,7 @@ def translate(genomes, bed, output):
             spc = min(lowers[sp1, c1][i1][1] - p1, lowers[sp2, c2][i2][1] - p2)
             if spc == 0:
               if lowers[sp1, c1][i1][1] - p1 == 0:
-                nsz = lowers[sp1, c1][i1 + 1][0] - lowers[sp1, c1][i1][1] 
+                nsz = lowers[sp1, c1][i1 + 1][0] - lowers[sp1, c1][i1][1]
                 new_cigar.append((nsz, 'S'))
                 p1 += nsz; i1 += 1
               else:
@@ -114,12 +121,12 @@ def translate(genomes, bed, output):
             else:
               new_cigar.append((spc, 'D'))
               p2 += spc; i += spc
-      
+
       cigar, psz, pop = [], 0, ''
       for sz, op in new_cigar:
-        if op == pop: 
+        if op == pop:
           psz += sz
-        else: 
+        else:
           if psz:
             cigar.append(f'{psz}{pop}')
           psz, pop = sz, op
@@ -131,7 +138,7 @@ def translate(genomes, bed, output):
       l[4] = str(conv(uppers[sp2, c2], lowers[sp2, c2], s2)[1])
       l[5] = str(conv(uppers[sp2, c2], lowers[sp2, c2], e2)[1])
       sds.append(l)
-    
+
     sds.sort(
       key=lambda l: (l[6], l[0], l[3], l[9], int(l[1]), int(l[4]), int(l[2]), int(l[5]))
     )
@@ -150,5 +157,5 @@ def translate(genomes, bed, output):
       elems.sort(key=lambda l: (l[4], l[0], l[1], l[2], l[3]))
       for l in elems:
         print('\t'.join(l), file=fo)
-  except: 
+  except:
     pass
