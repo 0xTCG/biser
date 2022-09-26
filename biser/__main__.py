@@ -1,6 +1,6 @@
 # 786
 
-import multiprocessing as mp
+import multiprocess as mp
 import tqdm
 import sys
 import subprocess
@@ -64,10 +64,10 @@ def run_biser(*args):
 
 def biser_search(args):
     args, params = args
-    if len(args) == 4:
-        tmp, genome, species, chr = args
-        out = f"{tmp}/search/{species}_{chr}.bed"
-        o = run_biser("search", genome, "-c", chr, "-o", out, *params)
+    if len(args) == 5:
+        tmp, genome, species, chr, start = args
+        out = f"{tmp}/search/{species}_{chr}_{start}.bed"
+        o = run_biser("search", genome, "-c", chr, "-o", out, start, *params)
         return (o, species, chr, out)
     else:
         tmp, genome1, chr1, genome2, intv2, species1, species2 = args
@@ -83,19 +83,21 @@ def search(tmp, genomes, threads, args):
     jobs = []
     for sp, genome in genomes.items():
         with open(f"{genome}.fai") as f:
-            chrs = [l.split()[0] for l in f]
+            chrs = [tuple(l.split()[:2]) for l in f]
             jobs += [
                 (
-                    (tmp, genome, sp, c),
+                    (tmp, genome, sp, c, str(st)),
                     [
                         f"--kmer-size={args.kmer_size}",
                         f"--winnow-size={args.winnow_size}",
                         f"--max-error={args.max_error / 100.0}",
                         f"--max-edit-error={args.max_edit_error / 100.0}",
+                        f"--max-chromosome-size={args.max_chromosome_size}"
                     ],
                 )
-                for c in chrs
+                for (c, l) in chrs
                 if args.keep_contigs or valid_chr(c)
+                for st in range(0, int(l), args.max_chromosome_size)
             ]
 
     results = []
@@ -420,10 +422,7 @@ def main(argv):
                 print("0. Hard-masking genomes")
                 with timing("Hard-masking", results):
                     os.makedirs(f"{tmp}/genomes")
-                    jobs = [
-                        (tmp, *g, [f"--max-chromosome-size={args.max_chromosome_size}"])
-                        for g in genomes.items()
-                    ]
+                    jobs = [(tmp, *g, []) for g in genomes.items()]
                     with mp.Pool(threads) as pool:
                         results[:] = list(
                             progress(pool.imap(biser_mask, jobs), total=len(jobs))

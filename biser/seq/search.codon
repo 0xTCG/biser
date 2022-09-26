@@ -1,14 +1,6 @@
-import sys
 import math
-import getopt
-import collections
 import bio
-import os
-import bisect
 import time
-import align
-import chain
-import hit
 from hit import Hit, Chromosome, Locus
 
 
@@ -19,10 +11,11 @@ REF_THRESHOLD = 500
 MAX_EXTEND = 5_000
 MAX_DISTANCE = 250
 INDEX_CUTOFF = 0.001
-MAX_SD_LEN = 2_000_000_000
+MAX_SD_LEN = 2_000_000
 MAX_ERROR = 0.3
 MAX_EDIT_ERROR = 0.15
 MERGE_DIST = 500
+MAX_CHROMOSOME_SIZE = 300_000_000
 
 
 class ListNode:
@@ -59,6 +52,7 @@ class ListNode:
 def tau():
   ratio = (MAX_ERROR - MAX_EDIT_ERROR) / MAX_EDIT_ERROR
   gap_error = min(1.0, ratio * MAX_EDIT_ERROR)
+  print(f"[tau] {MAX_ERROR}, {MAX_EDIT_ERROR}, {ratio}, {gap_error}")
   a = (1 - gap_error) / (1 + gap_error)
   b = 1 / (2 * math.exp(KMER_SIZE * MAX_EDIT_ERROR) - 1)
   return a * b
@@ -80,9 +74,11 @@ def save_sd(L, cur, chrs, result):
     coord = pad_sd(chrs, L.chr, L.first, L.last, cur.chr, L.ref, cur.loc)
     result.setdefault(
       (chr1.species, chr1.name, chr2.species, chr2.name, complement), []
-    ).append(
-      Hit(chr1, coord[0], coord[1], chr2, coord[2], coord[3], True)
-    )
+    ).append(Hit(
+        chr1, chr1.start + coord[0], chr1.start + coord[1],
+        chr2, chr2.start + coord[2], chr2.start + coord[3],
+        True
+    ))
   else:
     raise ValueError("reverse complemented intervals should not be here")
 
@@ -259,25 +255,29 @@ def filter_index(index, frequency):
       occurrence += hist[i]
     else:
       break
-  print(f"filtered {occurrence} k-mers")
+  print(f"[search] filtered {occurrence} k-mers")
   return threshold
 
 
-def search(genome, ch, result):
+def search(genome, ch, chr_start, result):
   tau = tau()
+  print(f"[search] tau= {tau}; max-chr= {MAX_CHROMOSOME_SIZE}")
 
   chrs = []
   species = get_species_name(genome)
   with bio.FASTA(genome) as fr:
     for st in [False, True]:
-      chrs.append(Chromosome(len(chrs), species, ch, st, len(fr[ch])))
+      sz = min(MAX_CHROMOSOME_SIZE + MAX_SD_LEN, len(fr[ch]) - chr_start)
+      chrs.append(Chromosome(len(chrs), species, ch, st, sz, chr_start))
 
   index = {}
   frequency = 0
   with bio.FASTA(genome) as fr:
     for chr_index, chr in enumerate(chrs):
+      print(f"[search] {chr.name} ({chr.start}-{chr.start + chr.len}) @ {chr.rc}")
+      seq = fr[chr.name][chr.start:chr.start + chr.len]
       frequency = build_index(
-        ~fr[chr.name] if chr.rc else fr[chr.name],
+        ~seq if chr.rc else seq,
         chr_index, index, chrs, result, tau,
         build_index=True, find_sds=True,
       )
@@ -285,7 +285,18 @@ def search(genome, ch, result):
   threshold = filter_index(index, frequency)
   with bio.FASTA(genome) as fr:
     for i in fr:
-      if i.name > ch:
+      if i.name == ch and chr_start + MAX_CHROMOSOME_SIZE < len(i.seq):
+        print(f"[search] {i.name} ({chr_start + MAX_CHROMOSOME_SIZE}-)")
+        sz = len(i.seq) - chr_start - MAX_CHROMOSOME_SIZE
+        chrs.append(Chromosome(
+          len(chrs), species, i.name, False, sz, chr_start + MAX_CHROMOSOME_SIZE
+        ))
+        build_index(
+          i.seq[chr_start + MAX_CHROMOSOME_SIZE:], len(chrs) - 1, index, chrs, result, tau,
+          build_index=False, find_sds=True, max_frequency=threshold,
+        )
+      elif i.name > ch:
+        print(f"[search] {i.name}")
         chrs.append(Chromosome(len(chrs), species, i.name, False, len(i.seq)))
         build_index(
           i.seq, len(chrs) - 1, index, chrs, result, tau,

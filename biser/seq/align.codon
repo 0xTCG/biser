@@ -1,14 +1,9 @@
-import sys
-from time import time
-from bio import FASTA, Kmer, CIGAR
-from time import timing
-from chain import chain
-from hit import Hit, Chromosome
+from hit import Hit
 
 
 def generate_anchors(h, KMER_SIZE: Static[int] = 10):
   x, y = h.x.chr[h.x.start:h.x.end], h.y.chr[h.y.start:h.y.end]
-  
+
   ref_hashes = {}
   for pos, kmer in y.kmers_with_pos(1, KMER_SIZE):
     ref_hashes.setdefault(int(kmer), []).append(pos)
@@ -38,9 +33,9 @@ def refine(orig_h, hits):
   GAP = 0.5
   GAPOPEN = 100 # try to approximate WGAC
   MIN_READ = 900 # minimal refined read size
-  SIDE_ALIGN = 500 
+  SIDE_ALIGN = 500
   MAX_GAP = 10 * 1024 # max gap during refining process
-  
+
   hits.sort()
   score = [h.score(MATCH, -MISMATCH, -GAP) for h in hits]
   dp, prev = [0.0] * len(hits), [-1] * len(hits)
@@ -55,7 +50,7 @@ def refine(orig_h, hits):
       c, p = hits[ai], hits[aj]
       c_xs = p.x.end if c.x.start < p.x.end else c.x.start
       c_ys = p.y.end if c.y.start < p.y.end else c.y.start
-      if p.x.end >= c.x.end or p.y.end >= c.y.end or p.y.start >= c.y.start: 
+      if p.x.end >= c.x.end or p.y.end >= c.y.end or p.y.start >= c.y.start:
         continue
 
       mi, ma = min(c_xs - p.x.end, c_ys - p.y.end), max(c_xs - p.x.end, c_ys - p.y.end)
@@ -100,7 +95,7 @@ def refine(orig_h, hits):
       for r in results
     ):
       continue
-    
+
     h = Hit(orig_h, [hits[pi] for pi in path], SIDE_ALIGN)
     if h.span() >= MIN_READ:
       yield h

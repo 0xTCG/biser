@@ -81,7 +81,7 @@ setup(
         "segmental duplications",
         "sequence decomposition",
     ],
-    install_requires=["tqdm", "ncls"],
+    install_requires=["tqdm", "ncls", "multiprocess"],
     entry_points={"console_scripts": ["biser = biser.__main__:console"]},
     packages=find_packages(),
     cmdclass={"build_py": CustomBuild},
