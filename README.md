@@ -61,17 +61,36 @@ Positional arguments:
   genomes               Indexed genomes in FASTA format.
 
 Optional arguments:
-  -h, --help                  Show the help message and exit.
-  --temp TEMP, -T TEMP        Temporary directory location. Must exist beforehand.
-  --threads N, -t N           Number of cores to use.
-  --output OUTPUT, -o OUTPUT  Output filename.
-  --hard, -H                  Pass if the input genomes are already hard-masked.
-  --keep-contigs              Do not ignore contigs, unplaced sequences, alternate
-                              alleles, patch chromosomes and mitochondrion sequences
-                              (e.g., chrM and chromosomes whose name contains underscore). 
-                              Enable this when running BISER on scaffolds and custom assemblies.
-  --keep-temp, -k             Keep temporary directory after the execution. Useful for debugging.
-  --no-decomposition          Skip the SD decomposition step.
+optional arguments:
+  -h, --help            show this help message and exit
+  --temp TEMP, -T TEMP  Temporary directory location
+  --threads THREADS, -t THREADS
+                        Number of threads
+  --output OUTPUT, -o OUTPUT
+                        Indexed genomes in FASTA format.
+  --hard, -H            Are input genomes already hard-masked?
+  --keep-contigs        Do not ignore contigs, unplaced sequences, alternate
+                        alleles, patch chromosomes and mitochondrion sequences
+                        (i.e., chrM and chromosomes whose name contains
+                        underscore). Enable this when running BISER on
+                        scaffolds and custom assemblies.
+  --keep-temp, -k       Keep temporary directory after the execution. Useful
+                        for debugging.
+  --resume RESUME       Resume the previously interrupted run (that was run
+                        with --keep-temp; needs the temp directory for
+                        resume).
+  --no-decomposition    Skip SD decomposition step.
+  --max-error MAX_ERROR
+                        Maximum SD error (large gaps includes).
+  --max-edit-error MAX_EDIT_ERROR
+                        Maximum SD edit error (large gaps NOT included).
+  --max-chromosome-size MAX_CHROMOSOME_SIZE
+                        Maximum chromosome size.
+  --kmer-size KMER_SIZE
+                        Search k-mer size.
+  --winnow-size WINNOW_SIZE
+                        Search winnow size.
+  --version, -v         show program's version number and exit
 ```
 
 ### Output format
@@ -79,8 +98,8 @@ Optional arguments:
 The output follows the [BEDPE file format](https://bedtools.readthedocs.io/en/latest/content/general-usage.html#bedpe-format).
 
 The first six (6) fields are the standard BEDPE fields describing the coordinates of SD mates:
-- `chr1`, `start1` and `end1`
-- `chr2`, `start2` and `end2`
+- `chr1`, `start1` and `end1` 
+- `chr2`, `start2` and `end2` (both intervals are semi-open and 0-indexed).
 
 Other fields are as follows:
 
@@ -102,7 +121,7 @@ The format of decomposition file is as follows:
 | Field              | Description |
 |--------------------|--------------------|
 | `reference`        | Reference genome name. |
-| `start`            | Start position of the core region. |
+| `start`            | Start position of the core region (0-indexed). |
 | `end`              | End position of the core region. |
 | `id`               | Core region. Note that many regions share the same core ID because core regions are duplicated across the genome(s). |
 | `len`              | Length of the core region. |
