@@ -3,7 +3,7 @@ import time
 import bio
 import bisect
 import math
-from copy import copy
+#from copy import copy
 
 
 MATCH = 5
