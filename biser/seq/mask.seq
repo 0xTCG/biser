@@ -15,12 +15,26 @@ def mask(path, out, width=80):
           print(''.join(s[j:j+width]), file=fo)
 
 
+def validate_cigar(s1, e1, s2, e2, cigar):
+  i, j = 0, 0
+  for sz, op in bio.CIGAR(cigar):
+    if op =='M':
+      i += sz; j += sz
+    elif op in ['I','S']:
+      i += sz
+    elif op in ['D','N']:
+      j += sz
+    else:
+      assert False, op
+  return s1 + i == e1 and s2 + j == e2
+
+
 def translate(genomes, bed, output):
   def conv(uppers, lowers, up):
     i = bisect.bisect(uppers, up) - 1
     return i, lowers[i][0] + (up - uppers[i])
 
-  def add(s, name, chr):
+  def add(s):
     u, l = [], []
     up = 0
     i = 0
@@ -43,14 +57,14 @@ def translate(genomes, bed, output):
       name, chr = '', []
       for l in f:
         if l[0] == '>' and name:
-          uppers[spc, name], lowers[spc, name] = add(''.join(chr), name, chr)
+          uppers[spc, name], lowers[spc, name] = add(''.join(chr))
           name, chr = l.split()[0][1:], []
         elif l[0] == '>':
           name = l.split()[0][1:]
         else:
           chr.append(l.strip())
       if name:
-        uppers[spc, name], lowers[spc, name] = add(''.join(chr), name, chr)
+        uppers[spc, name], lowers[spc, name] = add(''.join(chr))
 
   with timing("Translating"), open(bed) as f:
     sds = []
@@ -126,9 +140,10 @@ def translate(genomes, bed, output):
         cigar.append(f'{psz}{pop}')
       l[12] = ''.join(cigar)
       l[1] = str(conv(uppers[sp1, c1], lowers[sp1, c1], s1)[1])
-      l[2] = str(conv(uppers[sp1, c1], lowers[sp1, c1], e1)[1])
+      l[2] = str(p1)  # end position within the alignment might be wrong
       l[4] = str(conv(uppers[sp2, c2], lowers[sp2, c2], s2)[1])
-      l[5] = str(conv(uppers[sp2, c2], lowers[sp2, c2], e2)[1])
+      l[5] = str(p2)  # end position within the alignment might be wrong
+      assert validate_cigar(int(l[1]), p1, int(l[4]), p2, ''.join(cigar)), "Bad CIGAR"
       sds.append(l)
 
     sds.sort(
@@ -145,6 +160,7 @@ def translate(genomes, bed, output):
         l = lp.strip().split('\t')
         l[2] = str(conv(uppers[l[0], l[1]], lowers[l[0], l[1]], int(l[2]))[1])
         l[3] = str(conv(uppers[l[0], l[1]], lowers[l[0], l[1]], int(l[3]))[1])
+        l[5] = str(int(l[3]) - int(l[2]))
         elems.append(l)
       elems.sort(key=lambda l: (l[4], l[0], l[1], l[2], l[3]))
       for l in elems:

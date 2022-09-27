@@ -3,6 +3,7 @@ import time
 import bio
 import bisect
 import math
+from copy import copy
 
 
 MATCH = 5
@@ -125,8 +126,6 @@ class Hit:
     assert not self.x.chr.rc
     if rc and self.y.chr.rc:
       ys, ye = self.y.chr.len - ye, self.y.chr.len - ys
-    # if (xn, xs, xe) > (yn, ys, ye):
-      # xn, xs, xe, yn, ys, ye = yn, ys, ye, xn, xs, xe
     sp = f'{self.x.chr.species}:{self.y.chr.species}'
     return (
       f"{xn}\t{xs}\t{xe}\t" # coordinates
@@ -185,7 +184,6 @@ class Hit:
         case 'D':
           a.append('-' * l); b.append(str(self.y.chr[y:y+l]))
           m.append('*' * l)
-      # a.append(' ');b.append(' ');m.append(' ')
     return ''.join(a), ''.join(m), ''.join(b)
 
   def score(self, match, mismatch, gap):

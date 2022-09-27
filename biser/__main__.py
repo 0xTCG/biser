@@ -11,6 +11,7 @@ import os
 import glob
 import time
 import contextlib
+import hashlib
 from pathlib import Path
 
 from .cover import cover
@@ -40,26 +41,35 @@ def valid_chr(c):
     return "_" not in c and c != "chrM"
 
 
-def run_biser(*args):
+def run_biser(tmp, *args):
     root = os.path.dirname(__file__)
     # root = '/home/vagrant/.pyenv/versions/3.7.13/lib/python3.7/site-packages/biser'
     path = f"{root}/exe/biser.exe"
-    t = time.time()
-    o = subprocess.run(
-        [path, *args],
-        env={"OMP_NUM_THREADS": "1"},
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    t = time.time() - t
-    l = ["[p] " + " ".join(o.args)]
-    l += [f"[o] {l}" for l in o.stdout.decode("ascii").strip().split("\n")]
-    l += [f"[e] {l}" for l in o.stderr.decode("ascii").strip().split("\n")]
-    # print([path, *args], o.returncode)
-    if o.returncode != 0:
-        err = "\n".join(l)
-        raise RuntimeError(f"BISER failed:\n{err}")
-    return t, l  # time, output
+    run_id = hashlib.md5(' '.join([path, *args]).encode('utf-8'))
+    if tmp:
+        run_id = f"{tmp}/status/{args[0]}_{run_id.hexdigest()}"
+    if not tmp or not os.path.exists(run_id):
+        t = time.time()
+        o = subprocess.run(
+            [path, *args],
+            env={"OMP_NUM_THREADS": "1"},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        t = time.time() - t
+        l = ["[p] " + " ".join(o.args)]
+        l += [f"[o] {l}" for l in o.stdout.decode("ascii").strip().split("\n")]
+        l += [f"[e] {l}" for l in o.stderr.decode("ascii").strip().split("\n")]
+        # print([path, *args], o.returncode)
+        if o.returncode != 0:
+            err = "\n".join(l)
+            raise RuntimeError(f"BISER failed:\n{err}")
+        if tmp:
+            Path.touch(Path(run_id))
+        return t, l  # time, output
+    else:
+        # print(f'Ignoring cached run: {path}, args={args}')
+        return 0, ""
 
 
 def biser_search(args):
@@ -67,12 +77,12 @@ def biser_search(args):
     if len(args) == 5:
         tmp, genome, species, chr, start = args
         out = f"{tmp}/search/{species}_{chr}_{start}.bed"
-        o = run_biser("search", genome, "-c", chr, "-o", out, start, *params)
+        o = run_biser(tmp, "search", genome, "-c", chr, "-o", out, start, *params)
         return (o, species, chr, out)
     else:
         tmp, genome1, chr1, genome2, intv2, species1, species2 = args
         out = f"{tmp}/cross_search/{species1}_{chr1}_{species2}.bed"
-        o = run_biser("search", genome1, chr1, genome2, intv2, "-o", out, *params)
+        o = run_biser(tmp, "search", genome1, chr1, genome2, intv2, "-o", out, *params)
         return (o, species1, chr1, species2, out)
 
 
@@ -119,9 +129,9 @@ def search(tmp, genomes, threads, args):
 
 
 def biser_align(args):
-    species, bed, genomes = args
+    tmp, species, bed, genomes = args
     out = f"{bed}.align"
-    o = run_biser("align", *genomes, bed, "-o", out)
+    o = run_biser(tmp, "align", *genomes, bed, "-o", out)
     return (o, species, bed, out)
 
 
@@ -154,7 +164,7 @@ def align(tmp, genomes, threads, search, nbuckets=50):
                 with open(bed, "w") as fo:
                     for l in b:
                         print(l, file=fo)
-                jobs.append((sp, bed, [genomes[sp]]))
+                jobs.append((tmp, sp, bed, [genomes[sp]]))
 
     print(f"Total alignments: {total:,}")
     results = []
@@ -169,9 +179,10 @@ def align(tmp, genomes, threads, search, nbuckets=50):
     return results
 
 
-def biser_decompose(file):
+def biser_decompose(args):
+    tmp, file = args
     out = f"{file}_dec"
-    o = run_biser("decompose", file, "-o", out)
+    o = run_biser(tmp, "decompose", file, "-o", out)
     return o, out
 
 
@@ -190,7 +201,7 @@ def cross_biser(tmp, genomes, threads, alignments, args):
                     with open(b) as f:
                         for l in f:
                             print(l.strip(), file=fo)
-            run_biser("extract", sp_bed, "-o", f"{sp_bed}.regions.txt")
+            run_biser(tmp, "extract", sp_bed, "-o", f"{sp_bed}.regions.txt")
 
         chrs = {}
         for sp, genome in genomes.items():
@@ -253,7 +264,7 @@ def cross_biser(tmp, genomes, threads, alignments, args):
                 with open(bed, "w") as fo:
                     for l in b:
                         print(l, file=fo)
-                jobs.append(((sp1, sp2), bed, [genomes[sp1], genomes[sp2]]))
+                jobs.append((tmp, (sp1, sp2), bed, [genomes[sp1], genomes[sp2]]))
 
         results = []
         with timing("Align", results), mp.Pool(threads) as pool:
@@ -275,12 +286,12 @@ def decompose(tmp, genomes, threads, final):
     with timing("Decomposition", results):
         output = f"{tmp}/clusters"
         os.makedirs(output, exist_ok=True)
-        o = run_biser("cluster", final, *list(genomes.values()), "-o", output)
+        o = run_biser(tmp, "cluster", final, *list(genomes.values()), "-o", output)
         clusters = []
         for dirpath, _, files in os.walk(output):
             for f in files:
                 if f.endswith(".fa"):
-                    clusters.append(os.path.abspath(os.path.join(dirpath, f)))
+                    clusters.append((tmp, os.path.abspath(os.path.join(dirpath, f))))
         if clusters:
             with mp.Pool(threads) as pool:
                 results[:] = list(
@@ -305,7 +316,7 @@ def decompose(tmp, genomes, threads, final):
 def biser_mask(args):
     tmp, species, genome, rest = args
     out = f"{tmp}/genomes/{species}.fa"
-    o = run_biser("mask", genome, "-o", out, *rest)
+    o = run_biser(tmp, "mask", genome, "-o", out, *rest)
     subprocess.check_call(["samtools", "faidx", out])
     return o, species, out
 
@@ -327,7 +338,7 @@ def float_range(min, max):
 
 def main(argv):
     if len(argv) > 0 and argv[0] == "test":
-        _, l = run_biser("hello")
+        _, l = run_biser(None, "hello")
         if len(l) < 2 or not l[1].startswith("[o] BISER v"):
             print("Error: unexpected respose from BISER")
             print("\n".join(l))
@@ -377,6 +388,12 @@ def main(argv):
         help="Keep temporary directory after the execution. Useful for debugging.",
     )
     parser.add_argument(
+        "--resume",
+        default=None,
+        help="Resume the previously interrupted run (that was run with --keep-temp; "
+        "needs the temp directory for resume).",
+    )
+    parser.add_argument(
         "--no-decomposition", action="store_true",
         default=False, help="Skip SD decomposition step."
     )
@@ -409,7 +426,13 @@ def main(argv):
 
         genomes = {Path(path).stem: os.path.abspath(path) for path in args.genomes}
         with timing("BISER", force=True, indent=0):
-            tmp = tempfile.mkdtemp(prefix="biser", dir=args.temp)
+            Path(args.temp).mkdir(parents=True, exist_ok=True)
+            if args.resume:
+                tmp = args.resume
+                args.keep_temp = True
+            else:
+                tmp = tempfile.mkdtemp(prefix="biser.", dir=args.temp)
+            Path(f"{tmp}/status").mkdir(exist_ok=True)
             print(
                 f'Running BISER v{__version__} on {len(genomes)} genome(s): {", ".join(genomes)}'
             )
@@ -422,7 +445,7 @@ def main(argv):
                 results = []
                 print("0. Hard-masking genomes")
                 with timing("Hard-masking", results):
-                    os.makedirs(f"{tmp}/genomes")
+                    Path(f"{tmp}/genomes").mkdir(exist_ok=True)
                     jobs = [(tmp, *g, []) for g in genomes.items()]
                     with mp.Pool(threads) as pool:
                         results[:] = list(
@@ -458,6 +481,7 @@ def main(argv):
 
             if not args.hard:
                 run_biser(
+                    tmp,
                     "translate",
                     "-o",
                     args.output,
