@@ -3,7 +3,6 @@ import time
 import bio
 import bisect
 import math
-import copy
 
 
 MATCH = 5
@@ -60,11 +59,15 @@ class Hit:
   def __init__(self, h: Hit):
     self.x = Interval(h.x.chr, h.x.start, h.x.end)
     self.y = Interval(h.y.chr, h.y.start, h.y.end)
-    self.cigar = copy.copy(h.cigar)
+    self.cigar = copy(h.cigar)
   def __init__(self, xch: Chromosome, xs, xe, ych: Chromosome, ys, ye, flip=False):
     self.x, self.y = Interval(xch, xs, xe), Interval(ych, ys, ye)
-    if flip and self.y < self.x:
-      self.y, self.x = self.x, self.y
+    if flip:
+      if (self.x.chr.rc, self.x.chr.species, self.x.chr.name) == (self.y.chr.rc, self.y.chr.species, self.y.chr.name):
+        if (self.y.start, self.y.end) < (self.x.start, self.x.end):
+          self.y, self.x = self.x, self.y
+      elif self.y < self.x:
+        self.y, self.x = self.x, self.y
     assert not self.x.chr.rc
     if len(xch.seq) > 0:
       self.cigar = Hit.align(xch[xs:xe], ych[ys:ye])[1]
@@ -75,8 +78,8 @@ class Hit:
     sp = l[6].split(':')
     self.x = Interval(chromosomes[sp[0], l[0], l[8] == '-'], int(l[1]), int(l[2]))
     self.y = Interval(chromosomes[sp[1], l[3], l[9] == '-'], int(l[4]), int(l[5]))
-    assert self.x < self.y
-    assert not self.x.chr.rc
+    assert self.x < self.y, f"{s} failed"
+    assert not self.x.chr.rc, f"{s} failed"
     self.cigar = []
   def __init__(self, h: Hit, anchor: Tuple[int, int, int]):
     self.x = Interval(h.x.chr, anchor[0], anchor[0] + anchor[2])

@@ -72,13 +72,16 @@ def save_sd(L, cur, chrs, result):
     chr1, chr2 = chrs[L.chr], chrs[cur.chr]
     complement = chr1.rc or chr2.rc
     coord = pad_sd(chrs, L.chr, L.first, L.last, cur.chr, L.ref, cur.loc)
-    result.setdefault(
-      (chr1.species, chr1.name, chr2.species, chr2.name, complement), []
-    ).append(Hit(
-        chr1, chr1.start + coord[0], chr1.start + coord[1],
-        chr2, chr2.start + coord[2], chr2.start + coord[3],
-        True
-    ))
+    overlap = (chr1.species, chr1.name) == (chr2.species, chr2.name) and not complement
+    overlap = overlap and (chr1.start + coord[0], chr1.start + coord[1]) == (chr2.start + coord[2], chr2.start + coord[3])
+    if not overlap:
+      result.setdefault(
+        (chr1.species, chr1.name, chr2.species, chr2.name, complement), []
+      ).append(Hit(
+          chr1, chr1.start + coord[0], chr1.start + coord[1],
+          chr2, chr2.start + coord[2], chr2.start + coord[3],
+          True
+      ))
   else:
     raise ValueError("reverse complemented intervals should not be here")
 

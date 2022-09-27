@@ -377,7 +377,8 @@ def main(argv):
         help="Keep temporary directory after the execution. Useful for debugging.",
     )
     parser.add_argument(
-        "--no-decomposition", action="store_true", help="Skip SD decomposition step."
+        "--no-decomposition", action="store_true",
+        default=False, help="Skip SD decomposition step."
     )
     parser.add_argument(
         "--max-error", type=float_range(0, 100), default=30, help="Maximum SD error."
