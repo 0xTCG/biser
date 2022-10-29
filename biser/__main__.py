@@ -426,12 +426,14 @@ def main(argv):
 
         genomes = {Path(path).stem: os.path.abspath(path) for path in args.genomes}
         with timing("BISER", force=True, indent=0):
-            Path(args.temp).mkdir(parents=True, exist_ok=True)
             if args.resume:
                 tmp = args.resume
                 args.keep_temp = True
-            else:
+            elif args.temp:
+                Path(args.temp).mkdir(parents=True, exist_ok=True)
                 tmp = tempfile.mkdtemp(prefix="biser.", dir=args.temp)
+            else:
+                tmp = tempfile.mkdtemp(prefix="biser.")
             Path(f"{tmp}/status").mkdir(exist_ok=True)
             print(
                 f'Running BISER v{__version__} on {len(genomes)} genome(s): {", ".join(genomes)}'
