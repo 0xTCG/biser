@@ -6,3 +6,6 @@ _*
 biser/seq/biser
 *.pyc
 biser.egg-info
+build/
+dist/
+temp/
