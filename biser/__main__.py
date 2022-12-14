@@ -43,7 +43,6 @@ def valid_chr(c):
 
 def run_biser(tmp, *args):
     root = os.path.dirname(__file__)
-    # root = '/home/vagrant/.pyenv/versions/3.7.13/lib/python3.7/site-packages/biser'
     path = f"{root}/exe/biser.exe"
     run_id = hashlib.md5(' '.join([path, *args]).encode('utf-8'))
     if tmp:

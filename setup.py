@@ -12,19 +12,21 @@ import subprocess
 
 class CustomBuild(build_py):
     def run(self):
-        def compile_seq():
+        def compile_codon():
             target_dir = os.path.join(self.build_lib, "biser/exe")
             self.mkpath(target_dir)
             env = os.environ.copy()
-            if shutil.which("seqc"):
-                env["SEQ_LIBRARY_PATH"] = (
-                    Path(os.path.dirname(shutil.which("seqc"))) / ".." / "lib" / "seq"
-                )
+            # if shutil.which("seqc"):
+            #     env["SEQ_LIBRARY_PATH"] = (
+            #         Path(os.path.dirname(shutil.which("seqc"))) / ".." / "lib" / "seq"
+            #     )
             subprocess.check_call(
                 [
-                    "seqc",
+                    "codon",
                     "build",
-                    "biser/seq/__init__.seq",
+                    "-plugin",
+                    "seq",
+                    "biser/codon/__init__.codon",
                     "-release",
                     "-o",
                     f"{target_dir}/biser.exe",
@@ -46,12 +48,11 @@ class CustomBuild(build_py):
                 subprocess.check_call(
                     ["patchelf", "--set-rpath", "$ORIGIN", f"{target_dir}/biser.exe"]
                 )
-            os.unlink(f"{target_dir}/biser.exe.o")
-            seqpath = Path(shutil.which("seqc")).parent
-            for lib in ["libseqrt", "libomp"]:
+            codon_path = Path(shutil.which("codon")).parent
+            for lib in ["libcodonrt", "libomp"]:
                 for p in [
-                    seqpath / f"{lib}.{ext}",
-                    seqpath / ".." / "lib" / "seq" / f"{lib}.{ext}",
+                    codon_path / f"{lib}.{ext}",
+                    codon_path / ".." / "lib" / "codon" / f"{lib}.{ext}",
                 ]:
                     print(p)
                     if os.path.exists(p):
@@ -59,7 +60,7 @@ class CustomBuild(build_py):
                         break
 
         if not self.dry_run:
-            compile_seq()
+            compile_codon()
         build_py.run(self)
 
 
