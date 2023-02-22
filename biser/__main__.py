@@ -51,7 +51,11 @@ def run_biser(tmp, *args):
         t = time.time()
         o = subprocess.run(
             [path, *args],
-            env={"OMP_NUM_THREADS": "1"},
+            env={
+                "OMP_NUM_THREADS": "1",
+                "GC_INITIAL_HEAP_SIZE": "512M", #str(32 * 1024 * 1024),
+                # "GC_LIMIT": str(8179869184), #str(32 * 1024 * 1024),
+            },
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -62,9 +66,10 @@ def run_biser(tmp, *args):
         # print([path, *args], o.returncode)
         if o.returncode != 0:
             err = "\n".join(l)
-            raise RuntimeError(f"BISER failed:\n{err}")
+            raise RuntimeError(f"BISER failed ({o.returncode}):\n{err}")
         if tmp:
-            Path.touch(Path(run_id))
+            with open(run_id, "w") as fo:
+                print("\n".join(l), file=fo)
         return t, l  # time, output
     else:
         # print(f'Ignoring cached run: {path}, args={args}')

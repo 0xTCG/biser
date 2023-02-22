@@ -12,6 +12,32 @@ GAPO = -40
 GAPE = -1
 
 
+class LinkedListNode[T]:
+  data: T
+  next: Optional[LinkedListNode[T]]
+
+
+class LinkedList[T]:
+  head: LinkedListNode[T]
+  tail: LinkedListNode[T]
+
+  def __init__(self, val: T):
+    self.head = LinkedListNode(val, None)
+    self.tail = self.head
+
+  def append(self, other: LinkedList[T]):
+    if not self.head:
+      self.head, self.tail = other.head, other.tail
+    else:
+      self.tail.next, self.tail = other.head, other.tail
+
+  def __iter__(self):
+    n = self.head
+    while n:
+      yield n.data
+      n = n.next
+
+
 class Chromosome:
   id: int
   species: str
@@ -56,11 +82,13 @@ class Hit:
   x: Interval
   y: Interval
   cigar: List[Tuple[int, str]]
+  merged: Optional[LinkedList[Hit]]
 
   def __init__(self, h: Hit):
     self.x = Interval(h.x.chr, h.x.start, h.x.end)
     self.y = Interval(h.y.chr, h.y.start, h.y.end)
     self.cigar = copy(h.cigar)
+    self.merged = h.merged
   def __init__(self, xch: Chromosome, xs, xe, ych: Chromosome, ys, ye, flip=False):
     self.x, self.y = Interval(xch, xs, xe), Interval(ych, ys, ye)
     if flip:
@@ -74,6 +102,7 @@ class Hit:
       self.cigar = Hit.align(xch[xs:xe], ych[ys:ye])[1]
     else:
       self.cigar = []
+    self.merged = None
   def __init__(self, s: str, chromosomes):
     l = s.strip().split('\t')
     sp = l[6].split(':')
@@ -82,14 +111,17 @@ class Hit:
     assert self.x < self.y, f"{s} failed"
     assert not self.x.chr.rc, f"{s} failed"
     self.cigar = []
+    self.merged = None
   def __init__(self, h: Hit, anchor: Tuple[int, int, int]):
     self.x = Interval(h.x.chr, anchor[0], anchor[0] + anchor[2])
     self.y = Interval(h.y.chr, anchor[1], anchor[1] + anchor[2])
     self.cigar = [(anchor[2], '=')]
+    self.merged = None
   def __init__(self, h: Hit, anchors: List[Hit], side = 0):
     self.x = Interval(h.x.chr, anchors[0].x.start, anchors[-1].x.end)
     self.y = Interval(h.y.chr, anchors[0].y.start, anchors[-1].y.end)
     self.cigar = []
+    self.merged = None
     prev = anchors[0]
     for a in anchors[1:]:
       if a.x.start < prev.x.end or a.y.start < prev.y.end:
@@ -316,7 +348,10 @@ class Hit:
     return s, c
 
   def merge(hits, dist):
+    print("Merging", len(hits), "items with dist=", dist)
     hits.sort(key=lambda h: (h.x.start, h.y.start))
+    for h in hits:
+      h.merged = LinkedList(Hit(h))
     y_sorted, y_hits = [], []
     ph = Hit()
     for hi, h in enumerate(hits):
@@ -339,6 +374,7 @@ class Hit:
               h.y.end = max(h.y.end, y_hits[s].y.end)
               h.x.start = min(h.x.start, y_hits[s].x.start)
               h.y.start = min(h.y.start, y_hits[s].y.start)
+              h.merged.append(y_hits[s].merged)
               del y_sorted[s], y_hits[s]
               update = True
             else:
