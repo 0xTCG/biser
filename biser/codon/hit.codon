@@ -18,8 +18,8 @@ class LinkedListNode[T]:
 
 
 class LinkedList[T]:
-  head: LinkedListNode[T]
-  tail: LinkedListNode[T]
+  head: Optional[LinkedListNode[T]]
+  tail: Optional[LinkedListNode[T]]
 
   def __init__(self, val: T):
     self.head = LinkedListNode(val, None)

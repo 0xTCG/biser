@@ -16,10 +16,6 @@ class CustomBuild(build_py):
             target_dir = os.path.join(self.build_lib, "biser/exe")
             self.mkpath(target_dir)
             env = os.environ.copy()
-            # if shutil.which("seqc"):
-            #     env["SEQ_LIBRARY_PATH"] = (
-            #         Path(os.path.dirname(shutil.which("seqc"))) / ".." / "lib" / "seq"
-            #     )
             subprocess.check_call(
                 [
                     "codon",
