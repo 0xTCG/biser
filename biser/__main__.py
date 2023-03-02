@@ -44,7 +44,7 @@ def valid_chr(c):
 def run_biser(tmp, *args):
     root = os.path.dirname(__file__)
     # path = f"{root}/exe/biser.exe"
-    path = "/Users/inumanag/Projekti/biser/build/lib/biser/exe/biser.exe"
+    path = "/home/inumanag/nvme/biser/biser.exe"
     run_id = hashlib.md5(' '.join([path, *args]).encode('utf-8'))
     if tmp:
         run_id = f"{tmp}/status/{args[0]}_{run_id.hexdigest()}"
@@ -54,7 +54,8 @@ def run_biser(tmp, *args):
             [path, *args],
             env={
                 "OMP_NUM_THREADS": "1",
-                # "GC_INITIAL_HEAP_SIZE": "512M", #str(32 * 1024 * 1024),
+                "LD_LIBRARY_PATH": "/nvme/inumanag/codon/install_release/lib/codon",
+                "GC_INITIAL_HEAP_SIZE": "1G", #str(32 * 1024 * 1024),
                 # "GC_LIMIT": str(8179869184), #str(32 * 1024 * 1024),
             },
             stdout=subprocess.PIPE,
@@ -497,7 +498,7 @@ def main(argv):
                 )
             else:
                 shutil.copy(final, args.output)
-                if not args.no_decompostion:
+                if not args.no_decomposition:
                     shutil.copy(f"{final}.elem.txt", f"{args.output}.elem.txt")
 
             if not args.keep_temp:

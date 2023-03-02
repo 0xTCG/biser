@@ -68,15 +68,10 @@ def main():
         else:
           genome, ch, ygenome, yints = args
           search.cross_search(genome, ch, ygenome, yints, result)
-
-      def rep(f):
-        kx = [f"{h.x.start}-{h.x.end}:{h.y.start}-{h.y.end}:{max(abs(h.x.start-h.x.end),abs(h.y.start-h.y.end))}" for h in f]
-        return len(kx), ';'.join(kx)
       with time.timing("Merging"), open(out, "w") as f:
         for r in result.values():
           for h in hit.Hit.merge(r, search.MERGE_DIST):
             print(h, file=f)
-            print(">>", h, "COMPONENTS", max(abs(h.x.start-h.x.end),abs(h.y.start-h.y.end)), rep(h.merged))
     case 'align':
       if len(args) < 2:
         raise ValueError("Invalid arguments")
@@ -93,21 +88,21 @@ def main():
             )
       with time.timing("Alignment"), open(args[-1]) as f, open(out, 'w') as fo:
         for lp in f:
-          t = time.time()
           h = hit.Hit(lp, chromosomes)
           span = max(abs(h.x.start-h.x.end),abs(h.y.start-h.y.end))
-          print(">>", datetime.datetime.now(), span, h)
+          ts = datetime.datetime.now()
+          max_iter = 500
           if span > 300_000:
-            print('##', lp.strip())
+            max_iter = 50
             continue
           anchors = list(align.generate_anchors(h))
           new_hits = []
           for ch in chain.chain(anchors):
             nh = hit.Hit(h, [hit.Hit(h, anchors[i]) for i in ch])
             new_hits.append(nh)
-          for nh in align.refine(h, new_hits):
+          for nh in align.refine(h, new_hits, max_iter):
             print(nh.__str__(True), file=fo)
-          print("<<", datetime.datetime.now(), h)
+          print("<<", datetime.datetime.now() - ts, span, h, sep="\t")
     case 'extract':
       if len(args) != 1:
         raise ValueError("Invalid arguments")
