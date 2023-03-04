@@ -63,11 +63,12 @@ def run_biser(tmp, *args):
         )
         t = time.time() - t
         l = ["[p] " + " ".join(o.args)]
+        N = 10
         l += [f"[o] {l}" for l in o.stdout.decode("ascii").strip().split("\n")]
         l += [f"[e] {l}" for l in o.stderr.decode("ascii").strip().split("\n")]
         # print([path, *args], o.returncode)
         if o.returncode != 0:
-            err = "\n".join(l)
+            err = "\n".join(l[-N:])
             raise RuntimeError(f"BISER failed ({o.returncode}):\n{err}")
         if tmp:
             with open(run_id, "w") as fo:
@@ -157,6 +158,8 @@ def align(tmp, genomes, threads, search, nbuckets=50):
                     hits[sp].append((span, l))
         for h in hits.values():
             h.sort()
+
+        nbuckets = max(threads * 2, nbuckets)
         buckets = {sp: [[] for _ in range(nbuckets)] for sp in genomes}
         total = 0
         for sp, hs in hits.items():
@@ -258,7 +261,7 @@ def cross_biser(tmp, genomes, threads, alignments, args):
                     hits.setdefault((sp1, sp2), []).append((span, l))
         for h in hits.values():
             h.sort()
-        nbuckets = 50
+        nbuckets = max(threads * 2, 50)
         buckets = {sp: [[] for _ in range(nbuckets)] for sp in hits}
         for sp, hs in hits.items():
             for i, (_, h) in enumerate(hs):

@@ -348,6 +348,15 @@ class Hit:
     return s, c
 
   def merge(hits, dist):
+    def _y(ht):
+      for h in ht:
+        if h.x == h.y:  # special case: merge just squashes everything
+          if h.span() > 1_000:
+            hl = Hit(h)
+            hl.y.start += 1_000
+            yield hl
+        else:
+          yield h
     print("Merging", len(hits), "items with dist=", dist)
     hits.sort(key=lambda h: (h.x.start, h.y.start))
     # for h in hits:
@@ -358,7 +367,7 @@ class Hit:
       if h.x == h.y:
         continue
       if hi == 0 or ph.x.end + dist < h.x.start:
-        yield from y_hits
+        yield from _y(y_hits)
         y_sorted, y_hits = [h.y.end], [Hit(h)]
       else:
         while True:
@@ -386,4 +395,4 @@ class Hit:
         y_hits.insert(i, Hit(h))
       h.x.end = max(h.x.end, ph.x.end)
       ph = Hit(h)
-    yield from y_hits
+    yield from _y(y_hits)

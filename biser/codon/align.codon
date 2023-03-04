@@ -43,7 +43,7 @@ def refine(orig_h, hits, max_iter=500):
   dp, prev = [0.0] * len(hits), [-1] * len(hits)
   maxes = []
 
-  with timing('[refine] Chain'):
+  with timing('[refine] Refine'):
     for ai, a in enumerate(hits):
       if orig_h.same_chr():
         qo = min(a.x.end, a.y.end) - max(a.x.start, a.y.start)
