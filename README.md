@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/320/emojipedia/181/oyster_1f9aa.png" height=100 />
+  <img src="https://em-content.zobj.net/thumbs/240/twitter/348/oyster_1f9aa.png" height=100 />
 </p>
 
 # BISER
@@ -19,11 +19,14 @@ pip install biser
 ```
 
 If you wish to build BISER from source, you will also need
-[Seq programming language](https://docs.seq-lang.org/intro.html#install).
+[Codon programming language](https://github.com/exaloop/codon/)
+with the [Seq plugin](https://github.com/exaloop/seq).
 To install BISER from source, run:
 ```bash
 pip install git+https://github.com/0xTCG/biser.git
 ```
+
+> See [Dockerfile](Dockerfile) for detailed instructions to build BISER from source.
 
 ## Usage
 ### Single genome
