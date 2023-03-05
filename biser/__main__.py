@@ -41,10 +41,12 @@ def valid_chr(c):
     return "_" not in c and c != "chrM"
 
 
+env = {"OMP_NUM_THREADS": "1"}
+
+
 def run_biser(tmp, *args):
     root = os.path.dirname(__file__)
-    # path = f"{root}/exe/biser.exe"
-    path = "/home/inumanag/nvme/biser/biser.exe"
+    path = f"{root}/exe/biser.exe"
     run_id = hashlib.md5(' '.join([path, *args]).encode('utf-8'))
     if tmp:
         run_id = f"{tmp}/status/{args[0]}_{run_id.hexdigest()}"
@@ -52,12 +54,7 @@ def run_biser(tmp, *args):
         t = time.time()
         o = subprocess.run(
             [path, *args],
-            env={
-                "OMP_NUM_THREADS": "1",
-                "LD_LIBRARY_PATH": "/nvme/inumanag/codon/install_release/lib/codon",
-                "GC_INITIAL_HEAP_SIZE": "1G", #str(32 * 1024 * 1024),
-                # "GC_LIMIT": str(8179869184), #str(32 * 1024 * 1024),
-            },
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -428,10 +425,24 @@ def main(argv):
     parser.add_argument(
         "--version", "-v", action="version", version=f"%(prog)s v{__version__}"
     )
+    parser.add_argument(
+        "--ld-path",
+        default=None,
+        help="Override LD_LIBRARY_PATH (debug use only).",
+    )
+    parser.add_argument(
+        "--gc-heap",
+        default=None,
+        help="Set GC_INITIAL_HEAP_SIZE.",
+    )
     args = parser.parse_args(argv)
 
     try:
         threads = args.threads
+        if args.gc_heap:
+            env["GC_INITIAL_HEAP_SIZE"] = args.gc_heap
+        if args.ld_path:
+            env["LD_LIBRARY_PATH"] = args.ld_path
 
         genomes = {Path(path).stem: os.path.abspath(path) for path in args.genomes}
         with timing("BISER", force=True, indent=0):
