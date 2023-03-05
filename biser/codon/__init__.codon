@@ -16,7 +16,7 @@ from search import MAX_ERROR, MAX_EDIT_ERROR, MERGE_DIST, MAX_EXTEND, KMER_SIZE,
 
 
 def help():
-  print('BISER v1.0')
+  print('BISER v1.4')
   print('Usage: biser [search|align|extract|cluster|decompose] -o [output]')
   sys.exit(0)
 
