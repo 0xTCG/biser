@@ -26,7 +26,7 @@ RUN cmake3 --install /github/llvm-src/llvm/build
 # RUN tar xf /opt/llvm-codon-55b0b8fa1.tar.bz2 -C /opt
 
 # Step 2: build Codon & Seq
-RUN git clone -b pyext https://github.com/exaloop/codon /github/codon
+RUN git clone -b develop https://github.com/exaloop/codon /github/codon
 RUN cmake3 -S /github/codon -B /github/codon/build \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -52,7 +52,7 @@ RUN cmake3 --install /github/seq/build
 # RUN cd /github/codon && tar cjvf /opt/codon-$(git rev-parse --short HEAD).tar.bz2 -C /opt codon/
 # RUN cp /opt/codon-*.tar.bz2 /mnt/
 
-RUN git clone -b codon https://github.com/0xTCG/biser /github/biser
+RUN git clone -b master https://github.com/0xTCG/biser /github/biser
 RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install --upgrade twine setuptools wheel
 RUN cd /github/biser && PATH=/opt/codon/bin:${PATH} python3 setup.py sdist bdist_wheel -p manylinux2014-x86_64
