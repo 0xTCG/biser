@@ -53,7 +53,7 @@ All genomes should be indexed beforehand with `samtools faidx genome.fa`.
 
 To find SDs in multiple genomes, just run:
 ```bash
-biser -o <output> -j <jobs> <genome1.fa> <genome2.fa> ...
+biser -o <output> -t <threads> <genome1.fa> <genome2.fa> ...
 ```
 
 ### Other options
