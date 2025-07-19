@@ -41,10 +41,9 @@ decomposition of the found SDs.
 
 All genomes should be indexed beforehand with `samtools faidx genome.fa`.
 
-> ⚠️: BISER requires a soft-masked or a hard-masked genome assemblies for
-> the optimal performance.
-> Check for the presence of lowercase bases in your genome; if you have them,
-> you are good to go.
+> ⚠️: BISER requires a soft-masked genome or assemblies for the optimal performance.
+> Check for the presence of lowercase bases in your genome; if you have them, you are good to go.
+> Hard-masked genomes (with Ns) might be problematic.
 
 > ⚠️: If you are experiences crashes on Linux machines (especially in cluster environments),
 > try setting --gc-heap 1G (or higher).
