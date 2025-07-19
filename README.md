@@ -167,4 +167,8 @@ Paper simulations are available in [paper](paper/) directory.
 
 ## Contact
 
-Please reach out to [Ibrahim Numanagić](mailto:inumanag_at_uvic_dot_ca).
+Please reach out to [Ibrahim Numanagić](mailto:inumanag_at_uvic_dot_ca)
+or open a [GitHub issue](https://github.com/0xTCG/biser/issues).
+
+If you have an urgent problem, I suggest using e-mail. 
+GitHub issues are not constantly monitored.
