@@ -46,7 +46,7 @@ All genomes should be indexed beforehand with `samtools faidx genome.fa`.
 > Hard-masked genomes (with Ns) might be problematic.
 
 > ⚠️: If you are experiences crashes on Linux machines (especially in cluster environments),
-> try setting --gc-heap 1G (or higher).
+> try setting --gc-heap 1G (or higher). Also, see https://github.com/0xTCG/biser/issues/32 for more remedies.
 
 ### Multiple genomes
 
